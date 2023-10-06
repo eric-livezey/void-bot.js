@@ -413,6 +413,9 @@ declare class Playlist {
     listItems(): Promise<PlaylistItem[]>;
 }
 
+/**
+ * A search result contains information about a YouTube video, channel, or playlist that matches the search parameters specified in an API request. While a search result points to a uniquely identifiable resource, like a video, it does not have its own persistent data.
+ */
 declare class SearchResult {
     /**
      * Identifies the API resource's type. The value will be `youtube#searchResult`.
@@ -467,6 +470,9 @@ declare class SearchResult {
     readonly liveBroadcastContent: "live" | "upcoming" | "none";
 }
 
+/**
+ * A search list response contains information from the response to a search query.
+ */
 declare class SearchListResponse {
     /**
      * Identifies the API resource's type. The value will be `youtube#searchListResponse`.

@@ -1,10 +1,9 @@
 import { AudioPlayer, AudioPlayerStatus, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
 import { readFileSync, readdirSync, writeFileSync } from "fs";
-import * as Playlists from "./innertube/playlists.js";
 import { Duration, now } from "./innertube/utils.js";
 import * as Videos from "./innertube/videos.js";
-import { listSearchResults } from "./innertube/index.js";
+import { getPlaylist, listSearchResults } from "./innertube/index.js";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
@@ -251,8 +250,8 @@ class Track {
 async function playPlaylist(player, listId) {
     return new Promise(async (resolve) => {
         // Get the playlist by id
-        var playlist = await Playlists.get(listId);
-        if (playlist == "ERROR") {
+        var playlist = await getPlaylist(listId);
+        if (playlist === null) {
             resolve("That is not a valid YouTube playlist link.");
             return;
         };
@@ -294,10 +293,10 @@ async function playPlaylist(player, listId) {
         resolve({
             content: "**Added " + totalAdded + " tracks to the queue:**",
             embeds: [new EmbedBuilder()
-                .setTitle(playlist.snippet.title)
+                .setTitle(playlist.title)
                 .setURL("https://www.youtube.com/playlist?list=" + listId)
-                .setThumbnail(playlist.snippet.thumbnails.maxres ? playlist.snippet.thumbnails.maxres.url : playlist.snippet.thumbnails.high.url)
-                .setAuthor({ name: playlist.snippet.channelTitle, url: playlist.snippet.channelId ? "https://www.youtube.com/channel/" + playlist.snippet.channelId : undefined }).data]
+                .setThumbnail(playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url)
+                .setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined }).data]
         });
     })
 }
