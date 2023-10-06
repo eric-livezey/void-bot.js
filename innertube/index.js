@@ -1,5 +1,3 @@
-import { writeFileSync } from "fs";
-
 const CLIENTS = {
     youtube: { id: 1, name: "WEB", version: "2.20230914.04.00" }
 }
@@ -31,7 +29,7 @@ async function request(path, body) {
 
 async function getPlayerId(videoId) {
     const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
-    const startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
+    var startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
     return html.substring(startIndex, html.indexOf("/", startIndex));
 }
 
@@ -569,84 +567,71 @@ class SearchResult {
 }
 
 class SearchListResponse {
-    /**
-     * Identifies the API resource's type. The value will be `youtube#searchListResponse`.
-     * @type {"youtube#searchListResponse"}
-     */
-    kind;
-    /**
-     * The token that can be used as the value of the `pageToken` parameter to retrieve the next page in the result set.
-     */
-    nextPageToken;
-    /**
-     * The token that can be used as the value of the `pageToken` parameter to retrieve the previous page in the result set.
-     */
-    prevPageToken;
-    /**
-     * The region code that was used for the search query. The property value is a two-letter ISO country code that identifies the region. The default value is `US`.
-     * @type {"US"}
-     */
-    regionCode;
-    /**
-     * The `pageInfo` object encapsulates paging information for the result set.
-     */
-    pageInfo;
-    /**
-     * A list of results that match the search criteria.
-     */
-    items;
-    /**
-     * @param {import("./innertube-types.js").RawSearchResponse} data 
-     */
+    #kind;
+    #nextPageToken;
+    #regionCode;
+    #pageInfo;
+    #items;
+
     constructor(data) {
-        this.kind = "youtube#searchListResponse";
-        this.nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
-        this.regionCode = "US";
-        this.pageInfo = {
-            /**
-             * The total number of results in the result set.Please note that the value is an approximation and may not represent an exact value. In addition, the maximum value is 1,000,000.
-             * 
-             * You should not use this value to create pagination links. Instead, use the `nextPageToken` and `prevPageToken` property values to determine whether to show pagination links.
-             */
+        this.#kind = "youtube#searchListResponse";
+        this.#nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        this.#regionCode = "US";
+        this.#pageInfo = {
             totalResults: Number(data.estimatedResults),
-            /**
-             * The number of results included in the API response.
-             */
             resultsPerPage: null
         };
         const items = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents
             .find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
             .map((value) => new SearchResult(value));
-        this.items = items ? items : [];
+        this.#items = items ? items : [];
     }
 
     async next() {
-        if (!this.nextPageToken) {
+        if (!this.#nextPageToken) {
             return null;
         }
         const response = await request("/search", {
-            continuation: this.nextPageToken
+            continuation: this.#nextPageToken
         })
-        /**
-         * @type {import("./innertube-types.js").RawSearchResponse}
-         */
         const data = await (response.json());
         const continuationItems = data.onResponseReceivedCommands?.find((value) => value.appendContinuationItemsAction)?.appendContinuationItemsAction.continuationItems
-        this.nextPageToken = continuationItems.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        this.#nextPageToken = continuationItems.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         const newItems = continuationItems.find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
             .map((value) => new SearchResult(value));
-        this.items = this.items.concat(newItems);
+        this.#items = this.#items.concat(newItems);
         return newItems;
     }
+
+    get kind() {
+        return this.#kind;
+    };
+    get nextPageToken() {
+        return this.#nextPageToken;
+    };
+    get regionCode() {
+        return this.#regionCode;
+    };
+    get pageInfo() {
+        return this.#pageInfo;
+    };
+    get items() {
+        return this.#items;
+    };
+
+    toJSON() {
+        return {
+            kind: this.kind,
+            nextPageToken: this.nextPageToken,
+            regionCode: this.regionCode,
+            pageInfo: this.pageInfo,
+            items: this.#items
+        }
+    };
 }
 
-/**
- * Gets the {@link Video} resource for the specified id.
- * @param {string} id 
- * @returns The {@link Video} resource corresponding to the specified id.
- */
 async function getVideo(id) {
     const js = await getJs(await getPlayerId(id));
     const response = await request("/player", {
@@ -662,15 +647,10 @@ async function getVideo(id) {
     if (response.status != 200) {
         return null;
     } else {
-        return new Video(js, await response.json());
+        return new Video(await response.json(), js);
     }
 }
 
-/**
- * 
- * @param {string} id 
- * @returns 
- */
 async function getPlaylist(id) {
     const response = await request("/browse", { browseId: "VL" + id });
     if (response.status != 200) {
@@ -680,11 +660,6 @@ async function getPlaylist(id) {
     }
 }
 
-/**
- * Returns a collection of search results that match the query parameters specified in the API request. By default, a search result set identifies matching {@link Video `video`}, `channel`, and `playlist` resources, but you can also configure queries to only retrieve a specific type of resource.
- * @param {string} q The q parameter specifies the query term to search for.
- * @param {"video" | "channel" | "playlist" | undefined} type The type parameter restricts a search query to only retrieve a particular type of resource. The value is a comma-separated list of resource types. The default value is `video,channel,playlist`.
- */
 async function listSearchResults(q, type) {
     const response = await request("/search", {
         query: q,
@@ -698,7 +673,6 @@ async function listSearchResults(q, type) {
 }
 
 export {
-    Playlist,
     getVideo,
     getPlaylist,
     listSearchResults
