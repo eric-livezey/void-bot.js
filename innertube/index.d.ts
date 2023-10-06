@@ -503,21 +503,23 @@ declare class SearchListResponse {
 
 /**
  * Returns the video with the matching ID.
- * @param id The `id` parameter specifies a YouTube video ID for the resource that is being retrieved. In a `video` resource, the `id` property specifies the video's ID.
+ * 
+ * @param id Specifies a YouTube video ID for the resource that is being retrieved. In a `video` resource, the `id` property specifies the video's ID.
  */
 declare function getVideo(id: string): Promise<Video | null>;
 
 /**
  * Returns the playlist with the matching ID.
- * @param id The `id` parameter specifies a YouTube playlist ID for the resource that is being retrieved. In a `playlist` resource, the id property specifies the playlist's YouTube playlist ID.
+ * 
+ * @param id Specifies a YouTube playlist ID for the resource that is being retrieved. In a `playlist` resource, the id property specifies the playlist's YouTube playlist ID.
  */
 declare function getPlaylist(id: string): Promise<Playlist | null>;
 
 /**
  * Returns a collection of search results that match the query parameters specified in the API request. By default, a search result set identifies matching `video`, `channel`, and `playlist` resources, but you can also configure queries to only retrieve a specific type of resource.
-
- * @param q The `q` parameter specifies the query term to search for.
- * @param type The `type` parameter restricts a search query to only retrieve a particular type of resource.
+ * 
+ * @param q Specifies the query term to search for.
+ * @param type Restricts the search query to only retrieve a particular type of resource.
  */
 declare function listSearchResults(q: string, type: "video" | "channel" | "playlist"): Promise<SearchListResponse | null>;
 
