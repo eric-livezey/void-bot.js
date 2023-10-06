@@ -18,11 +18,8 @@ async function request(path, body) {
     }
     return await fetch(`https://www.youtube.com/youtubei/v1${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false`, {
         headers: {
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "cache-control": "no-cache",
             "content-type": "application/json",
-            "pragma": "no-cache",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
             "x-youtube-bootstrap-logged-in": "false",
             "x-youtube-client-name": CLIENTS.youtube.id,
             "x-youtube-client-version": CLIENTS.youtube.version
