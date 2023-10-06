@@ -1,5 +1,5 @@
 import { IncomingHttpHeaders } from "http";
-import { Duration } from "../../innertube/utils";
+import { Duration } from "./utils";
 
 /**
  * A `video` resource represents a YouTube video.
