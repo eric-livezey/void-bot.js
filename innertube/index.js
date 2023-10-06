@@ -360,17 +360,13 @@ class Playlist {
 
     constructor(data) {
         this.#kind = "youtube#playlist";
-        this.id = data.header?.playlistHeaderRenderer.playlistId;
+        this.#id = data.header?.playlistHeaderRenderer.playlistId;
         this.#channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
         this.#title = data.header?.playlistHeaderRenderer.title.simpleText;
         this.#description = data.header?.playlistHeaderRenderer.description;
         this.#thumbnails = data.header ? ((thumbnailData) => {
-            var album = false;
-            if (new URL(thumbnailData[0].url).searchParams.has("v")) {
-                album = true;
-            }
             const thumbnails = {};
-            if (!album) {
+            if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
                 const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
                 thumbnails.default = {
                     url: url.replace("hqdefault.jpg", "default.jpg"),
