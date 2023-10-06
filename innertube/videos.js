@@ -1,5 +1,4 @@
-import { readFileSync, readdirSync, writeFileSync } from "fs";
-import { Duration, download, httpsRequest, requestAPI, requestMusicAPI } from "../../innertube/utils.js";
+import { Duration, download, httpsRequest, requestAPI, requestMusicAPI } from "./utils.js";
 
 const JS_CACHE = {};
 
@@ -240,7 +239,7 @@ export async function get(id) {
 }
 
 export async function getMusicSearchSuggestions(q) {
-    const res = (await requestMusicAPI("music/get_search_suggestions", {input: q})).body;
+    const res = (await requestMusicAPI("music/get_search_suggestions", { input: q })).body;
     if (!res.contents) {
         return [];
     }
