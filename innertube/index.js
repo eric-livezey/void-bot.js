@@ -71,12 +71,7 @@ export class Video {
     #fileDetails;
     #liveStreamingDetails;
 
-    /**
-     * 
-     * @param {{}} js 
-     * @param {import("./innertube-types.js").RawPlayerData} data 
-     */
-    constructor(js, data) {
+    constructor(data, js) {
         this.#kind = "youtube#video";
         this.#id = data.videoDetails?.videoId;
         this.#publishedAt = data.microformat ? new Date(data.microformat.playerMicroformatRenderer.publishDate) : undefined;
@@ -131,21 +126,18 @@ export class Video {
             },
             ageRestricted: data.playabilityStatus?.reason == "Sign in to confirm your age",
             projection: data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase(),
-        }
+        };
         this.#status = {
             uploadStatus: data.playabilityStatus?.reason == "We're processing this video. Check back later." ? "uploaded" : "processed",
             privacyStatus: data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] == "This is a private video. Please sign in to verify that you may see it." ? "private" : "public",
             embeddable: data.playabilityStatus?.playableInEmbed,
-        }
+        };
         this.#statistics = {
-            viewCount: data.videoDetails?.viewCount,
-            likeCount: null,
-            dislikeCount: null,
-            commentCount: null
-        }
+            viewCount: Number(data.videoDetails?.viewCount),
+        };
         this.#player = {
             embedHtml: data.microformat ? `\u003ciframe width=\"${data.microformat.playerMicroformatRenderer.embed.width}\" height=\"${data.microformat.playerMicroformatRenderer.embed.height}\" src=\"${data.microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e` : undefined
-        }
+        };
         this.#fileDetails = {
             videoStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("video") && value).map((value) => {
                 return {
@@ -169,12 +161,12 @@ export class Video {
             durationMs: data.streamingData?.adaptiveFormats[0].approxDurationMs,
             dashManifestUrl: data.streamingData?.dashManifestUrl,
             hlsManifestUrl: data.streamingData?.hlsManifestUrl
-        }
+        };
         this.#liveStreamingDetails = data.microformat?.playerMicroformatRenderer.liveBroadcastDetails ? {
             actualStartTime: new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.startTimestamp),
             actualEndTime: data.microformat.playerMicroformatRenderer.liveBroadcastDetails.endTimestamp ? new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.endTimestamp) : undefined,
-        } : undefined
-    }
+        } : undefined;
+    };
 
     get kind() {
         return this.#kind;
@@ -220,202 +212,161 @@ export class Video {
     };
     get player() {
         return this.#player;
-    }
+    };
     get fileDetails() {
         return this.#fileDetails;
     };
     get liveStreamingDetails() {
         return this.#liveStreamingDetails;
     };
+
+    toJSON() {
+        return {
+            kind: this.kind,
+            id: this.id,
+            publishedAt: this.publishedAt,
+            channelId: this.channelId,
+            title: this.title,
+            description: this.description,
+            thumbnails: this.thumbnails,
+            channelTitle: this.channelTitle,
+            tags: this.tags,
+            category: this.category,
+            liveBroadcastContent: this.liveBroadcastContent,
+            contentDetails: this.contentDetails,
+            status: this.status,
+            statistics: this.statistics,
+            player: this.player,
+            fileDetails: this.fileDetails,
+            liveStreamingDetails: this.liveStreamingDetails
+        }
+    };
 }
 
-class SearchResult {
-    /**
-     * Identifies the API resource's type. The value will be `youtube#searchResult`.
-     * @type {"youtube#searchResult"}
-     */
-    kind;
-    /**
-     * The `id` object contains information that can be used to uniquely identify the resource that matches the search request.
-     */
-    id;
-    /**
-     * The value that YouTube uses to uniquely identify the channel that published the resource that the search result identifies.
-     */
-    channelId;
-    /**
-     * The title of the search result.
-     */
-    title;
-    /**
-     * A description of the search result.
-     */
-    description;
-    /**
-     * A map of thumbnail images associated with the search result. For each object in the map, the key is the name of the thumbnail image, and the value is an object that contains other information about the thumbnail.
-     */
-    thumbnails;
-    /**
-     * The title of the channel that published the resource that the search result identifies.
-     */
-    channelTitle;
-    /**
-     * An indication of whether a `video` or `channel` resource has live broadcast content. Valid property values are `upcoming`, `live`, and `none`.
-     * 
-     * For a `video` resource, a value of `upcoming` indicates that the video is a live broadcast that has not yet started, while a value of `live` indicates that the video is an active live broadcast. For a channel resource, a value of `upcoming` indicates that the channel has a scheduled broadcast that has not yet started, while a value of `live` indicates that the channel has an active live broadcast.
-     * @type {"upcoming" | "live" | "none"}
-     */
-    liveBroadcastContent;
+class PlaylistItem {
+    #kind;
+    #id;
+    #title;
+    #thumbnails;
+    #videoOwnerChannelTitle;
+    #playlistId;
+    #position;
+    #resourceId;
+    #contentDetails;
+    #status;
 
-    /**
-     * 
-     * @param {import("./innertube-types.js").RawSearchResultData} data 
-     */
     constructor(data) {
-        this.kind = "youtube#searchResult";
-        const videoData = data.videoRenderer;
-        const channelData = data.channelRenderer;
-        const playlistData = data.playlistRenderer
-        this.id = {
-            /**
-             * The type of the API resource.
-             * @type {"youtube#video" | "youtube#channel" | "youtube#playlist"}
-             */
-            kind: videoData ? "youtube#video" : channelData ? "youtube#channel" : "youtube#playlist",
-            /**
-             * If the `id.type` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
-             */
-            videoId: videoData?.videoId,
-            /**
-             * If the `id.type` property's value is `youtube#channel`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
-             */
-            channelId: channelData?.channelId,
-            /**
-             * If the `id.type` property's value is `youtube#playlist`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
-             */
-            playlistId: playlistData?.playlistId
-        };
-        this.channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-        this.title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
-        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
-        this.thumbnails = {
-            /**
-             * The default thumbnail image. The default thumbnail for a video – or a resource that refers to a video, such as a playlist item or search result – is 120px wide and 90px tall. The default thumbnail for a channel is 88px wide and 88px tall.
-             */
+        this.#kind = "youtube#playlistItem";
+        this.#id = data.videoId;
+        this.#title = data.title.runs.map((value) => value.text).join();
+        this.#thumbnails = {
             default: {
-                /**
-                 * The image's URL.
-                 */
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
-                /**
-                 * The image's width.
-                 */
-                width: videoData || playlistData ? 120 : 88,
-                /**
-                 * The image's height.
-                 */
-                height: videoData || playlistData ? 90 : 88
+                url: `https://i.ytimg.com/vi/${this.#id}/default.jpg`,
+                width: 120,
+                height: 90
             },
-            /**
-             * A higher resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 320px wide and 180px tall. For a channel, this image is 240px wide and 240px tall.
-             */
             medium: {
-                /**
-                 * The image's URL.
-                 */
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/mqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
-                /**
-                 * The image's width.
-                 */
-                width: videoData || playlistData ? 320 : 240,
-                /**
-                 * The image's height.
-                 */
-                height: videoData || playlistData ? 180 : 240
+                url: `https://i.ytimg.com/vi/${this.#id}/mqdefault.jpg`,
+                width: 320,
+                height: 180
             },
-            /**
-             * A high resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 480px wide and 360px tall. For a channel, this image is 800px wide and 800px tall.
-             */
             high: {
-                /**
-                 * The image's URL.
-                 */
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/hqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
-                /**
-                 * The image's width.
-                 */
-                width: videoData || playlistData ? 480 : 800,
-                /**
-                 * The image's height.
-                 */
-                height: videoData || playlistData ? 360 : 800
+                url: `https://i.ytimg.com/vi/${this.#id}/hqdefault.jpg`,
+                width: 480,
+                height: 360
             },
-            /**
-             * An even higher resolution version of the thumbnail image than the high resolution image. This image is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 640px wide and 480px tall.
-             */
-            standard: videoData || playlistData ? {
-                /**
-                 * The image's URL.
-                 */
-                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/sddefault.jpg`,
-                /**
-                 * The image's width.
-                 */
+            standard: {
+                url: `https://i.ytimg.com/vi/${this.#id}/sddefault.jpg`,
                 width: 640,
-                /**
-                 * The image's height.
-                 */
                 height: 480
-            } : undefined,
-            /**
-             * The highest resolution version of the thumbnail image. This image size is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 1280px wide and 720px tall.
-             */
-            maxres: videoData || playlistData ? {
-                /**
-                 * The image's URL.
-                 */
-                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/maxresdefault.jpg`,
-                /**
-                 * The image's width.
-                 */
+            },
+            maxres: {
+                url: `https://i.ytimg.com/vi/${this.#id}/maxresdefault.jpg`,
                 width: 1280,
-                /**
-                 * The image's height.
-                 */
                 height: 720
-            } : undefined
+            }
+        };
+        this.#videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
+        this.#playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
+        this.#position = Number(data.index.simpleText);
+        this.#resourceId = {
+            kind: "youtube#video",
+            videoId: this.#id
+        };
+        this.#contentDetails = {
+            videoId: this.#id
+        };
+        this.#status = {
+            privacyStatus: "public"
+        };
+    };
+
+    get kind() {
+        return this.#kind;
+    };
+    get id() {
+        return this.#id;
+    };
+    get title() {
+        return this.#title;
+    };
+    get thumbnails() {
+        return this.#thumbnails;
+    };
+    get videoOwnerChannelTitle() {
+        return this.#videoOwnerChannelTitle;
+    };
+    get playlistId() {
+        return this.#playlistId;
+    };
+    get position() {
+        return this.#position;
+    };
+    get resourceId() {
+        return this.#resourceId;
+    };
+    get contentDetails() {
+        return this.#contentDetails;
+    };
+    get status() {
+        return this.#status;
+    };
+
+    toJSON() {
+        return {
+            kind: this.kind,
+            id: this.id,
+            title: this.title,
+            thumbnails: this.thumbnails,
+            videoOwnerChannelTitle: this.videoOwnerChannelTitle,
+            playlistId: this.playlistId,
+            position: this.position,
+            resourceId: this.resourceId,
+            contentDetails: this.contentDetails,
+            status: this.status
         }
-        this.channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.title : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label == "LIVE") ? "live" : "none";
-    }
+    };
 }
 
 class Playlist {
-    /**
-     * Identifies the API resource's type. The value will be `youtube#playlist`.
-     * @type {"youtube#playlist"}
-     */
-    kind;
-    id;
-    channelId;
-    title;
-    description;
-    thumbnails;
-    channelTitle;
-    status;
-    contentDetails;
-    contents;
+    #kind;
+    #id;
+    #channelId;
+    #title;
+    #description;
+    #thumbnails;
+    #channelTitle;
+    #status;
+    #contentDetails;
+    #contents;
 
-    /**
-     * @param {import("./innertube-types.js").RawBrowseResponse} data 
-     */
     constructor(data) {
-        this.kind = "youtube#playlist";
+        this.#kind = "youtube#playlist";
         this.id = data.header?.playlistHeaderRenderer.playlistId;
-        this.channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
-        this.title = data.header?.playlistHeaderRenderer.title.simpleText;
-        this.description = data.header?.playlistHeaderRenderer.description;
-        this.thumbnails = data.header ? ((thumbnailData) => {
+        this.#channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
+        this.#title = data.header?.playlistHeaderRenderer.title.simpleText;
+        this.#description = data.header?.playlistHeaderRenderer.description;
+        this.#thumbnails = data.header ? ((thumbnailData) => {
             var album = false;
             if (new URL(thumbnailData[0].url).searchParams.has("v")) {
                 album = true;
@@ -423,89 +374,29 @@ class Playlist {
             const thumbnails = {};
             if (!album) {
                 const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
-                /**
-                 * The default thumbnail image. The default thumbnail for a video – or a resource that refers to a video, such as a playlist item or search result – is 120px wide and 90px tall. The default thumbnail for a channel is 88px wide and 88px tall.
-                 */
                 thumbnails.default = {
-                    /**
-                     * The image's URL.
-                     */
                     url: url.replace("hqdefault.jpg", "default.jpg"),
-                    /**
-                     * The image's width.
-                     */
                     width: 120,
-                    /**
-                     * The image's height.
-                     */
                     height: 90
                 }
-                /**
-                 * A higher resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 320px wide and 180px tall. For a channel, this image is 240px wide and 240px tall.
-                 */
                 thumbnails.medium = {
-                    /**
-                     * The image's URL.
-                     */
                     url: url.replace("hqdefault.jpg", "mqdefault.jpg"),
-                    /**
-                     * The image's width.
-                     */
                     width: 320,
-                    /**
-                     * The image's height.
-                     */
                     height: 180
                 }
-                /**
-                 * A high resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 480px wide and 360px tall. For a channel, this image is 800px wide and 800px tall.
-                 */
                 thumbnails.high = {
-                    /**
-                     * The image's URL.
-                     */
                     url: url,
-                    /**
-                     * The image's width.
-                     */
                     width: 480,
-                    /**
-                     * The image's height.
-                     */
                     height: 360
                 }
-                /**
-                 * An even higher resolution version of the thumbnail image than the high resolution image. This image is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 640px wide and 480px tall.
-                 */
                 thumbnails.standard = {
-                    /**
-                     * The image's URL.
-                     */
                     url: url.replace("hqdefault.jpg", "sddefault.jpg"),
-                    /**
-                     * The image's width.
-                     */
                     width: 640,
-                    /**
-                     * The image's height.
-                     */
                     height: 480
                 }
-                /**
-                 * The highest resolution version of the thumbnail image. This image size is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 1280px wide and 720px tall.
-                 */
                 thumbnails.maxres = {
-                    /**
-                     * The image's URL.
-                     */
                     url: url.replace("hqdefault.jpg", "maxresdefault.jpg"),
-                    /**
-                     * The image's width.
-                     */
                     width: 1280,
-                    /**
-                     * The image's height.
-                     */
                     height: 720
                 }
             } else {
@@ -515,46 +406,73 @@ class Playlist {
             }
             return thumbnails;
         })(data.header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails) : undefined;
-        this.channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
-        this.status = {
-            /**
-             * The playlist's privacy status.
-             * 
-             * Valid values for this property are:
-             * - `private`
-             * - `public`
-             * - `unlisted`
-             * @type {"private" | "public" | "unlisted"}
-             */
+        this.#channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
+        this.#status = {
             privacyStatus: data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private"
         }
-        this.contentDetails = {
-            /**
-             * The number of videos in the playlist.
-             */
+        this.#contentDetails = {
             itemCount: data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text) : undefined
         }
-        this.contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
+        this.#contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
     }
 
     async listItems() {
-        if (!this.contents) {
+        if (!this.#contents) {
             return [];
         }
-        var contents = this.contents;
+        var contents = this.#contents;
         var items = contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer));
-        var continuation = this.contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        var continuation = this.#contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         while (continuation) {
-            /**
-             * @type {import("./innertube-types.js").RawBrowseContinuationResponse}
-             */
             const data = await (await request("/browse", { continuation: continuation })).json();
             contents = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems;
             items = items.concat(contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer)));
             continuation = contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         }
         return items;
-    }
+    };
+
+    get kind() {
+        return this.#kind;
+    };
+    get id() {
+        return this.#id;
+    };
+    get channelId() {
+        return this.#channelId;
+    };
+    get title() {
+        return this.#title;
+    };
+    get description() {
+        return this.#description;
+    };
+    get thumbnails() {
+        return this.#thumbnails;
+    };
+    get channelTitle() {
+        return this.#channelTitle;
+    };
+    get status() {
+        return this.#status;
+    };
+    get contentDetails() {
+        return this.#contentDetails;
+    };
+
+    toJSON() {
+        return {
+            kind: this.kind,
+            id: this.id,
+            channelId: this.channelId,
+            title: this.title,
+            description: this.description,
+            thumbnails: this.thumbnails,
+            channelTitle: this.channelTitle,
+            status: this.status,
+            contentDetails: this.contentDetails
+        }
+    };
 }
 
 class PlaylistItem {
