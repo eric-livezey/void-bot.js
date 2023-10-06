@@ -1,0 +1,13 @@
+{
+    "name": "void-bot",
+    "version": "1.0.0",
+    "description": "",
+    "main": "main.js",
+    "type": "module",
+    "author": "Eric Livezey",
+    "license": "MIT",
+    "dependencies": {
+        "@discordjs/voice": "^0.16.0",
+        "discord.js": "^14.13.0"
+    }
+}
