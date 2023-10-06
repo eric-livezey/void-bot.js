@@ -475,44 +475,164 @@ class Playlist {
     };
 }
 
-class PlaylistItem {
+class SearchResult {
     /**
-     * Identifies the API resource's type. The value will be `youtube#playlist`.
-     * @type {"youtube#playlistItem"}
+     * Identifies the API resource's type. The value will be `youtube#searchResult`.
+     * @type {"youtube#searchResult"}
      */
     kind;
+    /**
+     * The `id` object contains information that can be used to uniquely identify the resource that matches the search request.
+     */
     id;
+    /**
+     * The value that YouTube uses to uniquely identify the channel that published the resource that the search result identifies.
+     */
+    channelId;
+    /**
+     * The title of the search result.
+     */
     title;
+    /**
+     * A description of the search result.
+     */
+    description;
+    /**
+     * A map of thumbnail images associated with the search result. For each object in the map, the key is the name of the thumbnail image, and the value is an object that contains other information about the thumbnail.
+     */
     thumbnails;
-    videoOwnerChannelTitle;
-    playlistId;
-    position;
-    resourceId;
-    contentDetails;
-    status;
+    /**
+     * The title of the channel that published the resource that the search result identifies.
+     */
+    channelTitle;
+    /**
+     * An indication of whether a `video` or `channel` resource has live broadcast content. Valid property values are `upcoming`, `live`, and `none`.
+     * 
+     * For a `video` resource, a value of `upcoming` indicates that the video is a live broadcast that has not yet started, while a value of `live` indicates that the video is an active live broadcast. For a channel resource, a value of `upcoming` indicates that the channel has a scheduled broadcast that has not yet started, while a value of `live` indicates that the channel has an active live broadcast.
+     * @type {"upcoming" | "live" | "none"}
+     */
+    liveBroadcastContent;
 
     /**
      * 
-     * @param {import("./innertube-types.js").PlaylistItemData} data 
+     * @param {import("./innertube-types.js").RawSearchResultData} data 
      */
     constructor(data) {
-        this.kind = "youtube#playlistItem";
-        this.id = data.videoId;
-        this.title = data.title.runs.map((value) => value.text).join();
-        this.thumbnails = data.thumbnail.thumbnails;
-        this.videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
-        this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
-        this.position = Number(data.index.simpleText);
-        this.resourceId = {
-            kind: "youtube#video",
-            videoId: this.id
+        this.kind = "youtube#searchResult";
+        const videoData = data.videoRenderer;
+        const channelData = data.channelRenderer;
+        const playlistData = data.playlistRenderer
+        this.id = {
+            /**
+             * The type of the API resource.
+             * @type {"youtube#video" | "youtube#channel" | "youtube#playlist"}
+             */
+            kind: videoData ? "youtube#video" : channelData ? "youtube#channel" : "youtube#playlist",
+            /**
+             * If the `id.type` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
+             */
+            videoId: videoData?.videoId,
+            /**
+             * If the `id.type` property's value is `youtube#channel`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
+             */
+            channelId: channelData?.channelId,
+            /**
+             * If the `id.type` property's value is `youtube#playlist`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
+             */
+            playlistId: playlistData?.playlistId
         };
-        this.contentDetails = {
-            videoId: this.id
-        };
-        this.status = {
-            privacyStatus: "public"
-        };
+        this.channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+        this.title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
+        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
+        this.thumbnails = {
+            /**
+             * The default thumbnail image. The default thumbnail for a video – or a resource that refers to a video, such as a playlist item or search result – is 120px wide and 90px tall. The default thumbnail for a channel is 88px wide and 88px tall.
+             */
+            default: {
+                /**
+                 * The image's URL.
+                 */
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
+                /**
+                 * The image's width.
+                 */
+                width: videoData || playlistData ? 120 : 88,
+                /**
+                 * The image's height.
+                 */
+                height: videoData || playlistData ? 90 : 88
+            },
+            /**
+             * A higher resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 320px wide and 180px tall. For a channel, this image is 240px wide and 240px tall.
+             */
+            medium: {
+                /**
+                 * The image's URL.
+                 */
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/mqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
+                /**
+                 * The image's width.
+                 */
+                width: videoData || playlistData ? 320 : 240,
+                /**
+                 * The image's height.
+                 */
+                height: videoData || playlistData ? 180 : 240
+            },
+            /**
+             * A high resolution version of the thumbnail image. For a video (or a resource that refers to a video), this image is 480px wide and 360px tall. For a channel, this image is 800px wide and 800px tall.
+             */
+            high: {
+                /**
+                 * The image's URL.
+                 */
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/hqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
+                /**
+                 * The image's width.
+                 */
+                width: videoData || playlistData ? 480 : 800,
+                /**
+                 * The image's height.
+                 */
+                height: videoData || playlistData ? 360 : 800
+            },
+            /**
+             * An even higher resolution version of the thumbnail image than the high resolution image. This image is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 640px wide and 480px tall.
+             */
+            standard: videoData || playlistData ? {
+                /**
+                 * The image's URL.
+                 */
+                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/sddefault.jpg`,
+                /**
+                 * The image's width.
+                 */
+                width: 640,
+                /**
+                 * The image's height.
+                 */
+                height: 480
+            } : undefined,
+            /**
+             * The highest resolution version of the thumbnail image. This image size is available for some videos and other resources that refer to videos, like playlist items or search results. This image is 1280px wide and 720px tall.
+             */
+            maxres: videoData || playlistData ? {
+                /**
+                 * The image's URL.
+                 */
+                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/maxresdefault.jpg`,
+                /**
+                 * The image's width.
+                 */
+                width: 1280,
+                /**
+                 * The image's height.
+                 */
+                height: 720
+            } : undefined
+        }
+        this.channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.title : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label == "LIVE") ? "live" : "none";
     }
 }
 
