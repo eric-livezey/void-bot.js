@@ -197,7 +197,7 @@ class Track {
     path;
 
     /**
-     * @param {?Videos.Video} video
+     * @param {Videos.Video | null} video
      */
     constructor(video) {
         this.id = video.id;
