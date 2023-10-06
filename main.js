@@ -24,7 +24,7 @@ const CACHE = JSON.parse(readFileSync("./innertube/cache.json"));
  */
 const PLAYERS = {};
 
-// Utility Function
+// Utility Functions
 
 /**
  * Returns a parsed URL object for the given string only if the given string is a valid URL.
@@ -808,7 +808,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         response = "You must provide an index.";
                     }
                     else if (!/[0-9]/.test(args[0])) {
-                        response = "Index must be a integer.";
+                        response = "Index must be an integer.";
                     } else {
                         response = info_command(message.guild, Number(args[0]));
                     }
@@ -819,15 +819,15 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "play [query]", value: "Plays something from YouTube using the [query] as a link or search query." },
                             { name: "skip", value: "Skips the currently playing track." },
                             { name: "stop", value: "Stops the currently playing track and clears the queue." },
-                            { name: "nowPlaying / np", value: "Displays the currently playing track." },
-                            { name: "queue / q", value: "Displays the queue." },
-                            { name: "connect / join [voice_channel]*", value: "Makes the bot join a voice channel, either [voice_channel]* or your current voice channel.." },
-                            { name: "disconnect / leave", value: "Makes the bot leave it's current voice channel." },
+                            { name: "nowPlaying | np", value: "Displays the currently playing track." },
+                            { name: "queue | q", value: "Displays the queue." },
+                            { name: "connect | join [voice_channel]*", value: "Makes the bot join a voice channel, either [voice_channel]* or your current voice channel.." },
+                            { name: "disconnect | leave", value: "Makes the bot leave it's current voice channel." },
                             { name: "remove [index]", value: "Remove track [index] from the queue." },
                             { name: "move [source_index] [destination index]", value: "Move the track at [source_index] to [destination_index]" },
                             { name: "shuffle", value: "Shuffles the queue." },
                             { name: "loop", value: "Loops the currently playing track." },
-                            { name: "info / i [index]", value: "Display info about a queued track at [index] in the queue." }).data]
+                            { name: "info | i [index]", value: "Display info about a queued track at [index] in the queue." }).data]
                     };
                     break;
                 default:
