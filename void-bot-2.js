@@ -378,7 +378,7 @@ async function play(member, query) {
         // Member is not in a voice channel
         return "You are not in a voice channel."
     } else if (member.voice.channel != member.guild.members.me.voice.channel) {
-        // Bot is already connected to member's voice channel
+        // Bot not connected to member's voice channel
         joinVoiceChannel({
             channelId: member.voice.channelId,
             guildId: member.guild.id,
