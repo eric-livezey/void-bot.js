@@ -1,10 +1,12 @@
 import { AudioPlayer, AudioPlayerStatus, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { ChannelType, Client, Colors, Embed, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
+import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
 import { readFileSync, readdirSync, writeFileSync } from "fs";
 import * as Playlists from "./innertube/playlists.js";
 import { Duration, now } from "./innertube/utils.js";
 import * as Videos from "./innertube/videos.js";
 import { listSearchResults } from "./innertube/index.js";
+
+process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
 // Global Variables
 const PREFIX = ".";

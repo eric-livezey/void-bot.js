@@ -4,9 +4,6 @@ const CLIENTS = {
     youtube: { id: 1, name: "WEB", version: "2.20230914.04.00" }
 }
 
-/**
- * @type {{[id: string]: { signatureTimestamp: number, decipher: (a: string) => string}}}
- */
 const JS_CACHE = {};
 
 async function request(path, body) {
@@ -35,19 +32,12 @@ async function request(path, body) {
     });
 }
 
-
-/**
- * @param {string} videoId 
- */
 async function getPlayerId(videoId) {
     const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
     const startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
     return html.substring(startIndex, html.indexOf("/", startIndex));
 }
 
-/**
- * @param {string} playerId 
- */
 async function getJs(playerId) {
     if (!JS_CACHE[playerId]) {
         const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text());
@@ -61,10 +51,6 @@ async function getJs(playerId) {
     return JS_CACHE[playerId];
 }
 
-/**
- * @param {{ signatureTimestamp: number, decipher: (a: string) => string }} js 
- * @param {URLSearchParams} signatureCipher
- */
 function decipher(js, signatureCipher) {
     return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
