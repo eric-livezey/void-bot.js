@@ -471,19 +471,19 @@ declare class SearchListResponse {
     /**
      * Identifies the API resource's type. The value will be `youtube#searchListResponse`.
      */
-    kind: "youtube#searchListResponse";
+    readonly kind: "youtube#searchListResponse";
     /**
      * The token that can be used as the value of the `pageToken` parameter to retrieve the next page in the result set.
      */
-    nextPageToken: string;
+    readonly nextPageToken: string;
     /**
      * The region code that was used for the search query. The property value is a two-letter ISO country code that identifies the region.
      */
-    regionCode: "US";
+    readonly regionCode: "US";
     /**
      * The `pageInfo` object encapsulates paging information for the result set.
      */
-    pageInfo: {
+    readonly pageInfo: {
         /**
          * The total number of results in the result set.Please note that the value is an approximation and may not represent an exact value. In addition, the maximum value is 1,000,000.
          * 
@@ -498,7 +498,7 @@ declare class SearchListResponse {
     /**
      * A list of results that match the search criteria.
      */
-    items: SearchResult[];
+    readonly items: SearchResult[];
 }
 
 /**
