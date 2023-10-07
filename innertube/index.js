@@ -623,7 +623,7 @@ class SearchListResponse {
             nextPageToken: this.nextPageToken,
             regionCode: this.regionCode,
             pageInfo: this.pageInfo,
-            items: this.#items
+            items: this.items
         }
     };
 }
