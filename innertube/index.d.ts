@@ -2,38 +2,38 @@ interface Thumbnail {
     /**
      * The image's URL.
      */
-    url: string
+    url: string;
     /**
      * The image's width.
      */
-    width: number
+    width: number;
     /**
      * The image's height.
      */
-    height: number
+    height: number;
 }
 
 interface Thumbnails {
     /**
      * The default thumbnail image. The default thumbnail for a video – or a resource that refers to a video such as a playlist item or search result – is 120px wide and 90px tall. The default thumbnail for a channel is 88px wide and 88px tall.
      */
-    default?: Thumbnail
+    default?: Thumbnail;
     /**
      * A higher resolution version of the thumbnail image. For a video (or a resource that refers to a video) this image is 320px wide and 180px tall. For a channel this image is 240px wide and 240px tall.
      */
-    medium?: Thumbnail
+    medium?: Thumbnail;
     /**
      * A high resolution version of the thumbnail image. For a video (or a resource that refers to a video) this image is 480px wide and 360px tall. For a channel this image is 800px wide and 800px tall.
      */
-    high?: Thumbnail
+    high?: Thumbnail;
     /**
      * An even higher resolution version of the thumbnail image than the `high` resolution image. This image is available for some videos and other resources that refer to videos like playlist items or search results. This image is 640px wide and 480px tall.
      */
-    standard?: Thumbnail
+    standard?: Thumbnail;
     /**
      * The highest resolution version of the thumbnail image. This image size is available for some videos and other resources that refer to videos like playlist items or search results. This image is 1280px wide and 720px tall.
      */
-    maxres?: Thumbnail
+    maxres?: Thumbnail;
 }
 
 /**
@@ -143,7 +143,7 @@ declare class Video {
         /**
          * Indicates whether the video is age restricted.
          */
-        ageResricted: boolean;
+        ageRestricted: boolean;
         /**
          * Specifies the projection format of the video.
          */
