@@ -4,6 +4,7 @@ import { readFileSync, readdirSync, writeFileSync } from "fs";
 import { Duration, now } from "./innertube/utils.js";
 import * as Videos from "./innertube/videos.js";
 import { getPlaylist, listSearchResults } from "./innertube/index.js";
+import { evaluate } from "./math.js";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
@@ -811,6 +812,16 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         response = "Index must be an integer.";
                     } else {
                         response = info_command(message.guild, Number(args[0]));
+                    }
+                    break;
+                case "evaluate":
+                case "eval":
+                case "e":
+                case "math":
+                    try {
+                        response = String(evaluate(args.join()));
+                    } catch (e) {
+                        response = e.message;
                     }
                     break;
                 case "help":
