@@ -405,7 +405,7 @@ class Playlist {
             privacyStatus: data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private"
         }
         this.#contentDetails = {
-            itemCount: data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text) : undefined
+            itemCount: data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]) : undefined
         }
         this.#contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
     }
