@@ -14,7 +14,7 @@ async function request(path, body) {
             }
         }
     }
-    return await fetch(`https://www.youtube.com/youtubei/v1${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false`, {
+    return await fetch(`https://www.youtube.com/youtubei/v1${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`, {
         headers: {
             "content-type": "application/json",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",

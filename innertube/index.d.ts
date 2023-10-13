@@ -1,3 +1,5 @@
+import { RawBrowseData, RawPlayerData, RawPlaylistItemData, RawSearchData, RawSearchResultData } from "./rawTypes";
+
 interface Thumbnail {
     /**
      * The image's URL.
@@ -285,6 +287,8 @@ declare class Video {
          */
         readonly concurrentViewers?: number;
     };
+
+    constructor(data: RawPlayerData);
 }
 
 /**
@@ -354,6 +358,8 @@ declare class PlaylistItem {
          */
         readonly privacyStatus: "private" | "public" | "unlisted";
     };
+
+    constructor(data: RawPlaylistItemData)
 }
 
 /**
@@ -411,6 +417,8 @@ declare class Playlist {
      * Returns a collection of playlist items from this playlist.
      */
     listItems(): Promise<PlaylistItem[]>;
+
+    constructor(data: RawBrowseData);
 }
 
 /**
@@ -468,6 +476,8 @@ declare class SearchResult {
      * For a `video` resource, a value of `upcoming` indicates that the video is a live broadcast that has not yet started, while a value of `live` indicates that the video is an active live broadcast. For a channel resource, a value of `upcoming` indicates that the channel has a scheduled broadcast that has not yet started, while a value of `live` indicates that the channel has an active live broadcast.
      */
     readonly liveBroadcastContent: "live" | "upcoming" | "none";
+
+    constructor(data: RawSearchResultData)
 }
 
 /**
@@ -505,6 +515,8 @@ declare class SearchListResponse {
      * A list of results that match the search criteria.
      */
     readonly items: SearchResult[];
+
+    constructor(data: RawSearchData)
 }
 
 /**
