@@ -51,63 +51,63 @@ function decipher(js, signatureCipher) {
 }
 
 export class Video {
-    #kind;
-    #id;
-    #publishedAt;
-    #channelId;
-    #title;
-    #description;
-    #thumbnails;
-    #channelTitle;
-    #tags;
-    #category;
-    #liveBroadcastContent;
-    #contentDetails;
-    #status;
-    #statistics;
-    #player;
-    #fileDetails;
-    #liveStreamingDetails;
+    kind;
+    id;
+    publishedAt;
+    channelId;
+    title;
+    description;
+    thumbnails;
+    channelTitle;
+    tags;
+    category;
+    liveBroadcastContent;
+    contentDetails;
+    status;
+    statistics;
+    player;
+    fileDetails;
+    liveStreamingDetails;
 
     constructor(data, js) {
-        this.#kind = "youtube#video";
-        this.#id = data.videoDetails?.videoId;
-        this.#publishedAt = data.microformat ? new Date(data.microformat.playerMicroformatRenderer.publishDate) : undefined;
-        this.#channelId = data.videoDetails?.channelId;
-        this.#title = data.videoDetails?.title;
-        this.#description = data.videoDetails?.shortDescription;
-        this.#thumbnails = data.videoDetails ? {
+        this.kind = "youtubevideo";
+        this.id = data.videoDetails?.videoId;
+        this.publishedAt = data.microformat ? new Date(data.microformat.playerMicroformatRenderer.publishDate) : undefined;
+        this.channelId = data.videoDetails?.channelId;
+        this.title = data.videoDetails?.title;
+        this.description = data.videoDetails?.shortDescription;
+        this.thumbnails = data.videoDetails ? {
             default: {
-                url: `https://i.ytimg.com/vi/${this.#id}/default.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
                 width: 120,
                 height: 90
             },
             medium: {
-                url: `https://i.ytimg.com/vi/${this.#id}/mqdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/mqdefault.jpg`,
                 width: 320,
                 height: 180
             },
             high: {
-                url: `https://i.ytimg.com/vi/${this.#id}/hqdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/hqdefault.jpg`,
                 width: 480,
                 height: 360
             },
             standard: {
-                url: `https://i.ytimg.com/vi/${this.#id}/sddefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/sddefault.jpg`,
                 width: 640,
                 height: 480
             },
             maxres: {
-                url: `https://i.ytimg.com/vi/${this.#id}/maxresdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/maxresdefault.jpg`,
                 width: 1280,
                 height: 720
             }
         } : undefined;
-        this.#channelTitle = data.videoDetails?.author;
-        this.#tags = data.videoDetails?.keywords;
-        this.#category = data.microformat?.playerMicroformatRenderer.category;
-        this.#liveBroadcastContent = data.videoDetails?.isLive ? "live" : data.videoDetails?.isLiveContent ? "upcoming" : "none";
-        this.#contentDetails = {
+        this.channelTitle = data.videoDetails?.author;
+        this.tags = data.videoDetails?.keywords;
+        this.category = data.microformat?.playerMicroformatRenderer.category;
+        this.liveBroadcastContent = data.videoDetails?.isLive ? "live" : data.videoDetails?.isLiveContent ? "upcoming" : "none";
+        this.contentDetails = {
             duration: data.videoDetails ? ((seconds) => {
                 return {
                     total: seconds,
@@ -125,18 +125,18 @@ export class Video {
             ageRestricted: data.playabilityStatus?.reason == "Sign in to confirm your age",
             projection: data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase(),
         };
-        this.#status = {
+        this.status = {
             uploadStatus: data.playabilityStatus?.reason == "We're processing this video. Check back later." ? "uploaded" : "processed",
             privacyStatus: data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] == "This is a private video. Please sign in to verify that you may see it." ? "private" : "public",
             embeddable: data.playabilityStatus?.playableInEmbed,
         };
-        this.#statistics = {
+        this.statistics = {
             viewCount: Number(data.videoDetails?.viewCount),
         };
-        this.#player = {
+        this.player = {
             embedHtml: data.microformat ? `\u003ciframe width=\"${data.microformat.playerMicroformatRenderer.embed.width}\" height=\"${data.microformat.playerMicroformatRenderer.embed.height}\" src=\"${data.microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e` : undefined
         };
-        this.#fileDetails = {
+        this.fileDetails = {
             videoStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("video") && value).map((value) => {
                 return {
                     widthPixels: value.width,
@@ -160,211 +160,91 @@ export class Video {
             dashManifestUrl: data.streamingData?.dashManifestUrl,
             hlsManifestUrl: data.streamingData?.hlsManifestUrl
         };
-        this.#liveStreamingDetails = data.microformat?.playerMicroformatRenderer.liveBroadcastDetails ? {
+        this.liveStreamingDetails = data.microformat?.playerMicroformatRenderer.liveBroadcastDetails ? {
             actualStartTime: new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.startTimestamp),
             actualEndTime: data.microformat.playerMicroformatRenderer.liveBroadcastDetails.endTimestamp ? new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.endTimestamp) : undefined,
         } : undefined;
     };
-
-    get kind() {
-        return this.#kind;
-    };
-    get id() {
-        return this.#id;
-    };
-    get publishedAt() {
-        return this.#publishedAt;
-    };
-    get channelId() {
-        return this.#channelId;
-    };
-    get title() {
-        return this.#title;
-    };
-    get description() {
-        return this.#description;
-    };
-    get thumbnails() {
-        return this.#thumbnails;
-    };
-    get channelTitle() {
-        return this.#channelTitle;
-    };
-    get tags() {
-        return this.#tags;
-    };
-    get category() {
-        return this.#category;
-    };
-    get liveBroadcastContent() {
-        return this.#liveBroadcastContent;
-    };
-    get contentDetails() {
-        return this.#contentDetails;
-    };
-    get status() {
-        return this.#status;
-    };
-    get statistics() {
-        return this.#statistics;
-    };
-    get player() {
-        return this.#player;
-    };
-    get fileDetails() {
-        return this.#fileDetails;
-    };
-    get liveStreamingDetails() {
-        return this.#liveStreamingDetails;
-    };
-
-    toJSON() {
-        return {
-            kind: this.kind,
-            id: this.id,
-            publishedAt: this.publishedAt,
-            channelId: this.channelId,
-            title: this.title,
-            description: this.description,
-            thumbnails: this.thumbnails,
-            channelTitle: this.channelTitle,
-            tags: this.tags,
-            category: this.category,
-            liveBroadcastContent: this.liveBroadcastContent,
-            contentDetails: this.contentDetails,
-            status: this.status,
-            statistics: this.statistics,
-            player: this.player,
-            fileDetails: this.fileDetails,
-            liveStreamingDetails: this.liveStreamingDetails
-        }
-    };
 }
 
 class PlaylistItem {
-    #kind;
-    #id;
-    #title;
-    #thumbnails;
-    #videoOwnerChannelTitle;
-    #playlistId;
-    #position;
-    #resourceId;
-    #contentDetails;
-    #status;
+    kind;
+    id;
+    title;
+    thumbnails;
+    videoOwnerChannelTitle;
+    playlistId;
+    position;
+    resourceId;
+    contentDetails;
+    status;
 
     constructor(data) {
-        this.#kind = "youtube#playlistItem";
-        this.#id = data.videoId;
-        this.#title = data.title.runs.map((value) => value.text).join();
-        this.#thumbnails = {
+        this.kind = "youtube#playlistItem";
+        this.id = data.videoId;
+        this.title = data.title.runs.map((value) => value.text).join();
+        this.thumbnails = {
             default: {
-                url: `https://i.ytimg.com/vi/${this.#id}/default.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
                 width: 120,
                 height: 90
             },
             medium: {
-                url: `https://i.ytimg.com/vi/${this.#id}/mqdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/mqdefault.jpg`,
                 width: 320,
                 height: 180
             },
             high: {
-                url: `https://i.ytimg.com/vi/${this.#id}/hqdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/hqdefault.jpg`,
                 width: 480,
                 height: 360
             },
             standard: {
-                url: `https://i.ytimg.com/vi/${this.#id}/sddefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/sddefault.jpg`,
                 width: 640,
                 height: 480
             },
             maxres: {
-                url: `https://i.ytimg.com/vi/${this.#id}/maxresdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${this.id}/maxresdefault.jpg`,
                 width: 1280,
                 height: 720
             }
         };
-        this.#videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
-        this.#playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
-        this.#position = Number(data.index.simpleText);
-        this.#resourceId = {
+        this.videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
+        this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
+        this.position = Number(data.index.simpleText);
+        this.resourceId = {
             kind: "youtube#video",
-            videoId: this.#id
+            videoId: this.id
         };
-        this.#contentDetails = {
-            videoId: this.#id
+        this.contentDetails = {
+            videoId: this.id
         };
-        this.#status = {
+        this.status = {
             privacyStatus: "public"
         };
-    };
-
-    get kind() {
-        return this.#kind;
-    };
-    get id() {
-        return this.#id;
-    };
-    get title() {
-        return this.#title;
-    };
-    get thumbnails() {
-        return this.#thumbnails;
-    };
-    get videoOwnerChannelTitle() {
-        return this.#videoOwnerChannelTitle;
-    };
-    get playlistId() {
-        return this.#playlistId;
-    };
-    get position() {
-        return this.#position;
-    };
-    get resourceId() {
-        return this.#resourceId;
-    };
-    get contentDetails() {
-        return this.#contentDetails;
-    };
-    get status() {
-        return this.#status;
-    };
-
-    toJSON() {
-        return {
-            kind: this.kind,
-            id: this.id,
-            title: this.title,
-            thumbnails: this.thumbnails,
-            videoOwnerChannelTitle: this.videoOwnerChannelTitle,
-            playlistId: this.playlistId,
-            position: this.position,
-            resourceId: this.resourceId,
-            contentDetails: this.contentDetails,
-            status: this.status
-        }
     };
 }
 
 class Playlist {
-    #kind;
-    #id;
-    #channelId;
-    #title;
-    #description;
-    #thumbnails;
-    #channelTitle;
-    #status;
-    #contentDetails;
+    kind;
+    id;
+    channelId;
+    title;
+    description;
+    thumbnails;
+    channelTitle;
+    status;
+    contentDetails;
     #contents;
 
     constructor(data) {
-        this.#kind = "youtube#playlist";
-        this.#id = data.header?.playlistHeaderRenderer.playlistId;
-        this.#channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
-        this.#title = data.header?.playlistHeaderRenderer.title.simpleText;
-        this.#description = data.header?.playlistHeaderRenderer.description;
-        this.#thumbnails = data.header ? ((thumbnailData) => {
+        this.kind = "youtube#playlist";
+        this.id = data.header?.playlistHeaderRenderer.playlistId;
+        this.channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
+        this.title = data.header?.playlistHeaderRenderer.title.simpleText;
+        this.description = data.header?.playlistHeaderRenderer.description;
+        this.thumbnails = data.header ? ((thumbnailData) => {
             const thumbnails = {};
             if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
                 const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
@@ -400,11 +280,11 @@ class Playlist {
             }
             return thumbnails;
         })(data.header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails) : undefined;
-        this.#channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
-        this.#status = {
+        this.channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
+        this.status = {
             privacyStatus: data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private"
         }
-        this.#contentDetails = {
+        this.contentDetails = {
             itemCount: data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]) : undefined
         }
         this.#contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
@@ -425,155 +305,76 @@ class Playlist {
         }
         return items;
     };
-
-    get kind() {
-        return this.#kind;
-    };
-    get id() {
-        return this.#id;
-    };
-    get channelId() {
-        return this.#channelId;
-    };
-    get title() {
-        return this.#title;
-    };
-    get description() {
-        return this.#description;
-    };
-    get thumbnails() {
-        return this.#thumbnails;
-    };
-    get channelTitle() {
-        return this.#channelTitle;
-    };
-    get status() {
-        return this.#status;
-    };
-    get contentDetails() {
-        return this.#contentDetails;
-    };
-
-    toJSON() {
-        return {
-            kind: this.kind,
-            id: this.id,
-            channelId: this.channelId,
-            title: this.title,
-            description: this.description,
-            thumbnails: this.thumbnails,
-            channelTitle: this.channelTitle,
-            status: this.status,
-            contentDetails: this.contentDetails
-        }
-    };
 }
 
 class SearchResult {
-    #kind;
-    #id;
-    #channelId;
-    #title;
-    #description;
-    #thumbnails;
-    #channelTitle;
-    #liveBroadcastContent;
+    kind;
+    id;
+    channelId;
+    title;
+    description;
+    thumbnails;
+    channelTitle;
+    liveBroadcastContent;
 
     constructor(data) {
-        this.#kind = "youtube#searchResult";
+        this.kind = "youtube#searchResult";
         const videoData = data.videoRenderer;
         const channelData = data.channelRenderer;
         const playlistData = data.playlistRenderer
-        this.#id = {
+        this.id = {
             kind: videoData ? "youtube#video" : channelData ? "youtube#channel" : "youtube#playlist",
             videoId: videoData?.videoId,
             channelId: channelData?.channelId,
             playlistId: playlistData?.playlistId
         };
-        this.#channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.#id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-        this.#title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
-        this.#description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
-        this.#thumbnails = {
+        this.channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+        this.title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
+        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
+        this.thumbnails = {
             default: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.#id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
                 width: videoData || playlistData ? 120 : 88,
                 height: videoData || playlistData ? 90 : 88
             },
             medium: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.#id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/mqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/mqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
                 width: videoData || playlistData ? 320 : 240,
                 height: videoData || playlistData ? 180 : 240
             },
             high: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.#id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/hqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
+                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/hqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
                 width: videoData || playlistData ? 480 : 800,
                 height: videoData || playlistData ? 360 : 800
             },
             standard: videoData || playlistData ? {
-                url: `https://i.ytimg.com/vi/${(videoData ? this.#id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/sddefault.jpg`,
+                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/sddefault.jpg`,
                 width: 640,
                 height: 480
             } : undefined,
             maxres: videoData || playlistData ? {
-                url: `https://i.ytimg.com/vi/${(videoData ? this.#id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/maxresdefault.jpg`,
+                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/maxresdefault.jpg`,
                 width: 1280,
                 height: 720
             } : undefined
         }
-        this.#channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.#title : playlistData.longBylineText.runs[0].text;
-        this.#liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label == "LIVE") ? "live" : "none";
+        this.channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.title : playlistData.longBylineText.runs[0].text;
+        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label == "LIVE") ? "live" : "none";
     }
-
-    get kind() {
-        return this.#kind;
-    };
-    get id() {
-        return this.#id;
-    };
-    get channelId() {
-        return this.#channelId;
-    };
-    get title() {
-        return this.#title;
-    };
-    get description() {
-        return this.#description;
-    };
-    get thumbnails() {
-        return this.#thumbnails;
-    };
-    get channelTitle() {
-        return this.#channelTitle;
-    };
-    get liveBroadcastContent() {
-        return this.#liveBroadcastContent;
-    };
-
-    toJSON() {
-        return {
-            kind: this.kind,
-            id: this.id,
-            channelId: this.channelId,
-            title: this.title,
-            description: this.description,
-            thumbnails: this.thumbnails,
-            liveBroadcastContent: this.liveBroadcastContent
-        }
-    };
 }
 
 class SearchListResponse {
-    #kind;
-    #nextPageToken;
-    #regionCode;
-    #pageInfo;
-    #items;
+    kind;
+    nextPageToken;
+    regionCode;
+    pageInfo;
+    items;
 
     constructor(data) {
-        this.#kind = "youtube#searchListResponse";
-        this.#nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
-        this.#regionCode = "US";
-        this.#pageInfo = {
+        this.kind = "youtube#searchListResponse";
+        this.nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        this.regionCode = "US";
+        this.pageInfo = {
             totalResults: Number(data.estimatedResults),
             resultsPerPage: null
         };
@@ -581,51 +382,25 @@ class SearchListResponse {
             .find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
             .map((value) => new SearchResult(value));
-        this.#items = items ? items : [];
+        this.items = items ? items : [];
     }
 
     async next() {
-        if (!this.#nextPageToken) {
+        if (!this.nextPageToken) {
             return null;
         }
         const response = await request("/search", {
-            continuation: this.#nextPageToken
+            continuation: this.nextPageToken
         })
         const data = await (response.json());
         const continuationItems = data.onResponseReceivedCommands?.find((value) => value.appendContinuationItemsAction)?.appendContinuationItemsAction.continuationItems
-        this.#nextPageToken = continuationItems.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        this.nextPageToken = continuationItems.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         const newItems = continuationItems.find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
             .map((value) => new SearchResult(value));
-        this.#items = this.#items.concat(newItems);
+        this.items = this.items.concat(newItems);
         return newItems;
     }
-
-    get kind() {
-        return this.#kind;
-    };
-    get nextPageToken() {
-        return this.#nextPageToken;
-    };
-    get regionCode() {
-        return this.#regionCode;
-    };
-    get pageInfo() {
-        return this.#pageInfo;
-    };
-    get items() {
-        return this.#items;
-    };
-
-    toJSON() {
-        return {
-            kind: this.kind,
-            nextPageToken: this.nextPageToken,
-            regionCode: this.regionCode,
-            pageInfo: this.pageInfo,
-            items: this.items
-        }
-    };
 }
 
 async function getVideo(id) {
@@ -640,19 +415,19 @@ async function getVideo(id) {
         racyCheckOk: false,
         contentCheckOk: false
     })
-    if (response.status != 200) {
-        return null;
-    } else {
+    if (response.status == 200) {
         return new Video(await response.json(), js);
+    } else {
+        return null;
     }
 }
 
 async function getPlaylist(id) {
     const response = await request("/browse", { browseId: "VL" + id });
-    if (response.status != 200) {
-        return null;
-    } else {
+    if (response.status == 200) {
         return new Playlist(await response.json());
+    } else {
+        return null;
     }
 }
 
@@ -661,10 +436,10 @@ async function listSearchResults(q, type) {
         query: q,
         params: type == "video" ? "EgIQAQ%3D%3D" : type == "channel" ? "EgIQAg%3D%3D" : type == "playlist" ? "EgIQAw%3D%3D" : undefined
     })
-    if (response.status != 200) {
-        return null;
-    } else {
+    if (response.status == 200) {
         return new SearchListResponse(await response.json());
+    } else {
+        return null;
     }
 }
 

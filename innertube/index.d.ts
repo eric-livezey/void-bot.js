@@ -2,38 +2,38 @@ interface Thumbnail {
     /**
      * The image's URL.
      */
-    url: string;
+    readonly url: string;
     /**
      * The image's width.
      */
-    width: number;
+    readonly width: number;
     /**
      * The image's height.
      */
-    height: number;
+    readonly height: number;
 }
 
 interface Thumbnails {
     /**
      * The default thumbnail image. The default thumbnail for a video – or a resource that refers to a video such as a playlist item or search result – is 120px wide and 90px tall. The default thumbnail for a channel is 88px wide and 88px tall.
      */
-    default?: Thumbnail;
+    readonly default?: Thumbnail;
     /**
      * A higher resolution version of the thumbnail image. For a video (or a resource that refers to a video) this image is 320px wide and 180px tall. For a channel this image is 240px wide and 240px tall.
      */
-    medium?: Thumbnail;
+    readonly medium?: Thumbnail;
     /**
      * A high resolution version of the thumbnail image. For a video (or a resource that refers to a video) this image is 480px wide and 360px tall. For a channel this image is 800px wide and 800px tall.
      */
-    high?: Thumbnail;
+    readonly high?: Thumbnail;
     /**
      * An even higher resolution version of the thumbnail image than the `high` resolution image. This image is available for some videos and other resources that refer to videos like playlist items or search results. This image is 640px wide and 480px tall.
      */
-    standard?: Thumbnail;
+    readonly standard?: Thumbnail;
     /**
      * The highest resolution version of the thumbnail image. This image size is available for some videos and other resources that refer to videos like playlist items or search results. This image is 1280px wide and 720px tall.
      */
-    maxres?: Thumbnail;
+    readonly maxres?: Thumbnail;
 }
 
 /**
@@ -97,57 +97,57 @@ declare class Video {
         /**
          * The length of the video.
          */
-        duration: {
+        readonly duration: {
             /**
              * Total length in seconds.
              */
-            total: number;
+            readonly total: number;
             /**
              * Number of seconds.
              */
-            seconds: number;
+            readonly seconds: number;
             /**
              * Number of minutes.
              */
-            minutes: number;
+            readonly minutes: number;
             /**
              * Number of hours.
              */
-            hours: number;
+            readonly hours: number;
             /**
              * Number of days.
              */
-            days: number;
+            readonly days: number;
         };
         /**
          * Indicates whether the video is available in 3D or in 2D.
          */
-        dimension: "2d" | "3d";
+        readonly dimension: "2d" | "3d";
         /**
          * Indicates whether the video is available in high definition (HD) or only in standard definition.
          */
-        definition: "hd" | "sd";
+        readonly definition: "hd" | "sd";
         /**
          * The `regionRestriction` object contains information about the countries where a video is (or is not) viewable. The object will contain either the `contentDetails.regionRestriction.allowed` property or the `contentDetails.regionRestriction.blocked` property.
          */
-        regionRestriction: {
+        readonly regionRestriction: {
             /**
              * A list of region codes that identify countries where the video is viewable. If this property is present and a country is not listed in its value, then the video is blocked from appearing in that country. If this property is present and contains an empty list, the video is blocked in all countries.
              */
-            allowed?: string[];
+            readonly allowed?: string[];
             /**
              * A list of region codes that identify countries where the video is blocked. If this property is present and a country is not listed in its value, then the video is viewable in that country. If this property is present and contains an empty list, the video is viewable in all countries.
              */
-            blocked?: string[];
+            readonly blocked?: string[];
         };
         /**
          * Indicates whether the video is age restricted.
          */
-        ageRestricted: boolean;
+        readonly ageRestricted: boolean;
         /**
          * Specifies the projection format of the video.
          */
-        projection: "360" | "rectangular";
+        readonly projection: "360" | "rectangular";
     };
     /**
      * The `status` object contains information about the video's uploading, processing, and privacy statuses.
@@ -156,15 +156,15 @@ declare class Video {
         /**
          * The status of the uploaded video.
          */
-        uploadStatus: "processed" | "uploaded";
+        readonly uploadStatus: "processed" | "uploaded";
         /**
          * The video's privacy status.
          */
-        privacyStatus: "private" | "public" | "unlisted";
+        readonly privacyStatus: "private" | "public" | "unlisted";
         /**
          * This value indicates whether the video can be embedded on another website.
          */
-        embeddable: boolean;
+        readonly embeddable: boolean;
     };
     /**
      * The `statistics` object contains statistics about the video.
@@ -173,7 +173,7 @@ declare class Video {
         /**
          * The number of times the video has been viewed.
          */
-        viewCount: number;
+        readonly viewCount: number;
     };
     /**
      * The `player` object contains information that you would use to play the video in an embedded player.
@@ -183,7 +183,7 @@ declare class Video {
          * An `<iframe>` tag that embeds a player that plays the video.
          * - If the video's aspect ratio is unknown, the embedded player defaults to a 4:3 format.
          */
-        embedHtml: string;
+        readonly embedHtml: string;
     };
     /**
      * The `fileDetails` object encapsulates information about the video file that was uploaded to YouTube, including the file's resolution, duration, audio and video codecs, stream bitrates, and more.
@@ -192,73 +192,73 @@ declare class Video {
         /**
          * A list of video streams contained in the uploaded video file. Each item in the list contains detailed metadata about a video stream.
          */
-        videoStreams: {
+        readonly videoStreams: {
             /**
              * The encoded video content's width in pixels. You can calculate the video's encoding aspect ratio as `width_pixels / height_pixels`.
              */
-            widthPixels: number;
+            readonly widthPixels: number;
             /**
              * The encoded video content's height in pixels.
              */
-            heightPixels: number;
+            readonly heightPixels: number;
             /**
              * The video stream's frame rate, in frames per second.
              */
-            frameRateFps: number;
+            readonly frameRateFps: number;
             /**
              * The video content's display aspect ratio, which specifies the aspect ratio in which the video should be displayed.
              */
-            aspectRatio: number;
+            readonly aspectRatio: number;
             /**
              * The video codec that the stream uses.
              */
-            codec: string;
+            readonly codec: string;
             /**
              * The video stream's bitrate, in bits per second.
              */
-            bitrateBps: number;
+            readonly bitrateBps: number;
             /**
              * The video stream's URL.
              */
-            url: string;
+            readonly url: string;
         }[];
         /**
          * A list of audio streams contained in the uploaded video file. Each item in the list contains detailed metadata about an audio stream.
          */
-        audioStreams: {
+        readonly audioStreams: {
             /**
              * The number of audio channels that the stream contains.
              */
-            channelCount: number;
+            readonly channelCount: number;
             /**
              * The audio codec that the stream uses.
              */
-            codec: string;
+            readonly codec: string;
             /**
              * The audio stream's bitrate, in bits per second.
              */
-            bitrateBps: number;
+            readonly bitrateBps: number;
             /**
              * The audio stream's URL.
              */
-            url: string;
+            readonly url: string;
         }[];
         /**
          * The length of the uploaded video in milliseconds.
          */
-        durationMs: number;
+        readonly durationMs: number;
         /**
          * The uploaded video file's combined (video and audio) bitrate in bits per second.
          */
-        bitrateBps: number;
+        readonly bitrateBps: number;
         /**
          * The video's DASH manifest URL. Will only be present if the video is a live live broadcast.
          */
-        dashManifestUrl?: string;
+        readonly dashManifestUrl?: string;
         /**
          * The video's HLS manifest URL. Will only be present if the video is a live live broadcast.
          */
-        hlsManifestUrl?: string;
+        readonly hlsManifestUrl?: string;
     };
     /**
      * The `liveStreamingDetails` object contains metadata about a live video broadcast. The object will only be present in a `video` resource if the video is an upcoming, live, or completed live broadcast.
@@ -267,23 +267,23 @@ declare class Video {
         /**
          * The time that the broadcast actually started. This value will not be available until the broadcast begins.
          */
-        actualStartTime?: Date;
+        readonly actualStartTime?: Date;
         /**
          * The time that the broadcast actually ended. This value will not be available until the broadcast is over.
          */
-        actualEndTime?: Date;
+        readonly actualEndTime?: Date;
         /**
          * The time that the broadcast is scheduled to begin.
          */
-        scheduledStartTime: Date;
+        readonly scheduledStartTime: Date;
         /**
          * The time that the broadcast is scheduled to end. If the value is empty or the property is not present, then the broadcast is scheduled to continue indefinitely.
          */
-        scheduledEndTime?: Date;
+        readonly scheduledEndTime?: Date;
         /**
          * The number of viewers currently watching the broadcast. The property and its value will be present if the broadcast has current viewers and the broadcast owner has not hidden the viewcount for the video. Note that YouTube stops tracking the number of concurrent viewers for a broadcast when the broadcast ends. So, this property would not identify the number of viewers watching an archived video of a live broadcast that already ended.
          */
-        concurrentViewers?: number;
+        readonly concurrentViewers?: number;
     };
 }
 
@@ -330,11 +330,11 @@ declare class PlaylistItem {
         /**
          * The kind, or type, of the referred resource.
          */
-        kind: string;
+        readonly kind: string;
         /**
          * If the `resourceId.kind` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify the video in the playlist.
          */
-        videoId: string;
+        readonly videoId: string;
     };
     /**
      * The `contentDetails` object is included in the resource if the included item is a YouTube video. The object contains additional information about the video.
@@ -343,7 +343,7 @@ declare class PlaylistItem {
         /**
          * The ID that YouTube uses to uniquely identify a video. To {@link getVideo retrieve the `video` resource}, set the `id` query parameter to this value in your API request.
          */
-        videoId: string;
+        readonly videoId: string;
     };
     /**
      * The `status` object contains information about the playlist item's privacy status.
@@ -352,7 +352,7 @@ declare class PlaylistItem {
         /**
          * The playlist item's privacy status.
          */
-        privacyStatus: "private" | "public" | "unlisted";
+        readonly privacyStatus: "private" | "public" | "unlisted";
     };
 }
 
@@ -395,7 +395,7 @@ declare class Playlist {
         /**
          * The playlist's privacy status.
          */
-        privacyStatus: "private" | "public" | "unlisted";
+        readonly privacyStatus: "private" | "public" | "unlisted";
     };
     /**
      * The `contentDetails` object contains information about the playlist content, including the number of videos in the playlist.
@@ -404,7 +404,7 @@ declare class Playlist {
         /**
          * The number of videos in the playlist.
          */
-        itemCount: number;
+        readonly itemCount: number;
     };
 
     /**
@@ -428,19 +428,19 @@ declare class SearchResult {
         /**
          * The type of the API resource.
          */
-        kind: "youtube#video" | "youtube#channel" | "youtube#playlist";
+        readonly kind: "youtube#video" | "youtube#channel" | "youtube#playlist";
         /**
          * If the `id.kind` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
          */
-        videoId?: string;
+        readonly videoId?: string;
         /**
          * If the `id.kind` property's value is `youtube#channel`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
          */
-        channelId?: string;
+        readonly channelId?: string;
         /**
          * If the `id.kind` property's value is `youtube#playlist`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
          */
-        playlistId?: string;
+        readonly playlistId?: string;
     };
     /**
      * The value that YouTube uses to uniquely identify the channel that published the resource that the search result identifies.
@@ -495,11 +495,11 @@ declare class SearchListResponse {
          * 
          * You should not use this value to create pagination links. Instead, use the `nextPageToken` property value to determine whether to show pagination links.
          */
-        totalResults: number;
+        readonly totalResults: number;
         /**
          * The number of results included in the API response.
          */
-        resultsPerPage: number;
+        readonly resultsPerPage: number;
     };
     /**
      * A list of results that match the search criteria.
