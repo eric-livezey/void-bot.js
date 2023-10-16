@@ -145,7 +145,8 @@ export class Video {
                     aspectRatio: value.width / value.width,
                     codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
                     bitrateBps: value.bitrate,
-                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher))
+                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                    contentLength: value.contentLength
                 }
             }),
             audioStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("audio")).map((value) => {
@@ -153,7 +154,8 @@ export class Video {
                     channelCount: value.audioChannels,
                     codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
                     bitrateBps: value.bitrate,
-                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher))
+                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                    contentLength: value.contentLength
                 }
             }),
             durationMs: data.streamingData?.adaptiveFormats[0].approxDurationMs,

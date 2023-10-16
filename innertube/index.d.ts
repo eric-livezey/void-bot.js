@@ -223,6 +223,10 @@ declare class Video {
              * The video stream's URL.
              */
             readonly url: string;
+            /**
+             * The video stream's size in bytes.
+             */
+            readonly contentLength: number;
         }[];
         /**
          * A list of audio streams contained in the uploaded video file. Each item in the list contains detailed metadata about an audio stream.
@@ -244,6 +248,10 @@ declare class Video {
              * The audio stream's URL.
              */
             readonly url: string;
+            /**
+             * The audio stream's size in bytes.
+             */
+            readonly contentLength: number;
         }[];
         /**
          * The length of the uploaded video in milliseconds.

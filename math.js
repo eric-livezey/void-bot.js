@@ -4,7 +4,6 @@
  */
 function precedenceOf(operator) {
     switch (operator) {
-        case 'E':
         case '^':
             return 3;
         case '*':
@@ -53,7 +52,6 @@ function applyFunction(value, funct) {
  */
 function applyOperation(leftOperand, rightOperand, operator) {
     switch (operator) {
-        case 'E': return leftOperand * Math.pow(10, rightOperand);
         case '^': return Math.pow(leftOperand, rightOperand);
         case '*': return leftOperand * rightOperand;
         case '/': return leftOperand / rightOperand;
@@ -70,7 +68,7 @@ function applyOperation(leftOperand, rightOperand, operator) {
  * @returns {number}
  */
 function evaluate(expression) {
-    const tokens = expression.split(/([()E^*/%+-])/g);
+    const tokens = expression.split(/([()^*/%+-])/g);
     const operands = [];
     const operators = [];
     for (var i = 0; i < tokens.length; i++) {
@@ -112,7 +110,7 @@ function evaluate(expression) {
                     operands.push(applyFunction(operands.pop(), operators.pop()));
                 }
             }
-        } else if (token.match(/^[E\^*/%+-]$/)) {
+        } else if (token.match(/^[\^*/%+-]$/)) {
             while (!operators.length == 0
                 && precedenceOf(operators[operators.length - 1].charAt(0)) >= precedenceOf(token.charAt(0))) {
                 const rightOperand = operands.pop();

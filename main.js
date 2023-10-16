@@ -729,7 +729,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
     } else if (message.content.startsWith(PREFIX)) {
         // Parse command name and arguments
         const args = message.content.split(" ");
-        const cmd = args.shift().substring(1);
+        const cmd = args.shift().substring(PREFIX.length);
         try {
             var response;
             // Handle Command
@@ -775,7 +775,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     if (args.length < 1) {
                         response = "You must provide an index.";
                     }
-                    else if (!/[0-9]/.test(args[0])) {
+                    else if (!/^[0-9]$/.test(args[0])) {
                         response = "Index must be a integer.";
                     } else {
                         response = remove_command(message.guild, Number(args[0]));
@@ -789,7 +789,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (args.length < 2) {
                         response = "You must provide a destination index";
                     }
-                    else if (!/[0-9]/.test(args[0]) || !/[0-9]/.test(args[1])) {
+                    else if (!/^[0-9]$/.test(args[0]) || !/^[0-9]$/.test(args[1])) {
                         response = "Both indexes must be integers.";
                     } else {
                         response = move_command(message.guild, Number(args[0]), Number(args[1]))
@@ -808,7 +808,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     if (args.length < 1) {
                         response = "You must provide an index.";
                     }
-                    else if (!/[0-9]/.test(args[0])) {
+                    else if (!/^[0-9]$/.test(args[0])) {
                         response = "Index must be an integer.";
                     } else {
                         response = info_command(message.guild, Number(args[0]));
@@ -818,6 +818,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "eval":
                 case "e":
                 case "math":
+                    // Evaluate
                     try {
                         response = String(evaluate(args.join()));
                     } catch (e) {
@@ -830,15 +831,17 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "play [query]", value: "Plays something from YouTube using the [query] as a link or search query." },
                             { name: "skip", value: "Skips the currently playing track." },
                             { name: "stop", value: "Stops the currently playing track and clears the queue." },
-                            { name: "nowPlaying | np", value: "Displays the currently playing track." },
-                            { name: "queue | q", value: "Displays the queue." },
-                            { name: "connect | join [voice_channel]*", value: "Makes the bot join a voice channel, either [voice_channel]* or your current voice channel.." },
-                            { name: "disconnect | leave", value: "Makes the bot leave it's current voice channel." },
+                            { name: "nowPlaying|np", value: "Displays the currently playing track." },
+                            { name: "queue|q", value: "Displays the queue." },
+                            { name: "connect|join [voice_channel]*", value: "Makes the bot join a voice channel, either [voice_channel]* or your current voice channel.." },
+                            { name: "disconnect|leave", value: "Makes the bot leave it's current voice channel." },
                             { name: "remove [index]", value: "Remove track [index] from the queue." },
                             { name: "move [source_index] [destination index]", value: "Move the track at [source_index] to [destination_index]" },
                             { name: "shuffle", value: "Shuffles the queue." },
                             { name: "loop", value: "Loops the currently playing track." },
-                            { name: "info | i [index]", value: "Display info about a queued track at [index] in the queue." }).data]
+                            { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
+                            { name: "evaluate|eval|e|math [expression]", value: "Evaluate a mathematical expression." },
+                            { name: "help", value: "Display this message." }).data]
                     };
                     break;
                 default:
