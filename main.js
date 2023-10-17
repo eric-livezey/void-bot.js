@@ -1,4 +1,4 @@
-import { AudioPlayer, AudioPlayerStatus, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
+import { AudioPlayer, AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
 import { readFileSync, readdirSync, writeFileSync } from "fs";
 import { Duration, now } from "./innertube/utils.js";
@@ -109,6 +109,14 @@ class Player {
      */
     queue;
     loop;
+    /**
+     * @type {AudioResource<null> | null}
+     */
+    audioResource;
+    /**
+     * @type {number}
+     */
+    volume;
 
     /**
      * @param {string} guildId 
@@ -122,6 +130,8 @@ class Player {
         this.nowPlaying = null;
         this.queue = [];
         this.loop = false;
+        this.audioResource = null;
+        this.volume = 1;
         this.audioPlayer.on(AudioPlayerStatus.Idle, async () => {
             if (this.nowPlaying !== null) {
                 // Something is playing
@@ -149,19 +159,32 @@ class Player {
     async play(track) {
         this.nowPlaying = track;
         try {
-            this.audioPlayer.play(createAudioResource(await track.path));
+            this.audioResource = createAudioResource(await track.path, { inlineVolume: true });
+            this.audioResource.volume.setVolume(this.volume);
+            this.audioPlayer.play(this.audioResource);
             this.nowPlaying.startTime = Date.now();
         } catch {
             this.play(new Track(await Videos.get(this.nowPlaying.id)));
         }
     }
 
-    async skip() {
+    skip() {
         if (this.nowPlaying) {
             this.nowPlaying.skipped = true;
             return this.audioPlayer.stop();
         } else {
             return false;
+        }
+    }
+
+    /**
+     * Set the volume percentage
+     * @param {number} volume the new volume
+     */
+    setVolume(volume) {
+        this.volume = volume;
+        if (this.audioResource) {
+            this.audioResource.volume.setVolume(volume);
         }
     }
 }
@@ -306,7 +329,7 @@ async function playPlaylist(player, listId) {
  * @param {GuildMember} member 
  * @param {string | undefined} channelId 
  */
-async function connect_command(member, channelId) {
+async function connectCommand(member, channelId) {
     if (!channelId) {
         // No channel ID provided
         if (member.voice.channelId !== null) {
@@ -355,7 +378,7 @@ async function connect_command(member, channelId) {
 /**
  * @param {Guild} guild 
  */
-async function disconnect_command(guild) {
+async function disconnectCommand(guild) {
     // Get voice connection for guild
     var vc = getVoiceConnection(guild.id);
     if (!vc) {
@@ -459,7 +482,7 @@ async function play(member, query) {
 /**
  * @param {Guild} guild 
  */
-async function stop_command(guild) {
+async function stopCommand(guild) {
     var player = getPlayer(guild.id);
     if (player.nowPlaying) {
         player.queue.splice(0, player.queue.length);
@@ -474,7 +497,7 @@ async function stop_command(guild) {
 /**
  * @param {Guild} guild 
  */
-async function skip_command(guild) {
+async function skipCommand(guild) {
     var player = getPlayer(guild.id);
     var track = player.nowPlaying;
     if (await player.skip()) {
@@ -490,7 +513,7 @@ async function skip_command(guild) {
 /**
  * @param {Guild} guild 
  */
-function now_playing_command(guild) {
+function nowPlayingCommand(guild) {
     var player = getPlayer(guild.id);
     if (player.nowPlaying) {
         return { content: "**Now playing:**", embeds: [player.nowPlaying.embed()] };
@@ -502,10 +525,10 @@ function now_playing_command(guild) {
 /**
  * @param {Message} message 
  */
-function queue_command(message) {
+function queueCommand(message) {
     var player = getPlayer(message.guild.id);
     if (player.queue.length == 0) {
-        return now_playing_command(message.guild);
+        return nowPlayingCommand(message.guild);
     }
     var totalSeconds = player.nowPlaying.duration.total;
     for (var i = 0; i < player.queue.length; i++) {
@@ -544,7 +567,7 @@ function queue_command(message) {
  * @param {Guild} guild
  * @param {number} index 
  */
-function remove_command(guild, index) {
+function removeCommand(guild, index) {
     var player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty.";
@@ -561,7 +584,7 @@ function remove_command(guild, index) {
  * @param {number} source 
  * @param {number} destination 
  */
-function move_command(guild, source, destination) {
+function moveCommand(guild, source, destination) {
     var player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty.";
@@ -587,13 +610,13 @@ function move_command(guild, source, destination) {
 /**
  * @param {Guild} guild 
  */
-function loop_command(guild) {
+function loopCommand(guild) {
     var player = getPlayer(guild.id);
     player.loop = !player.loop;
     return "Loop " + (player.loop ? "enabled." : "disabled.")
 }
 
-function info_command(guild, index) {
+function infoCommand(guild, index) {
     var player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty.";
@@ -604,7 +627,7 @@ function info_command(guild, index) {
     return { embeds: [player.queue[index - 1].embed()] };
 }
 
-function shuffle_command(guild) {
+function shuffleCommand(guild) {
     var player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty";
@@ -620,6 +643,17 @@ function shuffle_command(guild) {
     }
 
     return "Queue shuffled.";
+}
+
+/**
+ * 
+ * @param {Guild} guild 
+ * @param {number} percentage 
+ */
+async function volumeCommand(guild, percentage) {
+    const player = getPlayer(guild.id);
+    player.setVolume(percentage / 100);
+    return `Volume set to ${percentage}%.`;
 }
 
 // Events
@@ -668,7 +702,7 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
         }
         if (player.queue.length == 0) {
             // The queue is empty
-            var response = now_playing_command(interaction.guild)
+            var response = nowPlayingCommand(interaction.guild)
             if (typeof response == "string") {
                 // Clear embeds
                 response = { content: response, embeds: [] };
@@ -737,12 +771,12 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "join":
                 case "connect":
                     // Connect
-                    response = await connect_command(message.member, args.length <= 1 ? args[0] : undefined);
+                    response = await connectCommand(message.member, args.length <= 1 ? args[0] : undefined);
                     break;
                 case "leave":
                 case "disconnect":
                     // Disconnect
-                    response = await disconnect_command(message.guild);
+                    response = await disconnectCommand(message.guild);
                     break;
                 case "play":
                     // Play
@@ -754,31 +788,31 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "stop":
                     // Stop
-                    response = await stop_command(message.guild);
+                    response = await stopCommand(message.guild);
                     break;
                 case "skip":
                     // Skip
-                    response = await skip_command(message.guild);
+                    response = await skipCommand(message.guild);
                     break;
                 case "now-playing":
                 case "np":
                     // Now Playing
-                    response = now_playing_command(message.guild);
+                    response = nowPlayingCommand(message.guild);
                     break;
                 case "queue":
                 case "q":
                     // Queue
-                    response = queue_command(message);
+                    response = queueCommand(message);
                     break;
                 case "remove":
                     // Remove
                     if (args.length < 1) {
                         response = "You must provide an index.";
                     }
-                    else if (!/^[0-9]$/.test(args[0])) {
+                    else if (!/^[0-9]+$/.test(args[0])) {
                         response = "Index must be a integer.";
                     } else {
-                        response = remove_command(message.guild, Number(args[0]));
+                        response = removeCommand(message.guild, Number(args[0]));
                     }
                     break;
                 case "move":
@@ -789,18 +823,18 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (args.length < 2) {
                         response = "You must provide a destination index";
                     }
-                    else if (!/^[0-9]$/.test(args[0]) || !/^[0-9]$/.test(args[1])) {
+                    else if (!/^[0-9]+$/.test(args[0]) || !/^[0-9]+$/.test(args[1])) {
                         response = "Both indexes must be integers.";
                     } else {
-                        response = move_command(message.guild, Number(args[0]), Number(args[1]))
+                        response = moveCommand(message.guild, Number(args[0]), Number(args[1]))
                     }
                     break;
                 case "shuffle":
-                    response = shuffle_command(message.guild);
+                    response = shuffleCommand(message.guild);
                     break;
                 case "loop":
                     // Loop
-                    response = loop_command(message.guild);
+                    response = loopCommand(message.guild);
                     break;
                 case "info":
                 case "i":
@@ -808,10 +842,20 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     if (args.length < 1) {
                         response = "You must provide an index.";
                     }
-                    else if (!/^[0-9]$/.test(args[0])) {
+                    else if (!/^[0-9]+$/.test(args[0])) {
                         response = "Index must be an integer.";
                     } else {
-                        response = info_command(message.guild, Number(args[0]));
+                        response = infoCommand(message.guild, Number(args[0]));
+                    }
+                    break;
+                case "volume":
+                    if (args.length < 1) {
+                        response = "You must provide a percentage.";
+                    }
+                    else if (!/^[0-9]+(\.[0-9]+)?$/.test(args[0])) {
+                        response = "percentage must be a number.";
+                    } else {
+                        response = await volumeCommand(message.guild, Number(args[0]));
                     }
                     break;
                 case "evaluate":
@@ -841,6 +885,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "loop", value: "Loops the currently playing track." },
                             { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
                             { name: "evaluate|eval|e|math [expression]", value: "Evaluate a mathematical expression." },
+                            { name: "volume [percentage]", value: "Set the volume to the specified percentage" },
                             { name: "help", value: "Display this message." }).data]
                     };
                     break;
