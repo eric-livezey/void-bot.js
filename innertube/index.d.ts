@@ -39,6 +39,24 @@ interface Thumbnails {
 }
 
 /**
+ * Specifies a type of search result.
+ */
+declare enum SearchResultTypes {
+    /**
+     * Video search results.
+     */
+    VIDEO = "video",
+    /**
+     * Channel search results.
+     */
+    CHANNEL = "channel",
+    /**
+     * Playlist search results.
+     */
+    PLAYLIST = "playlist"
+}
+
+/**
  * A `video` resource represents a YouTube video.
  */
 declare class Video {
@@ -296,7 +314,10 @@ declare class Video {
         readonly concurrentViewers?: number;
     };
 
-    constructor(data: RawPlayerData);
+    constructor(data: RawPlayerData, js: {
+        signatureTimestamp: number;
+        decipher: (cipher: string) => string;
+    });
 }
 
 /**
@@ -547,9 +568,10 @@ declare function getPlaylist(id: string): Promise<Playlist | null>;
  * @param q Specifies the query term to search for.
  * @param type Restricts the search query to only retrieve a particular type of resource.
  */
-declare function listSearchResults(q: string, type: "video" | "channel" | "playlist"): Promise<SearchListResponse | null>;
+declare function listSearchResults(q: string, type: SearchResultTypes): Promise<SearchListResponse | null>;
 
 export {
+    SearchResultTypes as SearchResultType,
     Video,
     PlaylistItem,
     Playlist,

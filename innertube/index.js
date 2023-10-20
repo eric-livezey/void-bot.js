@@ -50,7 +50,13 @@ function decipher(js, signatureCipher) {
     return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
 
-export class Video {
+const SearchResultTypes = {
+    VIDEO: "video",
+    CHANNEL: "channel",
+    PLAYLIST: "playlist"
+};
+
+class Video {
     kind;
     id;
     publishedAt;
@@ -122,12 +128,12 @@ export class Video {
             regionRestriction: {
                 allowed: data.microformat?.playerMicroformatRenderer.availableCountries,
             },
-            ageRestricted: data.playabilityStatus?.reason == "Sign in to confirm your age",
+            ageRestricted: data.playabilityStatus?.reason === "Sign in to confirm your age",
             projection: data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase(),
         };
         this.status = {
-            uploadStatus: data.playabilityStatus?.reason == "We're processing this video. Check back later." ? "uploaded" : "processed",
-            privacyStatus: data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] == "This is a private video. Please sign in to verify that you may see it." ? "private" : "public",
+            uploadStatus: data.playabilityStatus?.reason === "We're processing this video. Check back later." ? "uploaded" : "processed",
+            privacyStatus: data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public",
             embeddable: data.playabilityStatus?.playableInEmbed,
         };
         this.statistics = {
@@ -332,7 +338,7 @@ class SearchResult {
         };
         this.channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
         this.title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
-        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
+        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs?.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
         this.thumbnails = {
             default: {
                 url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
@@ -361,7 +367,7 @@ class SearchResult {
             } : undefined
         }
         this.channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.title : playlistData.longBylineText.runs[0].text;
-        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label == "LIVE") ? "live" : "none";
+        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label === "LIVE") ? "live" : "none";
     }
 }
 
@@ -384,6 +390,9 @@ class SearchListResponse {
             .find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
             .map((value) => new SearchResult(value));
+        if (!items) {
+            console.log(data);
+        }
         this.items = items ? items : [];
     }
 
@@ -417,7 +426,7 @@ async function getVideo(id) {
         racyCheckOk: false,
         contentCheckOk: false
     })
-    if (response.status == 200) {
+    if (response.status === 200) {
         return new Video(await response.json(), js);
     } else {
         return null;
@@ -426,7 +435,7 @@ async function getVideo(id) {
 
 async function getPlaylist(id) {
     const response = await request("/browse", { browseId: "VL" + id });
-    if (response.status == 200) {
+    if (response.status === 200) {
         return new Playlist(await response.json());
     } else {
         return null;
@@ -436,9 +445,9 @@ async function getPlaylist(id) {
 async function listSearchResults(q, type) {
     const response = await request("/search", {
         query: q,
-        params: type == "video" ? "EgIQAQ%3D%3D" : type == "channel" ? "EgIQAg%3D%3D" : type == "playlist" ? "EgIQAw%3D%3D" : undefined
+        params: type === SearchResultTypes.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultTypes.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultTypes.PLAYLIST ? "EgIQAw%3D%3D" : undefined
     })
-    if (response.status == 200) {
+    if (response.status === 200) {
         return new SearchListResponse(await response.json());
     } else {
         return null;
@@ -446,6 +455,12 @@ async function listSearchResults(q, type) {
 }
 
 export {
+    SearchResultTypes as SearchResultType,
+    Video,
+    PlaylistItem,
+    Playlist,
+    SearchResult,
+    SearchListResponse,
     getVideo,
     getPlaylist,
     listSearchResults
