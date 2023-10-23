@@ -5,6 +5,7 @@ const CLIENTS = {
 const JS_CACHE = {};
 
 async function request(path, body) {
+    // Append base context to body
     body = {
         ...body,
         context: {
@@ -28,20 +29,30 @@ async function request(path, body) {
 }
 
 async function getPlayerId(videoId) {
+    // Fetch source video HTML
     const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
+    // Find the player id
     var startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
     return html.substring(startIndex, html.indexOf("/", startIndex));
 }
 
 async function getJs(playerId) {
+    // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
+        // Fetch JS with player id
         const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text());
+        // Find the object containing decipher functions
         const f = js.search(/var [A-Za-z]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})/);
+        // Find the function for deciphering signature ciphers
         const d = js.indexOf("function(a){a=a.split(\"\")") + 11;
+        // Find the signature timestamp
         const s = js.indexOf("signatureTimestamp:") + 19;
+        // Find the first comma after the signature timestamp
         const c = js.indexOf(",", s);
+        // Find the first bracket after the signature timestamp
         const b = js.indexOf("}", s);
-        eval(`${js.substring(f, js.indexOf("}}", f) + 2)};JS_CACHE[playerId]={decipher:(a)=>${js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18)},signatureTimestamp:${Number(js.substring(s, c < b && c != -1 ? c : b))}}`);
+        // Evaluate the code that will save a new object to the cache
+        eval(`${/* save the object with decipher functions */js.substring(f, js.indexOf("}}", f) + 2)};JS_CACHE[playerId]={decipher:(a)=>${/* save function for deciphering as anonymous function */js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18)},signatureTimestamp:${/* signature timestamp ends with either a comma or a bracket */Number(js.substring(s, c < b && c != -1 ? c : b))}}`);
     }
     return JS_CACHE[playerId];
 }
@@ -306,6 +317,9 @@ class Playlist {
         var items = contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer));
         var continuation = this.#contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         while (continuation) {
+            /**
+             * @type {import("./rawTypes").RawBrowseContinuationData}
+             */
             const data = await (await request("/browse", { continuation: continuation })).json();
             contents = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems;
             items = items.concat(contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer)));

@@ -21,7 +21,7 @@ export function now(): string;
  * 
  * @param options 
  * @param body 
- * @deprecated {@link fetch}
+ * @deprecated use {@link fetch}
  */
 export function httpsRequest(options: string | RequestOptions | URL, body: string): Promise<{
     statusCode: number,

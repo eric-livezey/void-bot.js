@@ -596,7 +596,7 @@ function moveCommand(guild, source, destination) {
         return `${destination} is not a valid index in the queue.`;
     }
     if (source == destination) {
-        return "Indexes must not be equal.";
+        return "Indices must not be equal.";
     }
     var track = player.queue.splice(source - 1, 1)[0];
     if (source > destination) {
