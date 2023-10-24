@@ -251,7 +251,7 @@ function getEmojiIdentifier(emoji) {
     } else {
         // Emoji is custom
         const format = formatEmoji(emoji.id, emoji.animated).substring(1);
-        return format.startsWith(":") ? format.substring(1, format.length - 1) : format.substring(format.length - 1)
+        return format.substring(format.startsWith(":") ? 1 : 0, format.length - 1);
     }
 }
 
