@@ -148,6 +148,14 @@ class Player {
         }
     }
 
+    pause() {
+        return this.audioPlayer.pause();
+    }
+
+    resume() {
+        return this.audioPlayer.unpause();
+    }
+
     /**
      * Skips the currently playing track if there is one.
      * 
@@ -156,6 +164,7 @@ class Player {
     skip() {
         if (this.nowPlaying) {
             this.nowPlaying.skipped = true;
+            this.resume();
             return this.audioPlayer.stop();
         } else {
             return false;
@@ -246,10 +255,10 @@ function getPlayer(guildId) {
  */
 function getEmojiIdentifier(emoji) {
     if (!emoji.id) {
-        // Emoji is unicode
+        // emoji is unicode
         return encodeURIComponent(emoji.name);
     } else {
-        // Emoji is custom
+        // emoji is custom
         const format = formatEmoji(emoji.id, emoji.animated).substring(1);
         return format.substring(format.startsWith(":") ? 1 : 0, format.length - 1);
     }
@@ -536,9 +545,12 @@ async function playCommand(interaction, query) {
     } else {
         // Query is a search query
         const search = await listSearchResults(query, "video");
-        // Check if there are 0 results
+        // Check if there are 0 total results
         if (search.pageInfo.totalResults === 0) {
             return { content: "There were no results for your query.", ephemeral: true };
+        } else if (search.items.length === 0) {
+            // If the items list is still empty, try again
+            return await playCommand(interaction, query);
         }
         videoId = search.items[0].id.videoId;
     }
@@ -554,8 +566,31 @@ async function playCommand(interaction, query) {
     return { content: content, embeds: [createVideoEmbed(video)] };
 }
 
-async function resumeCommand(interaction) {
-    return "RESUME_COMMAND";
+/**
+ * Pauses the currently playing track.
+ * 
+ * @param {ChatInputCommandInteraction} interaction 
+ */
+function pauseCommand(interaction) {
+    const player = getPlayer(interaction.guildId);
+    if (player.nowPlaying === null) {
+        return "Nothing is playing";
+    }
+    return player.pause() ? "Audio paused." : "The player is already paused.";
+}
+
+/**
+ * Resumes the currently playing audio track.
+ * 
+ * @param {ChatInputCommandInteraction} interaction 
+ * @returns 
+ */
+function resumeCommand(interaction) {
+    const player = getPlayer(interaction.guildId);
+    if (player.nowPlaying === null) {
+        return "Nothing is playing";
+    }
+    return player.resume() ? "Audio resumed." : "The player is not paused.";
 }
 
 /**
@@ -721,7 +756,7 @@ async function reactionRolesCommand(interaction, subcommand) {
             // Delete the reaction role
             deleteReactionRole(interaction.guildId, interaction.channelId, message.id, emoji ? getEmojiIdentifier(emoji) : undefined);
             // Reaction role deletion was successful
-            return { content: `Reaction role ${emojis.length > 1 ? "s" : ""} successfully removed.`, ephemeral: true };
+            return { content: `Reaction role${emojis.length > 1 ? "s" : ""} successfully removed.`, ephemeral: true };
     }
 }
 
@@ -760,10 +795,12 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 // Play command
                 response = await playCommand(interaction, interaction.options.getString("query", true));
                 break;
-            case "PAUSE_PLACEHOLDER":
+            case "1168907698163679383":
                 // Pause command
+                response = pauseCommand(interaction);
                 break;
-            case "RESUME_PLACEHOLDER":
+            case "1168907890891964548":
+                response = resumeCommand(interaction);
                 // Resume command
                 break;
             case "1153327771460829184":

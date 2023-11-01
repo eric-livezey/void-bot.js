@@ -431,8 +431,10 @@ async function play(member, query) {
         // Query is a search query
         const search = await listSearchResults(query, "video");
         // Check if there are 0 results
-        if (search.items.length == 0) {
+        if (search.pageInfo.totalResults === 0) {
             return "There were no results for your query.";
+        } else if (search.items.length === 0) {
+            return await play(member, query);
         }
         // Get the video ID of the first search result
         videoId = search.items[0].id.videoId;
