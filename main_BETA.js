@@ -2,7 +2,7 @@ import { AudioPlayer, AudioPlayerStatus, AudioResource, StreamType, VoiceConnect
 import { ChannelType, ChatInputCommandInteraction, Client, Colors, CommandInteraction, EmbedBuilder, Events, Partials, PermissionFlagsBits, Routes, VoiceChannel, formatEmoji, parseEmoji } from "discord.js";
 import { readFileSync, writeFileSync } from "fs";
 import { Readable } from "stream";
-import { Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
+import { Playlist, SearchResultTypes, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { Duration } from "./innertube/utils.js";
 import { getMusicSearchSuggestions } from "./innertube/videos.js";
 
@@ -387,14 +387,14 @@ function createVideoEmbed(video, startTime) {
             .setColor(Colors.Red)
             .setTitle("Unavailable Video")
             .setDescription("The video is unavailable.");
-    } else if (video.status.privacyStatus === "private") {
+    } else if (video.privacyStatus === "private") {
         // Video is private error
         eb
             .setColor(Colors.Red)
             .setTitle("Private Video")
             .setDescription("The video is private.");
     } else {
-        if (video.contentDetails.ageRestricted) {
+        if (video.ageRestricted) {
             // Video is age restricted error, but we can still display the video info
             eb
                 .setColor(Colors.Red)
@@ -406,7 +406,7 @@ function createVideoEmbed(video, startTime) {
             .setURL("https://www.youtube.com/watch?v=" + video.id)
             .setAuthor({ name: video.channelTitle, url: "https://www.youtube.com/channel/" + video.channelId })
             .setThumbnail(video.thumbnails.maxres.url)
-            .addFields({ name: "Duration", value: (startTime ? new Duration(Math.floor((Date.now() - startTime) / 1000)).format() + "/" : "") + new Duration(video.contentDetails.duration.total).format() });
+            .addFields({ name: "Duration", value: (startTime ? new Duration(Math.floor((Date.now() - startTime) / 1000)).format() + "/" : "") + new Duration(video.duration.total).format() });
     }
     return eb.data;
 }
@@ -444,10 +444,10 @@ async function playPlaylist(interaction, listId) {
     var total = 0;
     for (const listItem of await playlist.listItems()) {
         const video = await getVideo(listItem.id);
-        if (video === null || video.status.privacyStatus === "private") {
+        if (video === null || video.privacyStatus === "private") {
             // Video is private or unavailable
             continue;
-        } else if (video.contentDetails.ageRestricted) {
+        } else if (video.ageRestricted) {
             // Video is age restricted
             continue;
         }
@@ -544,20 +544,26 @@ async function playCommand(interaction, query) {
         }
     } else {
         // Query is a search query
-        const search = await listSearchResults(query, "video");
+        var search = await listSearchResults(query, SearchResultTypes.VIDEO);
         // Check if there are 0 total results
-        if (search.pageInfo.totalResults === 0) {
+        if (search.totalResults === 0) {
             return { content: "There were no results for your query.", ephemeral: true };
-        } else if (search.items.length === 0) {
+        }
+        var attempts = 1;
+        while (search.items.length === 0) {
+            if (attempts === 10) {
+                return { content: "Something went wrong with your search.", ephemeral: true };
+            }
             // If the items list is still empty, try again
-            return await playCommand(interaction, query);
+            search = await listSearchResults(query, SearchResultTypes.VIDEO);
+            attempts++;
         }
         videoId = search.items[0].id.videoId;
     }
     const video = await getVideo(videoId);
     const player = getPlayer(interaction.guildId);
     var content;
-    if (video === null || video.status.privacyStatus === "private" || video.contentDetails.ageRestricted) {
+    if (video === null || video.privacyStatus === "private" || video.ageRestricted) {
         // Track cannot be played
         content = "**Issue Playing Track:**";
     } else {
@@ -654,7 +660,7 @@ async function streamsCommand(interaction, link) {
     interaction.deferReply();
     const video = await getVideo(videoId);
     const embeds = [createVideoEmbed(video)];
-    if (video === null || video.status.privacyStatus === "private" || video.contentDetails.ageRestricted) {
+    if (video === null || video.privacyStatus === "private" || video.ageRestricted) {
         interaction.editReply({ content: "**Error getting audio streams:**", embeds: embeds });
         return null;
     }

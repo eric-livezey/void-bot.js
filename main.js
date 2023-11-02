@@ -429,12 +429,19 @@ async function play(member, query) {
         }
     } else {
         // Query is a search query
-        const search = await listSearchResults(query, "video");
+        var search = await listSearchResults(query, "video");
         // Check if there are 0 results
-        if (search.pageInfo.totalResults === 0) {
+        if (search.totalResults === 0) {
             return "There were no results for your query.";
-        } else if (search.items.length === 0) {
-            return await play(member, query);
+        }
+        // Count attempts
+        var attempt = 1;
+        while (search.items.length === 0) {
+            if (attempt === 10) {
+                return "Something went wrong.";
+            }
+            search = await listSearchResults(query, "video");
+            attempt++;
         }
         // Get the video ID of the first search result
         videoId = search.items[0].id.videoId;

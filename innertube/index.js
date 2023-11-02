@@ -68,7 +68,6 @@ const SearchResultTypes = {
 };
 
 class Video {
-    kind;
     id;
     publishedAt;
     channelId;
@@ -87,7 +86,6 @@ class Video {
     liveStreamingDetails;
 
     constructor(data, js) {
-        this.kind = "youtubevideo";
         this.id = data.videoDetails?.videoId;
         this.publishedAt = data.microformat ? new Date(data.microformat.playerMicroformatRenderer.publishDate) : undefined;
         this.channelId = data.videoDetails?.channelId;
@@ -124,35 +122,27 @@ class Video {
         this.tags = data.videoDetails?.keywords;
         this.category = data.microformat?.playerMicroformatRenderer.category;
         this.liveBroadcastContent = data.videoDetails?.isLive ? "live" : data.videoDetails?.isLiveContent ? "upcoming" : "none";
-        this.contentDetails = {
-            duration: data.videoDetails ? ((seconds) => {
-                return {
-                    total: seconds,
-                    days: Math.floor(seconds / 86400),
-                    hours: Math.floor(seconds % 86400 / 3600),
-                    minutes: Math.floor(seconds % 3600 / 60),
-                    seconds: seconds % 60
-                }
-            })(Number(data.videoDetails.lengthSeconds)) : undefined,
-            dimension: null,
-            definition: null,
-            regionRestriction: {
-                allowed: data.microformat?.playerMicroformatRenderer.availableCountries,
-            },
-            ageRestricted: data.playabilityStatus?.reason === "Sign in to confirm your age",
-            projection: data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase(),
+        this.duration = data.videoDetails ? ((seconds) => {
+            return {
+                total: seconds,
+                days: Math.floor(seconds / 86400),
+                hours: Math.floor(seconds % 86400 / 3600),
+                minutes: Math.floor(seconds % 3600 / 60),
+                seconds: seconds % 60
+            }
+        })(Number(data.videoDetails.lengthSeconds)) : undefined;
+        this.dimension = null;
+        this.definition = null;
+        this.regionRestriction = {
+            allowed: data.microformat?.playerMicroformatRenderer.availableCountries
         };
-        this.status = {
-            uploadStatus: data.playabilityStatus?.reason === "We're processing this video. Check back later." ? "uploaded" : "processed",
-            privacyStatus: data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public",
-            embeddable: data.playabilityStatus?.playableInEmbed,
-        };
-        this.statistics = {
-            viewCount: Number(data.videoDetails?.viewCount),
-        };
-        this.player = {
-            embedHtml: data.microformat ? `\u003ciframe width=\"${data.microformat.playerMicroformatRenderer.embed.width}\" height=\"${data.microformat.playerMicroformatRenderer.embed.height}\" src=\"${data.microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e` : undefined
-        };
+        this.ageRestricted = data.playabilityStatus?.reason === "Sign in to confirm your age";
+        this.projection = data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase();
+        this.uploadStatus = data.playabilityStatus?.reason === "We're processing this video. Check back later." ? "uploaded" : "processed";
+        this.privacyStatus = data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public";
+        this.embeddable = data.playabilityStatus?.playableInEmbed;
+        this.viewCount = Number(data.videoDetails?.viewCount);
+        this.embedHtml = data.microformat ? `\u003ciframe width=\"${data.microformat.playerMicroformatRenderer.embed.width}\" height=\"${data.microformat.playerMicroformatRenderer.embed.height}\" src=\"${data.microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e` : undefined;
         this.fileDetails = {
             videoStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("video") && value).map((value) => {
                 return {
@@ -187,7 +177,6 @@ class Video {
 }
 
 class PlaylistItem {
-    kind;
     id;
     title;
     thumbnails;
@@ -199,7 +188,6 @@ class PlaylistItem {
     status;
 
     constructor(data) {
-        this.kind = "youtube#playlistItem";
         this.id = data.videoId;
         this.title = data.title.runs.map((value) => value.text).join();
         this.thumbnails = {
@@ -232,21 +220,12 @@ class PlaylistItem {
         this.videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
         this.position = Number(data.index.simpleText);
-        this.resourceId = {
-            kind: "youtube#video",
-            videoId: this.id
-        };
-        this.contentDetails = {
-            videoId: this.id
-        };
-        this.status = {
-            privacyStatus: "public"
-        };
+        this.videoId = this.id;
+        this.privacyStatus = "public";
     };
 }
 
 class Playlist {
-    kind;
     id;
     channelId;
     title;
@@ -258,7 +237,6 @@ class Playlist {
     #contents;
 
     constructor(data) {
-        this.kind = "youtube#playlist";
         this.id = data.header?.playlistHeaderRenderer.playlistId;
         this.channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
         this.title = data.header?.playlistHeaderRenderer.title.simpleText;
@@ -300,12 +278,8 @@ class Playlist {
             return thumbnails;
         })(data.header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails) : undefined;
         this.channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
-        this.status = {
-            privacyStatus: data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private"
-        }
-        this.contentDetails = {
-            itemCount: data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]) : undefined
-        }
+        this.privacyStatus = data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private";
+        this.itemCount = data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]) : undefined;
         this.#contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
     }
 
@@ -330,7 +304,6 @@ class Playlist {
 }
 
 class SearchResult {
-    kind;
     id;
     channelId;
     title;
@@ -340,12 +313,11 @@ class SearchResult {
     liveBroadcastContent;
 
     constructor(data) {
-        this.kind = "youtube#searchResult";
         const videoData = data.videoRenderer;
         const channelData = data.channelRenderer;
         const playlistData = data.playlistRenderer
         this.id = {
-            kind: videoData ? "youtube#video" : channelData ? "youtube#channel" : "youtube#playlist",
+            kind: videoData ? SearchResultTypes.VIDEO : channelData ? SearchResultTypes.CHANNEL : SearchResultTypes.PLAYLIST,
             videoId: videoData?.videoId,
             channelId: channelData?.channelId,
             playlistId: playlistData?.playlistId
@@ -386,20 +358,16 @@ class SearchResult {
 }
 
 class SearchListResponse {
-    kind;
     nextPageToken;
     regionCode;
     pageInfo;
     items;
 
     constructor(data) {
-        this.kind = "youtube#searchListResponse";
         this.nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         this.regionCode = "US";
-        this.pageInfo = {
-            totalResults: Number(data.estimatedResults),
-            resultsPerPage: null
-        };
+        this.totalResults = Number(data.estimatedResults);
+        this.resultsPerPage = null;
         const items = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents
             .find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
             .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
@@ -469,7 +437,7 @@ async function listSearchResults(q, type) {
 }
 
 export {
-    SearchResultTypes as SearchResultType,
+    SearchResultTypes,
     Video,
     PlaylistItem,
     Playlist,
