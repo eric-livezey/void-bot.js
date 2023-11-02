@@ -78,10 +78,17 @@ class Video {
     tags;
     category;
     liveBroadcastContent;
-    contentDetails;
-    status;
-    statistics;
-    player;
+    duration;
+    dimension;
+    definition;
+    regionRestriction;
+    ageRestricted;
+    projection;
+    uploadStatus;
+    privacyStatus;
+    embeddable;
+    viewCount;
+    embedHtml;
     fileDetails;
     liveStreamingDetails;
 
@@ -183,9 +190,8 @@ class PlaylistItem {
     videoOwnerChannelTitle;
     playlistId;
     position;
-    resourceId;
-    contentDetails;
-    status;
+    videoId;
+    privacyStatus;
 
     constructor(data) {
         this.id = data.videoId;
@@ -232,8 +238,8 @@ class Playlist {
     description;
     thumbnails;
     channelTitle;
-    status;
-    contentDetails;
+    privacyStatus;
+    itemCount;
     #contents;
 
     constructor(data) {
@@ -360,7 +366,8 @@ class SearchResult {
 class SearchListResponse {
     nextPageToken;
     regionCode;
-    pageInfo;
+    totalResults;
+    resultsPerPage;
     items;
 
     constructor(data) {
