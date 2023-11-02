@@ -61,10 +61,6 @@ declare enum SearchResultTypes {
  */
 declare class Video {
     /**
-     * Identifies the API resource's type. The value will be `youtube#video`.
-     */
-    readonly kind: "youtube#video";
-    /**
      * The ID that YouTube uses to uniquely identify the video.
      */
     readonly id: string;
@@ -111,100 +107,80 @@ declare class Video {
      */
     readonly liveBroadcastContent: "live" | "none" | "upcoming";
     /**
-     * The `contentDetails` object contains information about the video content, including the length of the video and an indication of whether captions are available for the video.
+     * The length of the video.
      */
-    readonly contentDetails: {
+    readonly duration: {
         /**
-         * The length of the video.
+         * Total length in seconds.
          */
-        readonly duration: {
-            /**
-             * Total length in seconds.
-             */
-            readonly total: number;
-            /**
-             * Number of seconds.
-             */
-            readonly seconds: number;
-            /**
-             * Number of minutes.
-             */
-            readonly minutes: number;
-            /**
-             * Number of hours.
-             */
-            readonly hours: number;
-            /**
-             * Number of days.
-             */
-            readonly days: number;
-        };
+        readonly total: number;
         /**
-         * Indicates whether the video is available in 3D or in 2D.
+         * Number of seconds.
          */
-        readonly dimension: "2d" | "3d";
+        readonly seconds: number;
         /**
-         * Indicates whether the video is available in high definition (HD) or only in standard definition.
+         * Number of minutes.
          */
-        readonly definition: "hd" | "sd";
+        readonly minutes: number;
         /**
-         * The `regionRestriction` object contains information about the countries where a video is (or is not) viewable. The object will contain either the `contentDetails.regionRestriction.allowed` property or the `contentDetails.regionRestriction.blocked` property.
+         * Number of hours.
          */
-        readonly regionRestriction: {
-            /**
-             * A list of region codes that identify countries where the video is viewable. If this property is present and a country is not listed in its value, then the video is blocked from appearing in that country. If this property is present and contains an empty list, the video is blocked in all countries.
-             */
-            readonly allowed?: string[];
-            /**
-             * A list of region codes that identify countries where the video is blocked. If this property is present and a country is not listed in its value, then the video is viewable in that country. If this property is present and contains an empty list, the video is viewable in all countries.
-             */
-            readonly blocked?: string[];
-        };
+        readonly hours: number;
         /**
-         * Indicates whether the video is age restricted.
+         * Number of days.
          */
-        readonly ageRestricted: boolean;
-        /**
-         * Specifies the projection format of the video.
-         */
-        readonly projection: "360" | "rectangular";
+        readonly days: number;
     };
     /**
-     * The `status` object contains information about the video's uploading, processing, and privacy statuses.
+     * Indicates whether the video is available in 3D or in 2D.
      */
-    readonly status: {
+    readonly dimension: "2d" | "3d";
+    /**
+     * Indicates whether the video is available in high definition (HD) or only in standard definition.
+     */
+    readonly definition: "hd" | "sd";
+    /**
+     * The `regionRestriction` object contains information about the countries where a video is (or is not) viewable. The object will contain either the `contentDetails.regionRestriction.allowed` property or the `contentDetails.regionRestriction.blocked` property.
+     */
+    readonly regionRestriction: {
         /**
-         * The status of the uploaded video.
+         * A list of region codes that identify countries where the video is viewable. If this property is present and a country is not listed in its value, then the video is blocked from appearing in that country. If this property is present and contains an empty list, the video is blocked in all countries.
          */
-        readonly uploadStatus: "processed" | "uploaded";
+        readonly allowed?: string[];
         /**
-         * The video's privacy status.
+         * A list of region codes that identify countries where the video is blocked. If this property is present and a country is not listed in its value, then the video is viewable in that country. If this property is present and contains an empty list, the video is viewable in all countries.
          */
-        readonly privacyStatus: "private" | "public" | "unlisted";
-        /**
-         * This value indicates whether the video can be embedded on another website.
-         */
-        readonly embeddable: boolean;
+        readonly blocked?: string[];
     };
     /**
-     * The `statistics` object contains statistics about the video.
+     * Indicates whether the video is age restricted.
      */
-    readonly statistics: {
-        /**
-         * The number of times the video has been viewed.
-         */
-        readonly viewCount: number;
-    };
+    readonly ageRestricted: boolean;
     /**
-     * The `player` object contains information that you would use to play the video in an embedded player.
+     * Specifies the projection format of the video.
      */
-    readonly player: {
-        /**
-         * An `<iframe>` tag that embeds a player that plays the video.
-         * - If the video's aspect ratio is unknown, the embedded player defaults to a 4:3 format.
-         */
-        readonly embedHtml: string;
-    };
+    readonly projection: "360" | "rectangular";
+    /**
+     * The status of the uploaded video.
+     */
+    readonly uploadStatus: "processed" | "uploaded";
+    /**
+     * The video's privacy status.
+     */
+    readonly privacyStatus: "private" | "public" | "unlisted";
+    /**
+     * This value indicates whether the video can be embedded on another website.
+     */
+    readonly embeddable: boolean;
+    /**
+     * The number of times the video has been viewed.
+     */
+    readonly viewCount: number;
+    /**
+     * An `<iframe>` tag that embeds a player that plays the video.
+     * - If the video's aspect ratio is unknown, the embedded player defaults to a 4:3 format.
+     */
+    readonly embedHtml: string;
     /**
      * The `fileDetails` object encapsulates information about the video file that was uploaded to YouTube, including the file's resolution, duration, audio and video codecs, stream bitrates, and more.
      */
@@ -325,10 +301,6 @@ declare class Video {
  */
 declare class PlaylistItem {
     /**
-     * Identifies the API resource's type. The value will be `youtube#playlistItem`.
-     */
-    readonly kind: "youtube#playlistItem";
-    /**
      * The ID that YouTube uses to uniquely identify the playlist item.
      */
     readonly id: string;
@@ -357,36 +329,13 @@ declare class PlaylistItem {
      */
     readonly position: number;
     /**
-     * The `resourceId` object contains information that can be used to uniquely identify the resource that is included in the playlist as the playlist item.
+     * The ID that YouTube uses to uniquely identify a video. To {@link getVideo retrieve the `video` resource}, set the `id` query parameter to this value in your API request.
      */
-    readonly resourceId: {
-        /**
-         * The kind, or type, of the referred resource.
-         */
-        readonly kind: string;
-        /**
-         * If the `resourceId.kind` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify the video in the playlist.
-         */
-        readonly videoId: string;
-    };
+    readonly videoId: string;
     /**
-     * The `contentDetails` object is included in the resource if the included item is a YouTube video. The object contains additional information about the video.
+     * The playlist item's privacy status.
      */
-    readonly contentDetails: {
-        /**
-         * The ID that YouTube uses to uniquely identify a video. To {@link getVideo retrieve the `video` resource}, set the `id` query parameter to this value in your API request.
-         */
-        readonly videoId: string;
-    };
-    /**
-     * The `status` object contains information about the playlist item's privacy status.
-     */
-    readonly status: {
-        /**
-         * The playlist item's privacy status.
-         */
-        readonly privacyStatus: "private" | "public" | "unlisted";
-    };
+    readonly privacyStatus: "private" | "public" | "unlisted";
 
     constructor(data: RawPlaylistItemData)
 }
@@ -395,10 +344,6 @@ declare class PlaylistItem {
  * A `playlist` resource represents a YouTube playlist. A playlist is a collection of videos that can be viewed sequentially and shared with other users. By default, playlists are publicly visible to other users, but playlists can be public or private.
  */
 declare class Playlist {
-    /**
-     * Identifies the API resource's type. The value will be `youtube#playlist`.
-     */
-    readonly kind: "youtube#playlist";
     /**
      * The ID that YouTube uses to uniquely identify the playlist.
      */
@@ -424,23 +369,13 @@ declare class Playlist {
      */
     readonly channelTitle: string;
     /**
-     * The `status` object contains status information for the playlist.
+     * The playlist's privacy status.
      */
-    readonly status: {
-        /**
-         * The playlist's privacy status.
-         */
-        readonly privacyStatus: "private" | "public" | "unlisted";
-    };
+    readonly privacyStatus: "private" | "public" | "unlisted";
     /**
-     * The `contentDetails` object contains information about the playlist content, including the number of videos in the playlist.
+     * The number of videos in the playlist.
      */
-    readonly contentDetails: {
-        /**
-         * The number of videos in the playlist.
-         */
-        readonly itemCount: number;
-    };
+    readonly itemCount: number;
 
     /**
      * Returns a collection of playlist items from this playlist.
@@ -455,27 +390,23 @@ declare class Playlist {
  */
 declare class SearchResult {
     /**
-     * Identifies the API resource's type. The value will be `youtube#searchResult`.
-     */
-    readonly kind: "youtube#searchResult";
-    /**
      * The `id` object contains information that can be used to uniquely identify the resource that matches the search request.
      */
     readonly id: {
         /**
          * The type of the API resource.
          */
-        readonly kind: "youtube#video" | "youtube#channel" | "youtube#playlist";
+        readonly type: SearchResultTypes;
         /**
-         * If the `id.kind` property's value is `youtube#video`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
+         * If the `id.type` property's value is {@link SearchResultTypes.VIDEO}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
          */
         readonly videoId?: string;
         /**
-         * If the `id.kind` property's value is `youtube#channel`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
+         * If the `id.type` property's value is {@link SearchResultTypes.CHANNEL}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
          */
         readonly channelId?: string;
         /**
-         * If the `id.kind` property's value is `youtube#playlist`, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
+         * If the `id.type` property's value is {@link SearchResultTypes.PLAYLIST}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
          */
         readonly playlistId?: string;
     };
@@ -514,10 +445,6 @@ declare class SearchResult {
  */
 declare class SearchListResponse {
     /**
-     * Identifies the API resource's type. The value will be `youtube#searchListResponse`.
-     */
-    readonly kind: "youtube#searchListResponse";
-    /**
      * The token that can be used as the value of the `pageToken` parameter to retrieve the next page in the result set.
      */
     readonly nextPageToken: string;
@@ -526,20 +453,15 @@ declare class SearchListResponse {
      */
     readonly regionCode: "US";
     /**
-     * The `pageInfo` object encapsulates paging information for the result set.
+     * The total number of results in the result set.Please note that the value is an approximation and may not represent an exact value. In addition, the maximum value is 1,000,000.
+     * 
+     * You should not use this value to create pagination links. Instead, use the `nextPageToken` property value to determine whether to show pagination links.
      */
-    readonly pageInfo: {
-        /**
-         * The total number of results in the result set.Please note that the value is an approximation and may not represent an exact value. In addition, the maximum value is 1,000,000.
-         * 
-         * You should not use this value to create pagination links. Instead, use the `nextPageToken` property value to determine whether to show pagination links.
-         */
-        readonly totalResults: number;
-        /**
-         * The number of results included in the API response.
-         */
-        readonly resultsPerPage: number;
-    };
+    readonly totalResults: number;
+    /**
+     * The number of results included in the API response.
+     */
+    readonly resultsPerPage: number;
     /**
      * A list of results that match the search criteria.
      */
@@ -571,7 +493,7 @@ declare function getPlaylist(id: string): Promise<Playlist | null>;
 declare function listSearchResults(q: string, type: SearchResultTypes): Promise<SearchListResponse | null>;
 
 export {
-    SearchResultTypes as SearchResultType,
+    SearchResultTypes,
     Video,
     PlaylistItem,
     Playlist,
