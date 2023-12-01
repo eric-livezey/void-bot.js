@@ -163,8 +163,12 @@ class Player {
             this.audioResource.volume.setVolume(this.volume);
             this.audioPlayer.play(this.audioResource);
             this.nowPlaying.startTime = Date.now();
+            return true;
         } catch {
-            this.play(new Track(await Videos.get(this.nowPlaying.id)));
+            // Something went wrong, reset and return false
+            this.nowPlaying = null;
+            this.audioResource = null;
+            return false;
         }
     }
 
@@ -220,7 +224,7 @@ class Track {
     path;
 
     /**
-     * @param {Videos.Video | null} video
+     * @param {Videos.Video} video
      */
     constructor(video) {
         this.id = video.id;
@@ -271,6 +275,12 @@ class Track {
 
 // Commands
 
+/**
+ * 
+ * @param {Player} player 
+ * @param {string} listId 
+ * @returns 
+ */
 async function playPlaylist(player, listId) {
     return new Promise(async (resolve) => {
         // Get the playlist by id
@@ -310,7 +320,9 @@ async function playPlaylist(player, listId) {
                 player.queue.push(track);
             } else {
                 // Nothing is playing, play it
-                player.play(track);
+                if (!player.play(track)) {
+                    continue;
+                }
             }
             totalAdded++;
         }
@@ -434,10 +446,10 @@ async function play(member, query) {
         if (search.totalResults === 0) {
             return "There were no results for your query.";
         }
-        // Count attempts
+        // Arbitrarily try 25 times since inntertube items is sometimes 0
         var attempt = 1;
         while (search.items.length === 0) {
-            if (attempt === 10) {
+            if (attempt === 25) {
                 return "Something went wrong.";
             }
             search = await listSearchResults(query, "video");
@@ -482,8 +494,12 @@ async function play(member, query) {
             resolve({ content: "**Added to the queue:**", embeds: [track.embed()] });
         } else {
             // Nothing is playing, play it
-            player.play(track);
-            resolve({ content: "**Now playing:**", embeds: [track.embed()] });
+            if (!player.play(track)) {
+                resolve("Something went wrong.");
+                console.log(track);
+            } else {
+                resolve({ content: "**Now playing:**", embeds: [track.embed()] });
+            }
         }
     });
 }
@@ -869,11 +885,9 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "evaluate":
                 case "eval":
-                case "e":
-                case "math":
                     // Evaluate
                     try {
-                        response = String(evaluate(args.join()));
+                        response = String(evaluate(args.join(" ")));
                     } catch (e) {
                         response = e.message;
                     }
@@ -893,13 +907,13 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "shuffle", value: "Shuffles the queue." },
                             { name: "loop", value: "Loops the currently playing track." },
                             { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
-                            { name: "evaluate|eval|e|math [expression]", value: "Evaluate a mathematical expression." },
+                            { name: "evaluate|eval [expression]", value: "Evaluate a mathematical expression." },
                             { name: "volume [percentage]", value: "Set the volume to the specified percentage" },
                             { name: "help", value: "Display this message." }).data]
                     };
                     break;
                 default:
-                    response = "Unrecognized command."
+                    response = "Unrecognized command.\nUse `.help` for a list of commands.";
                     break;
             }
             await message.channel.send(response);

@@ -492,6 +492,22 @@ declare function getPlaylist(id: string): Promise<Playlist | null>;
  */
 declare function listSearchResults(q: string, type: SearchResultTypes): Promise<SearchListResponse | null>;
 
+/**
+ * Returns an object representing a device code and verification URL for a linking device.
+ */
+declare function getDeviceCode(): Promise<{
+    deviceCode: string,
+    userCode: string,
+    expires: number,
+    verificationUrl: string
+}>
+
+/**
+ * Sets the bearer token to whatever is returned using the given device code
+ * @param deviceCode A device code
+ */
+declare function setBearerToken(deviceCode: string): Promise<void>;
+
 export {
     SearchResultTypes,
     Video,
@@ -501,5 +517,7 @@ export {
     SearchListResponse,
     getVideo,
     getPlaylist,
-    listSearchResults
+    listSearchResults,
+    getDeviceCode,
+    setBearerToken
 }

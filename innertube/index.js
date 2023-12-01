@@ -1,27 +1,47 @@
 const CLIENTS = {
-    youtube: { id: 1, name: "WEB", version: "2.20230914.04.00" }
+    WEB: { id: 1, name: "WEB", version: "2.20230914.04.00" },
+    ANDROID_EMBED: { name: "ANDROID", version: "16.20", screen: "EMBED" }
 }
+
+// Client secrets for YouTube on TV
+const CLIENT_ID = "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com";
+const CLIENT_SECRET = "SboVhoG9s0rNafixCSGGKXAT";
 
 const JS_CACHE = {};
 
+const BEARER_TOKEN = {};
+
 async function request(path, body) {
+    var useOAuth = false;
+    var client = CLIENTS.WEB;
+    // Check if bearer token is set
+    if (BEARER_TOKEN.access_token) {
+        // Check if bearer token is still valid
+        if (new Date().getTime() >= BEARER_TOKEN.expires) {
+            await refreshBearerToken();
+        }
+        useOAuth = true;
+        client = CLIENTS.ANDROID_EMBED;
+    }
     // Append base context to body
     body = {
         ...body,
         context: {
             client: {
-                clientName: CLIENTS.youtube.name,
-                clientVersion: CLIENTS.youtube.version
+                clientName: client.name,
+                clientVersion: client.version,
+                clientScreen: client.screen
             }
         }
     }
-    return await fetch(`https://www.youtube.com/youtubei/v1${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`, {
+    // Set authorization header if using OAuth
+    const authHeader = useOAuth ? { authorization: "Bearer " + BEARER_TOKEN.access_token } : {};
+    return await fetch(`https://www.youtube.com/youtubei/v1${path}` + (useOAuth ? "" : "?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"), {
         headers: {
             "content-type": "application/json",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-            "x-youtube-bootstrap-logged-in": "false",
-            "x-youtube-client-name": CLIENTS.youtube.id,
-            "x-youtube-client-version": CLIENTS.youtube.version
+            "x-youtube-client-version": client.version,
+            ...authHeader
         },
         body: JSON.stringify(body),
         method: "POST"
@@ -443,6 +463,71 @@ async function listSearchResults(q, type) {
     }
 }
 
+async function getDeviceCode() {
+    // Arbitrarily subtract 30 seconds to account for time discrepencies
+    const start = new Date().getTime() - 30000;
+    const response = await (await fetch("https://oauth2.googleapis.com/device/code", {
+        headers: {
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        },
+        body: JSON.stringify({
+            "client_id": CLIENT_ID,
+            "scope": "https://www.googleapis.com/auth/youtube"
+        }),
+        method: "POST"
+    })).json();
+    return {
+        deviceCode: response.device_code,
+        userCode: response.user_code,
+        expires: start + response.expires_in * 1000,
+        verificationUrl: response.verification_url
+    };
+}
+
+async function setBearerToken(deviceCode) {
+    // Arbitrarily subtract 30 seconds to account for time discrepencies
+    const start = new Date().getTime() - 30000;
+    const response = await (await fetch("https://oauth2.googleapis.com/token", {
+        headers: {
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        },
+        body: JSON.stringify({
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            device_code: deviceCode,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        }),
+        method: "POST"
+    })).json();
+    BEARER_TOKEN.access_token = response.access_token;
+    BEARER_TOKEN.expires = start + response.expires_in * 1000;
+    BEARER_TOKEN.refresh_token = response.refresh_token;
+}
+
+async function refreshBearerToken() {
+    if (!BEARER_TOKEN.refresh_token) {
+        return;
+    }
+    const start = new Date().getTime() - 30000;
+    const response = await (await fetch("https://oauth2.googleapis.com/token", {
+        headers: {
+            "content-type": "application/json",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+        },
+        body: JSON.stringify({
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            grant_type: "refresh_token",
+            refresh_token: BEARER_TOKEN.refresh_token
+        }),
+        method: "POST"
+    })).json();
+    BEARER_TOKEN.access_token = response.access_token;
+    BEARER_TOKEN.expires = start + response.expires_in * 1000;
+}
+
 export {
     SearchResultTypes,
     Video,
@@ -452,5 +537,7 @@ export {
     SearchListResponse,
     getVideo,
     getPlaylist,
-    listSearchResults
+    listSearchResults,
+    getDeviceCode,
+    setBearerToken
 }

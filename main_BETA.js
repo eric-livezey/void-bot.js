@@ -325,7 +325,7 @@ function createReactionRole(guildId, channelId, messageId, emoji, roleId) {
  */
 function getUrl(s) {
     if (/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/.test(s) && !s.startsWith("http")) {
-        // String is a valid URL without a protocol
+        // String is (probably) a valid URL without a protocol
         s = "https://" + s;
     }
     if (URL.canParse(s) && /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/.test(s)) {
