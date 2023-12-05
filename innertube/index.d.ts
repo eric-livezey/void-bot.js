@@ -493,7 +493,7 @@ declare function getPlaylist(id: string): Promise<Playlist | null>;
 declare function listSearchResults(q: string, type: SearchResultTypes): Promise<SearchListResponse | null>;
 
 /**
- * Returns an object representing a device code and verification URL for a linking device.
+ * Returns an object representing a device code and verification URL for a linking device. You must visit `verificationUrl` and enter `userCode` before `expires` in order for the `deviceCode` to be valid.
  */
 declare function getDeviceCode(): Promise<{
     deviceCode: string,
@@ -503,7 +503,7 @@ declare function getDeviceCode(): Promise<{
 }>
 
 /**
- * Sets the bearer token to whatever is returned using the given device code
+ * Sets the bearer token using the given device code. The device code can be obtained from the `deviceCode` property of the object returned from {@link getDeviceCode}.
  * @param deviceCode A device code
  */
 declare function setBearerToken(deviceCode: string): Promise<void>;

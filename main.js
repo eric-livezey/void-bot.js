@@ -6,10 +6,10 @@ import * as Videos from "./innertube/videos.js";
 import { getPlaylist, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 
-process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
+process.env.TOKEN = JSON.parse(readFileSync("./env_TEST.json")).TOKEN;
 
 // Global Variables
-const PREFIX = ".";
+const PREFIX = ",";
 
 const CLIENT = new Client({
     intents: [((1 << 17) - 1) | (1 << 20) | (1 << 21)],
@@ -172,6 +172,23 @@ class Player {
         }
     }
 
+    pause() {
+        if (this.nowPlaying && this.audioPlayer.pause()) {
+            this.nowPlaying.pausedAt = Date.now();
+            return true;
+        }
+        return false;
+    }
+
+    resume() {
+        if (this.nowPlaying && this.audioPlayer.unpause()) {
+            this.nowPlaying.startTime = this.nowPlaying.startTime + (Date.now() - this.nowPlaying.pausedAt);
+            this.nowPlaying.pausedAt = null;
+            return true;
+        }
+        return false;
+    }
+
     skip() {
         if (this.nowPlaying) {
             this.nowPlaying.skipped = true;
@@ -215,9 +232,13 @@ class Track {
     thumbnail;
     skipped;
     /**
-     * @type {string}
+     * @type {number | null}
      */
     startTime;
+    /**
+     * @type {number | null}
+     */
+    pausedAt;
     /**
      * @type {Promise<string>}
      */
@@ -231,6 +252,7 @@ class Track {
         this.title = video.snippet.title;
         this.url = "https://www.youtube.com/watch?v=" + video.id;
         this.startTime = null;
+        this.pausedAt = null;
         this.duration = video.contentDetails.duration;
         this.author = video.snippet.channelTitle;
         this.authorUrl = "https://www.youtube.com/channel/" + video.snippet.channelId;
@@ -268,7 +290,7 @@ class Track {
             .setURL(this.url)
             .setThumbnail(this.thumbnail)
             .setAuthor({ name: this.author, url: this.authorUrl })
-            .addFields({ name: "Duration", value: (this.startTime ? new Duration(Math.floor((Date.now() - this.startTime) / 1000)).format() + "/" : "") + this.duration.format() })
+            .addFields({ name: "Duration", value: (this.startTime ? new Duration(Math.floor((this.pausedAt ? this.pausedAt - this.startTime : (Date.now() - this.startTime)) / 1000)).format() + "/" : "") + this.duration.format() })
             .data;
     }
 }
@@ -504,6 +526,35 @@ async function play(member, query) {
     });
 }
 
+
+/**
+ * @param {string} guildId 
+ */
+function pauseCommand(guildId) {
+    const player = getPlayer(guildId);
+    if (player.pause()) {
+        return { content: "**Paused:**", embeds: [player.nowPlaying.embed()] };
+    } else if (player.nowPlaying === null) {
+        return "There is nothing playing.";
+    } else {
+        return "The track is already paused.";
+    }
+}
+
+/**
+ * @param {string} guildId guild ID 
+ */
+function resumeCommand(guildId) {
+    const player = getPlayer(guildId);
+    if (player.resume()) {
+        return { content: "**Resumed:**", embeds: [player.nowPlaying.embed()] };
+    } else if (player.nowPlaying === null) {
+        return "There is nothing playing.";
+    } else {
+        return "The track is not paused.";
+    }
+}
+
 /**
  * @param {Guild} guild 
  */
@@ -525,7 +576,7 @@ async function stopCommand(guild) {
 async function skipCommand(guild) {
     var player = getPlayer(guild.id);
     var track = player.nowPlaying;
-    if (await player.skip()) {
+    if (player.skip()) {
         return {
             content: "**Skipped:**",
             embeds: [track.embed()]
@@ -563,7 +614,7 @@ function queueCommand(message) {
         .setAuthor({ name: "Now Playing:" })
         .setTitle(player.nowPlaying.title)
         .setURL(player.nowPlaying.url)
-        .setDescription(new Duration(Math.floor((Date.now() - player.nowPlaying.startTime) / 1000)).format() + "/" + player.nowPlaying.duration.format())
+        .setDescription(new Duration(Math.floor((player.nowPlaying.pausedAt ? player.nowPlaying.pausedAt - player.nowPlaying.startTime : (Date.now() - player.nowPlaying.startTime)) / 1000)).format() + "/" + player.nowPlaying.duration.format())
         .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(totalSeconds).format() + ")" });
     for (var i = 0; i < player.queue.length && i < 25; i++) {
         eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: player.queue[i].duration.format() });
@@ -748,7 +799,7 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
             eb.setAuthor({ name: "Now Playing:" })
                 .setTitle(player.nowPlaying.title)
                 .setURL(player.nowPlaying.url)
-                .setDescription(new Duration(Math.floor((Date.now() - player.nowPlaying.startTime) / 1000)).format() + "/" + player.nowPlaying.duration.format())
+                .setDescription(new Duration(Math.floor((player.nowPlaying.pausedAt ? player.nowPlaying.pausedAt - player.nowPlaying.startTime : (Date.now() - player.nowPlaying.startTime)) / 1000)).format() + "/" + player.nowPlaying.duration.format())
         }
         // Append up to 25 tracks to the queue message
         for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
@@ -806,10 +857,19 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "play":
                     // Play
                     if (args.length < 1) {
-                        response = "You must provide a query.";
+                        // Resume
+                        response = resumeCommand(message.guildId);
                     } else {
                         response = await play(message.member, message.content.substring(6).trim());
                     }
+                    break;
+                case "pause":
+                    // Pause
+                    response = pauseCommand(message.guildId);
+                    break;
+                case "resume":
+                    // Resume
+                    response = resumeCommand(message.guildId);
                     break;
                 case "stop":
                     // Stop
@@ -895,12 +955,14 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "help":
                     response = {
                         embeds: [new EmbedBuilder().addFields(
-                            { name: "play [query]", value: "Plays something from YouTube using the [query] as a link or search query." },
+                            { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If no query is provided, attempts resume." },
+                            { name: "pause", value: "Resumes the currently playing track." },
+                            { name: "resume", value: "Pauses the currently playing track." },
                             { name: "skip", value: "Skips the currently playing track." },
                             { name: "stop", value: "Stops the currently playing track and clears the queue." },
                             { name: "nowPlaying|np", value: "Displays the currently playing track." },
                             { name: "queue|q", value: "Displays the queue." },
-                            { name: "connect|join [voice_channel]*", value: "Makes the bot join a voice channel, either [voice_channel]* or your current voice channel.." },
+                            { name: "connect|join *[voice_channel]", value: "Makes the bot join a voice channel, either [voice_channel] or your current voice channel." },
                             { name: "disconnect|leave", value: "Makes the bot leave it's current voice channel." },
                             { name: "remove [index]", value: "Remove track [index] from the queue." },
                             { name: "move [source_index] [destination index]", value: "Move the track at [source_index] to [destination_index]" },

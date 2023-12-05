@@ -72,7 +72,12 @@ async function getJs(playerId) {
         // Find the first bracket after the signature timestamp
         const b = js.indexOf("}", s);
         // Evaluate the code that will save a new object to the cache
-        eval(`${/* save the object with decipher functions */js.substring(f, js.indexOf("}}", f) + 2)};JS_CACHE[playerId]={decipher:(a)=>${/* save function for deciphering as anonymous function */js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18)},signatureTimestamp:${/* signature timestamp ends with either a comma or a bracket */Number(js.substring(s, c < b && c != -1 ? c : b))}}`);
+        eval(`${/* save the object with decipher functions */js.substring(f, js.indexOf("}}", f) + 2)};
+        JS_CACHE[playerId]={
+            decipher:(a)=>${/* save function for deciphering as anonymous function */js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18)},
+            signatureTimestamp:${/* signature timestamp ends with either a comma or a bracket */Number(js.substring(s, c < b && c != -1 ? c : b))}
+        }`
+        );
     }
     return JS_CACHE[playerId];
 }
