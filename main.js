@@ -6,10 +6,10 @@ import * as Videos from "./innertube/videos.js";
 import { getPlaylist, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 
-process.env.TOKEN = JSON.parse(readFileSync("./env_TEST.json")).TOKEN;
+process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
 // Global Variables
-const PREFIX = ",";
+const PREFIX = ".";
 
 const CLIENT = new Client({
     intents: [((1 << 17) - 1) | (1 << 20) | (1 << 21)],
@@ -192,6 +192,7 @@ class Player {
     skip() {
         if (this.nowPlaying) {
             this.nowPlaying.skipped = true;
+            this.resume();
             return this.audioPlayer.stop();
         } else {
             return false;
@@ -374,7 +375,7 @@ async function connectCommand(member, channelId) {
             return "You are not in a voice channel.";
         }
     }
-    if (channelId.startsWith("<#") & channelId.endsWith(">")) {
+    if (channelId.startsWith("<#") && channelId.endsWith(">")) {
         // Channel ID is a mention
         channelId = channelId.substring(2, channelId.length - 1);
     }
@@ -468,7 +469,7 @@ async function play(member, query) {
         if (search.totalResults === 0) {
             return "There were no results for your query.";
         }
-        // Arbitrarily try 25 times since inntertube items is sometimes 0
+        // Arbitrarily try 25 times since innertube items is sometimes 0
         var attempt = 1;
         while (search.items.length === 0) {
             if (attempt === 25) {
@@ -563,6 +564,7 @@ async function stopCommand(guild) {
     if (player.nowPlaying) {
         player.queue.splice(0, player.queue.length);
         player.nowPlaying = null;
+        player.loop = false;
         player.audioPlayer.stop();
         return "Audio stopped."
     } else {

@@ -52,30 +52,26 @@ async function getPlayerId(videoId) {
     // Fetch source video HTML
     const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
     // Find the player id
-    var startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
-    return html.substring(startIndex, html.indexOf("/", startIndex));
+    return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
 }
 
 async function getJs(playerId) {
     // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
         // Fetch JS with player id
-        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text());
+        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
         // Find the object containing decipher functions
-        const f = js.search(/var [A-Za-z]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})/);
+        const functions = js.match(/var [A-Za-z0-9]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})((?!\}\}).)+\}\}/)[0];
         // Find the function for deciphering signature ciphers
-        const d = js.indexOf("function(a){a=a.split(\"\")") + 11;
+        const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
         // Find the signature timestamp
-        const s = js.indexOf("signatureTimestamp:") + 19;
-        // Find the first comma after the signature timestamp
-        const c = js.indexOf(",", s);
-        // Find the first bracket after the signature timestamp
-        const b = js.indexOf("}", s);
+        const signatureTimestamp = js.match(/signatureTimestamp:(?<timestamp>[0-9]+)(,|\})/).groups["timestamp"];
         // Evaluate the code that will save a new object to the cache
-        eval(`${/* save the object with decipher functions */js.substring(f, js.indexOf("}}", f) + 2)};
+        eval(
+        `${functions};
         JS_CACHE[playerId]={
-            decipher:(a)=>${/* save function for deciphering as anonymous function */js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18)},
-            signatureTimestamp:${/* signature timestamp ends with either a comma or a bracket */Number(js.substring(s, c < b && c != -1 ? c : b))}
+            decipher:(a)=>${decipher},
+            signatureTimestamp:${signatureTimestamp}
         }`
         );
     }
@@ -86,7 +82,7 @@ function decipher(js, signatureCipher) {
     return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
 
-const SearchResultTypes = {
+const SearchResultType = {
     VIDEO: "video",
     CHANNEL: "channel",
     PLAYLIST: "playlist"
@@ -348,7 +344,7 @@ class SearchResult {
         const channelData = data.channelRenderer;
         const playlistData = data.playlistRenderer
         this.id = {
-            kind: videoData ? SearchResultTypes.VIDEO : channelData ? SearchResultTypes.CHANNEL : SearchResultTypes.PLAYLIST,
+            kind: videoData ? SearchResultType.VIDEO : channelData ? SearchResultType.CHANNEL : SearchResultType.PLAYLIST,
             videoId: videoData?.videoId,
             channelId: channelData?.channelId,
             playlistId: playlistData?.playlistId
@@ -459,7 +455,7 @@ async function getPlaylist(id) {
 async function listSearchResults(q, type) {
     const response = await request("/search", {
         query: q,
-        params: type === SearchResultTypes.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultTypes.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultTypes.PLAYLIST ? "EgIQAw%3D%3D" : undefined
+        params: type === SearchResultType.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultType.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultType.PLAYLIST ? "EgIQAw%3D%3D" : undefined
     })
     if (response.status === 200) {
         return new SearchListResponse(await response.json());
@@ -534,7 +530,7 @@ async function refreshBearerToken() {
 }
 
 export {
-    SearchResultTypes,
+    SearchResultType,
     Video,
     PlaylistItem,
     Playlist,

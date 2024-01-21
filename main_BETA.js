@@ -2,7 +2,7 @@ import { AudioPlayer, AudioPlayerStatus, AudioResource, StreamType, VoiceConnect
 import { ChannelType, ChatInputCommandInteraction, Client, Colors, CommandInteraction, EmbedBuilder, Events, Partials, PermissionFlagsBits, Routes, VoiceChannel, formatEmoji, parseEmoji } from "discord.js";
 import { readFileSync, writeFileSync } from "fs";
 import { Readable } from "stream";
-import { Playlist, SearchResultTypes, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
+import { Playlist, SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { Duration } from "./innertube/utils.js";
 import { getMusicSearchSuggestions } from "./innertube/videos.js";
 
@@ -544,7 +544,7 @@ async function playCommand(interaction, query) {
         }
     } else {
         // Query is a search query
-        var search = await listSearchResults(query, SearchResultTypes.VIDEO);
+        var search = await listSearchResults(query, SearchResultType.VIDEO);
         // Check if there are 0 total results
         if (search.totalResults === 0) {
             return { content: "There were no results for your query.", ephemeral: true };
@@ -555,7 +555,7 @@ async function playCommand(interaction, query) {
                 return { content: "Something went wrong with your search.", ephemeral: true };
             }
             // If the items list is still empty, try again
-            search = await listSearchResults(query, SearchResultTypes.VIDEO);
+            search = await listSearchResults(query, SearchResultType.VIDEO);
             attempts++;
         }
         videoId = search.items[0].id.videoId;
@@ -902,4 +902,6 @@ CLIENT.on(Events.GuildDelete, (guild) => {
 
 // Code
 
-await CLIENT.login(process.env.TOKEN);
+// await CLIENT.login(process.env.TOKEN);
+CLIENT = process.env.TOKEN;
+(await CLIENT.guilds.fetch("888445748293804165")).client = undefined;

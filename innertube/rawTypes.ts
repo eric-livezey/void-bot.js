@@ -9,52 +9,59 @@ export type RawPlayerData = {
 			}[];
 		}[];
 		maxAgeSeconds: number;
-		mainAppWebResponseContext: {
+		mainAppWebResponseContext?: {
 			loggedOut: boolean;
 			trackingParam: string;
 		};
-		webResponseContextExtensionData: {
+		webResponseContextExtensionData?: {
+			webResponseContextPreloadData?: {
+				preloadMessageNames: string[];
+			};
 			hasDecorated: boolean;
 		};
 	};
 	playabilityStatus: {
 		status: string;
 		playableInEmbed?: boolean;
+		liveStreamability?: {
+			liveStreamabilityRenderer: {
+				videoId: string;
+				pollDelayMs: string;
+				displayEndscreen?: boolean;
+				broadcastId?: string;
+			};
+		};
 		miniplayer?: {
 			miniplayerRenderer: {
 				playbackMode: string;
 			};
 		};
 		contextParams: string;
+		audioOnlyPlayability?: {
+			audioOnlyPlayabilityRenderer: {
+				trackingParams: string;
+				audioOnlyAvailability: string;
+			};
+		};
+		transportControlsConfig?: {
+			seekForwardStatus: {
+				replaceDefault: boolean;
+			};
+			seekBackwardStatus: {
+				replaceDefault: boolean;
+			};
+			playbackRateStatus: {
+				replaceDefault: boolean;
+			};
+		};
 		reason?: string;
 		errorScreen?: {
 			playerErrorMessageRenderer: {
 				subreason?: {
 					runs?: {
 						text: string;
-					}[];
-					simpleText?: string;
-				};
-				reason: {
-					simpleText: string;
-				};
-				proceedButton?: {
-					buttonRenderer: {
-						style: string;
-						size: string;
-						isDisabled: boolean;
-						text: {
-							simpleText: string;
-						};
-						navigationEndpoint: {
+						navigationEndpoint?: {
 							clickTrackingParams: string;
-							commandMetadata: {
-								webCommandMetadata: {
-									url: string;
-									webPageType: string;
-									rootVe: number;
-								};
-							};
 							signInEndpoint: {
 								nextEndpoint: {
 									clickTrackingParams: string;
@@ -63,31 +70,77 @@ export type RawPlayerData = {
 									};
 								};
 							};
+							commandMetadata?: {
+								webCommandMetadata: {
+									url: string;
+									webPageType: string;
+									rootVe: number;
+								};
+							};
 						};
-						trackingParams: string;
-					};
+					}[];
+					simpleText?: string;
 				};
-				thumbnail: {
+				icon?: {
+					iconType: string;
+				};
+				reason?: {
+					runs?: {
+						text: string;
+						navigationEndpoint?: {
+							clickTrackingParams: string;
+							urlEndpoint: {
+								url: string;
+								target: string;
+							};
+						};
+					}[];
+					simpleText?: string;
+				};
+				thumbnail?: {
 					thumbnails: {
 						url: string;
 						width: number;
 						height: number;
 					}[];
 				};
-				icon: {
-					iconType: string;
+				proceedButton?: {
+					buttonRenderer: {
+						style: string;
+						size?: string;
+						isDisabled: boolean;
+						text: {
+							simpleText: string;
+						};
+						navigationEndpoint: {
+							clickTrackingParams: string;
+							commandMetadata?: {
+								webCommandMetadata: {
+									url: string;
+									webPageType: string;
+									rootVe: number;
+								};
+							};
+							signInEndpoint?: {
+								nextEndpoint: {
+									clickTrackingParams: string;
+									urlEndpoint: {
+										url: string;
+									};
+								};
+							};
+							urlEndpoint?: {
+								url: string;
+								target: string;
+							};
+						};
+						trackingParams: string;
+					};
 				};
 			};
 		};
-		messages?: string[];
-		liveStreamability?: {
-			liveStreamabilityRenderer: {
-				videoId: string;
-				broadcastId: string;
-				pollDelayMs: string;
-			};
-		};
 		desktopLegacyAgeGateReason?: number;
+		messages?: string[];
 	};
 	streamingData?: {
 		expiresInSeconds: string;
@@ -108,6 +161,8 @@ export type RawPlayerData = {
 			audioChannels: number;
 			signatureCipher?: string;
 			url?: string;
+			contentLength?: string;
+			averageBitrate?: number;
 		}[];
 		adaptiveFormats: {
 			itag: number;
@@ -138,24 +193,45 @@ export type RawPlayerData = {
 			audioSampleRate?: string;
 			audioChannels?: number;
 			loudnessDb?: number;
-			targetDurationSec?: number;
-			maxDvrDurationSec?: number;
 			signatureCipher?: string;
 			colorInfo?: {
 				primaries: string;
 				transferCharacteristics: string;
 				matrixCoefficients: string;
 			};
+			xtags?: string;
+			audioTrack?: {
+				displayName: string;
+				id: string;
+				audioIsDefault: boolean;
+			};
+			targetDurationSec?: number;
+			maxDvrDurationSec?: number;
 		}[];
 		dashManifestUrl?: string;
 		hlsManifestUrl?: string;
-		probeUrl?: string;
+	};
+	heartbeatParams?: {
+		softFailOnError: boolean;
+		heartbeatServerData: string;
+		intervalMilliseconds?: string;
 	};
 	playerAds?: {
 		playerLegacyDesktopWatchAdsRenderer: {
 			playerAdParams: {
 				showContentThumbnail: boolean;
-				enabledEngageTypes: string;
+				adPreroll?: string;
+				tagForChildDirected?: boolean;
+				adDevice?: number;
+				midrollFreqcap?: number;
+				sffb?: boolean;
+				adLoggingFlag?: number;
+				fadeOutStartMilliseconds?: number;
+				fadeOutDurationMilliseconds?: number;
+				fadeInStartMilliseconds?: number;
+				fadeInDurationMilliseconds?: number;
+				applyFadeOnMidrolls?: boolean;
+				enabledEngageTypes?: string;
 			};
 			gutParams: {
 				tag: string;
@@ -168,40 +244,63 @@ export type RawPlayerData = {
 	playbackTracking?: {
 		videostatsPlaybackUrl: {
 			baseUrl: string;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 		videostatsDelayplayUrl: {
 			baseUrl: string;
+			headers?: {
+				headerType: string;
+			}[];
 			elapsedMediaTimeSeconds?: number;
 		};
 		videostatsWatchtimeUrl: {
 			baseUrl: string;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 		ptrackingUrl: {
 			baseUrl: string;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 		qoeUrl: {
 			baseUrl: string;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 		atrUrl: {
 			baseUrl: string;
 			elapsedMediaTimeSeconds: number;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 		videostatsScheduledFlushWalltimeSeconds: number[];
 		videostatsDefaultFlushIntervalSeconds: number;
 		youtubeRemarketingUrl?: {
 			baseUrl: string;
 			elapsedMediaTimeSeconds: number;
+			headers?: {
+				headerType: string;
+			}[];
 		};
 	};
 	videoDetails?: {
 		videoId: string;
 		title: string;
 		lengthSeconds: string;
-		keywords: string[];
+		isLive?: boolean;
+		keywords?: string[];
 		channelId: string;
 		isOwnerViewing: boolean;
-		shortDescription: string;
+		shortDescription?: string;
 		isCrawlable: boolean;
+		isLiveDvrEnabled?: boolean;
 		thumbnail: {
 			thumbnails: {
 				url: string;
@@ -209,18 +308,180 @@ export type RawPlayerData = {
 				height: number;
 			}[];
 		};
+		liveChunkReadahead?: number;
 		allowRatings: boolean;
 		viewCount: string;
 		author: string;
+		isLowLatencyLiveStream?: boolean;
 		isPrivate: boolean;
 		isUnpluggedCorpus: boolean;
-		isLiveContent: boolean;
-		isLowLatencyLiveStream?: boolean;
 		latencyClass?: string;
-		isLive?: boolean;
-		isLiveDvrEnabled?: boolean;
-		liveChunkReadahead?: number;
+		isLiveContent: boolean;
+		musicVideoType?: string;
 	};
+	annotations?: {
+		playerAnnotationsExpandedRenderer: {
+			featuredChannel: {
+				startTimeMs: string;
+				endTimeMs: string;
+				watermark: {
+					thumbnails: {
+						url: string;
+						width: number;
+						height: number;
+					}[];
+				};
+				trackingParams: string;
+				navigationEndpoint: {
+					clickTrackingParams: string;
+					browseEndpoint: {
+						browseId: string;
+					};
+					commandMetadata?: {
+						webCommandMetadata: {
+							url: string;
+							webPageType: string;
+							rootVe: number;
+							apiUrl: string;
+						};
+					};
+				};
+				channelName: string;
+				subscribeButton: {
+					subscribeButtonRenderer: {
+						buttonText: {
+							runs: {
+								text: string;
+							}[];
+						};
+						subscribed: boolean;
+						enabled: boolean;
+						type: string;
+						channelId: string;
+						showPreferences: boolean;
+						subscribedButtonText: {
+							runs: {
+								text: string;
+							}[];
+						};
+						unsubscribedButtonText: {
+							runs: {
+								text: string;
+							}[];
+						};
+						trackingParams: string;
+						unsubscribeButtonText: {
+							runs: {
+								text: string;
+							}[];
+						};
+						serviceEndpoints: {
+							clickTrackingParams: string;
+							subscribeEndpoint?: {
+								channelIds: string[];
+								params: string;
+							};
+							commandMetadata?: {
+								webCommandMetadata: {
+									sendPost: boolean;
+									apiUrl?: string;
+								};
+							};
+							unsubscribeEndpoint?: {
+								channelIds: string[];
+								params: string;
+							};
+							signalServiceEndpoint?: {
+								signal: string;
+								actions: {
+									clickTrackingParams: string;
+									openPopupAction: {
+										popup: {
+											confirmDialogRenderer: {
+												trackingParams: string;
+												dialogMessages: {
+													runs: {
+														text: string;
+													}[];
+												}[];
+												confirmButton: {
+													buttonRenderer: {
+														style: string;
+														size?: string;
+														isDisabled: boolean;
+														text: {
+															runs: {
+																text: string;
+															}[];
+														};
+														serviceEndpoint: {
+															clickTrackingParams: string;
+															commandMetadata?: {
+																webCommandMetadata: {
+																	sendPost: boolean;
+																	apiUrl: string;
+																};
+															};
+															unsubscribeEndpoint: {
+																channelIds: string[];
+																params: string;
+															};
+														};
+														accessibility: {
+															label: string;
+														};
+														trackingParams: string;
+													};
+												};
+												cancelButton: {
+													buttonRenderer: {
+														style: string;
+														size?: string;
+														isDisabled: boolean;
+														text: {
+															runs: {
+																text: string;
+															}[];
+														};
+														accessibility: {
+															label: string;
+														};
+														trackingParams: string;
+													};
+												};
+												primaryIsCancel?: boolean;
+											};
+										};
+										popupType: string;
+									};
+								}[];
+							};
+						}[];
+						subscribeAccessibility?: {
+							accessibilityData: {
+								label: string;
+							};
+						};
+						unsubscribeAccessibility?: {
+							accessibilityData: {
+								label: string;
+							};
+						};
+						signInEndpoint?: {
+							clickTrackingParams: string;
+							commandMetadata: {
+								webCommandMetadata: {
+									url: string;
+								};
+							};
+						};
+					};
+				};
+			};
+			allowSwipeDismiss: boolean;
+			annotationId?: string;
+		};
+	}[];
 	playerConfig?: {
 		audioConfig: {
 			loudnessDb?: number;
@@ -237,55 +498,52 @@ export type RawPlayerData = {
 				readAheadGrowthRateMs: number;
 			};
 		};
-		webPlayerConfig: {
+		embeddedPlayerConfig?: {
+			embeddedPlayerMode: string;
+		};
+		webPlayerConfig?: {
 			useCobaltTvosDash: boolean;
 			webPlayerActionsPorting: {
-				getSharePanelCommand: {
+				getSharePanelCommand?: {
 					clickTrackingParams: string;
-					commandMetadata: {
+					webPlayerShareEntityServiceEndpoint: {
+						serializedShareEntity: string;
+					};
+					commandMetadata?: {
 						webCommandMetadata: {
 							sendPost: boolean;
 							apiUrl: string;
 						};
-					};
-					webPlayerShareEntityServiceEndpoint: {
-						serializedShareEntity: string;
 					};
 				};
 				subscribeCommand: {
 					clickTrackingParams: string;
-					commandMetadata: {
-						webCommandMetadata: {
-							sendPost: boolean;
-							apiUrl: string;
-						};
-					};
 					subscribeEndpoint: {
 						channelIds: string[];
 						params: string;
 					};
-				};
-				unsubscribeCommand: {
-					clickTrackingParams: string;
-					commandMetadata: {
+					commandMetadata?: {
 						webCommandMetadata: {
 							sendPost: boolean;
 							apiUrl: string;
 						};
 					};
+				};
+				unsubscribeCommand: {
+					clickTrackingParams: string;
 					unsubscribeEndpoint: {
 						channelIds: string[];
 						params: string;
 					};
-				};
-				addToWatchLaterCommand: {
-					clickTrackingParams: string;
-					commandMetadata: {
+					commandMetadata?: {
 						webCommandMetadata: {
 							sendPost: boolean;
 							apiUrl: string;
 						};
 					};
+				};
+				addToWatchLaterCommand: {
+					clickTrackingParams: string;
 					playlistEditEndpoint: {
 						playlistId: string;
 						actions: {
@@ -293,15 +551,15 @@ export type RawPlayerData = {
 							action: string;
 						}[];
 					};
-				};
-				removeFromWatchLaterCommand: {
-					clickTrackingParams: string;
-					commandMetadata: {
+					commandMetadata?: {
 						webCommandMetadata: {
 							sendPost: boolean;
 							apiUrl: string;
 						};
 					};
+				};
+				removeFromWatchLaterCommand: {
+					clickTrackingParams: string;
 					playlistEditEndpoint: {
 						playlistId: string;
 						actions: {
@@ -309,11 +567,19 @@ export type RawPlayerData = {
 							removedVideoId: string;
 						}[];
 					};
+					commandMetadata?: {
+						webCommandMetadata: {
+							sendPost: boolean;
+							apiUrl: string;
+						};
+					};
 				};
 			};
 		};
 		livePlayerConfig?: {
 			liveReadaheadSeconds: number;
+			hasSubfragmentedFmp4: boolean;
+			hasSubfragmentedWebm: boolean;
 			isLiveHeadPlayable: boolean;
 		};
 	};
@@ -321,13 +587,64 @@ export type RawPlayerData = {
 		playerStoryboardSpecRenderer?: {
 			spec: string;
 			recommendedLevel: number;
+			highResolutionRecommendedLevel?: number;
 		};
 		playerLiveStoryboardSpecRenderer?: {
 			spec: string;
 		};
 	};
 	microformat?: {
-		playerMicroformatRenderer: {
+		microformatDataRenderer?: {
+			urlCanonical: string;
+			title: string;
+			description: string;
+			thumbnail: {
+				thumbnails: {
+					url: string;
+					width: number;
+					height: number;
+				}[];
+			};
+			siteName: string;
+			appName: string;
+			androidPackage: string;
+			iosAppStoreId: string;
+			iosAppArguments: string;
+			ogType: string;
+			urlApplinksIos: string;
+			urlApplinksAndroid: string;
+			urlTwitterIos: string;
+			urlTwitterAndroid: string;
+			twitterCardType: string;
+			twitterSiteHandle: string;
+			schemaDotOrgType: string;
+			noindex: boolean;
+			unlisted: boolean;
+			paid: boolean;
+			familySafe: boolean;
+			tags?: string[];
+			pageOwnerDetails: {
+				name: string;
+				externalChannelId: string;
+				youtubeProfileUrl: string;
+			};
+			videoDetails: {
+				externalVideoId: string;
+				durationSeconds?: string;
+				durationIso8601?: string;
+			};
+			linkAlternates: {
+				hrefUrl: string;
+				title?: string;
+				alternateType?: string;
+			}[];
+			viewCount: string;
+			publishDate: string;
+			category: string;
+			uploadDate: string;
+			availableCountries?: string[];
+		};
+		playerMicroformatRenderer?: {
 			thumbnail: {
 				thumbnails: {
 					url: string;
@@ -341,10 +658,16 @@ export type RawPlayerData = {
 				height: number;
 			};
 			title: {
-				simpleText: string;
+				runs?: {
+					text: string;
+				}[];
+				simpleText?: string;
 			};
 			description: {
-				simpleText: string;
+				runs?: {
+					text: string;
+				}[];
+				simpleText?: string;
 			};
 			lengthSeconds: string;
 			ownerProfileUrl: string;
@@ -372,12 +695,15 @@ export type RawPlayerData = {
 					teaser: {
 						simpleCardTeaserRenderer: {
 							message: {
-								simpleText: string;
+								simpleText?: string;
+								runs?: {
+									text: string;
+								}[];
 							};
 							trackingParams: string;
 							prominent: boolean;
 							logVisibilityUpdates: boolean;
-							onTapCommand: {
+							onTapCommand?: {
 								clickTrackingParams: string;
 								changeEngagementPanelVisibilityAction: {
 									targetId: string;
@@ -393,10 +719,105 @@ export type RawPlayerData = {
 						iconAfterTeaserMs: string;
 					}[];
 					trackingParams: string;
+					content?: {
+						videoInfoCardContentRenderer?: {
+							videoThumbnail: {
+								thumbnails: {
+									url: string;
+									width: number;
+									height: number;
+								}[];
+							};
+							lengthString: {
+								runs: {
+									text: string;
+								}[];
+								accessibility: {
+									accessibilityData: {
+										label: string;
+									};
+								};
+							};
+							videoTitle: {
+								runs: {
+									text: string;
+								}[];
+							};
+							channelName: {
+								runs: {
+									text: string;
+								}[];
+							};
+							viewCountText: {
+								runs: {
+									text: string;
+								}[];
+							};
+							action: {
+								clickTrackingParams: string;
+								watchEndpoint: {
+									videoId: string;
+								};
+							};
+							trackingParams: string;
+						};
+						playlistInfoCardContentRenderer?: {
+							playlistThumbnail: {
+								thumbnails: {
+									url: string;
+									width: number;
+									height: number;
+								}[];
+							};
+							playlistVideoCount: {
+								runs: {
+									text: string;
+								}[];
+							};
+							playlistTitle: {
+								runs: {
+									text: string;
+								}[];
+							};
+							channelName: {
+								runs: {
+									text: string;
+								}[];
+							};
+							videoCountText: {
+								runs: {
+									text: string;
+								}[];
+							};
+							action: {
+								clickTrackingParams: string;
+								watchEndpoint: {
+									videoId: string;
+									playlistId: string;
+									loggingContext: {
+										vssLoggingContext: {
+											serializedContextData: string;
+										};
+									};
+								};
+							};
+							trackingParams: string;
+						};
+					};
+					icon?: {
+						infoCardIconRenderer: {
+							trackingParams: string;
+						};
+					};
+					cardId?: string;
+					feature?: string;
 				};
 			}[];
 			headerText: {
-				simpleText: string;
+				simpleText?: string;
+				runs?: {
+					text: string;
+				}[];
 			};
 			icon: {
 				infoCardIconRenderer: {
@@ -494,7 +915,7 @@ export type RawPlayerData = {
 	};
 	messages?: {
 		mealbarPromoRenderer: {
-			icon: {
+			icon?: {
 				thumbnails: {
 					url: string;
 					width: number;
@@ -508,7 +929,7 @@ export type RawPlayerData = {
 			}[];
 			actionButton: {
 				buttonRenderer: {
-					style: string;
+					style?: string;
 					size: string;
 					text: {
 						runs: {
@@ -516,7 +937,7 @@ export type RawPlayerData = {
 						}[];
 					};
 					trackingParams: string;
-					command: {
+					command?: {
 						clickTrackingParams: string;
 						commandExecutorCommand: {
 							commands: {
@@ -547,11 +968,27 @@ export type RawPlayerData = {
 							}[];
 						};
 					};
+					serviceEndpoint?: {
+						clickTrackingParams: string;
+						feedbackEndpoint: {
+							feedbackToken: string;
+							uiActions: {
+								hideEnclosingContainer: boolean;
+							};
+						};
+					};
+					navigationEndpoint?: {
+						clickTrackingParams: string;
+						browseEndpoint: {
+							browseId: string;
+							params: string;
+						};
+					};
 				};
 			};
 			dismissButton: {
 				buttonRenderer: {
-					style: string;
+					style?: string;
 					size: string;
 					text: {
 						runs: {
@@ -559,7 +996,7 @@ export type RawPlayerData = {
 						}[];
 					};
 					trackingParams: string;
-					command: {
+					command?: {
 						clickTrackingParams: string;
 						commandExecutorCommand: {
 							commands: {
@@ -579,6 +1016,15 @@ export type RawPlayerData = {
 							}[];
 						};
 					};
+					serviceEndpoint?: {
+						clickTrackingParams: string;
+						feedbackEndpoint: {
+							feedbackToken: string;
+							uiActions: {
+								hideEnclosingContainer: boolean;
+							};
+						};
+					};
 				};
 			};
 			triggerCondition: string;
@@ -586,7 +1032,7 @@ export type RawPlayerData = {
 			trackingParams: string;
 			impressionEndpoints: {
 				clickTrackingParams: string;
-				commandMetadata: {
+				commandMetadata?: {
 					webCommandMetadata: {
 						sendPost: boolean;
 						apiUrl: string;
@@ -605,7 +1051,20 @@ export type RawPlayerData = {
 					text: string;
 				}[];
 			};
-			enableSharedFeatureForImpressionHandling: boolean;
+			logo?: {
+				thumbnails: {
+					url: string;
+					width: number;
+					height: number;
+				}[];
+			};
+			logoDark?: {
+				thumbnails: {
+					url: string;
+					width: number;
+					height: number;
+				}[];
+			};
 		};
 	}[];
 	adPlacements?: {
@@ -615,21 +1074,18 @@ export type RawPlayerData = {
 					kind: string;
 					adTimeOffset: {
 						offsetStartMilliseconds: string;
-						offsetEndMilliseconds?: string;
+						offsetEndMilliseconds: string;
 					};
 					hideCueRangeMarker: boolean;
 				};
 			};
 			renderer: {
-				adBreakServiceRenderer?: {
-					prefetchMilliseconds?: string;
-					getAdBreakUrl: string;
-				};
+				clientForecastingAdRenderer?: {};
 				instreamVideoAdRenderer?: {
 					playerOverlay: {
 						instreamAdPlayerOverlayRenderer: {
-							skipOrPreviewRenderer: {
-								adPreviewRenderer: {
+							skipOrPreviewRenderer?: {
+								adPreviewRenderer?: {
 									thumbnail: {
 										thumbnail: {
 											thumbnails: {
@@ -647,20 +1103,60 @@ export type RawPlayerData = {
 										trackingParams: string;
 									};
 								};
+								skipAdRenderer?: {
+									preskipRenderer: {
+										adPreviewRenderer: {
+											thumbnail: {
+												thumbnail: {
+													thumbnails: {
+														url: string;
+														width: number;
+														height: number;
+													}[];
+												};
+												trackingParams: string;
+											};
+											trackingParams: string;
+											templatedCountdown: {
+												templatedAdText: {
+													text: string;
+													isTemplated: boolean;
+													trackingParams: string;
+												};
+											};
+											durationMilliseconds: number;
+										};
+									};
+									skippableRenderer: {
+										skipButtonRenderer: {
+											message: {
+												text: string;
+												isTemplated: boolean;
+												trackingParams: string;
+											};
+											trackingParams: string;
+										};
+									};
+									trackingParams: string;
+									skipOffsetMilliseconds: number;
+								};
 							};
 							trackingParams: string;
 							visitAdvertiserRenderer: {
 								buttonRenderer: {
 									style: string;
 									text: {
-										simpleText: string;
+										simpleText?: string;
+										runs?: {
+											text: string;
+										}[];
 									};
 									icon: {
 										iconType: string;
 									};
 									navigationEndpoint: {
 										clickTrackingParams: string;
-										commandMetadata: {
+										commandMetadata?: {
 											webCommandMetadata: {
 												url: string;
 												webPageType: string;
@@ -670,6 +1166,7 @@ export type RawPlayerData = {
 										urlEndpoint: {
 											url: string;
 											target: string;
+											attributionSrcMode: string;
 										};
 									};
 									trackingParams: string;
@@ -706,7 +1203,7 @@ export type RawPlayerData = {
 											isDisabled: boolean;
 											serviceEndpoint: {
 												clickTrackingParams: string;
-												openPopupAction: {
+												openPopupAction?: {
 													popup: {
 														aboutThisAdRenderer: {
 															url: {
@@ -716,6 +1213,63 @@ export type RawPlayerData = {
 														};
 													};
 													popupType: string;
+												};
+												commandMetadata?: {
+													webCommandMetadata: {
+														ignoreNavigation: boolean;
+													};
+												};
+												adInfoDialogEndpoint?: {
+													dialog: {
+														adInfoDialogRenderer: {
+															dialogMessage: {
+																runs: {
+																	text: string;
+																	navigationEndpoint?: {
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				url: string;
+																				webPageType: string;
+																				rootVe: number;
+																			};
+																		};
+																		urlEndpoint: {
+																			url: string;
+																			target: string;
+																		};
+																	};
+																}[];
+															};
+															confirmLabel: {
+																runs: {
+																	text: string;
+																}[];
+															};
+															trackingParams: string;
+															closeOverlayRenderer: {
+																buttonRenderer: {
+																	style: string;
+																	size: string;
+																	isDisabled: boolean;
+																	icon: {
+																		iconType: string;
+																	};
+																	trackingParams: string;
+																};
+															};
+															title: {
+																runs: {
+																	text: string;
+																}[];
+															};
+															adReasons: {
+																runs: {
+																	text: string;
+																}[];
+															}[];
+														};
+													};
 												};
 											};
 											icon: {
@@ -729,8 +1283,11 @@ export type RawPlayerData = {
 											};
 										};
 									};
-									hoverText: {
-										simpleText: string;
+									hoverText?: {
+										simpleText?: string;
+										runs?: {
+											text: string;
+										}[];
 									};
 									trackingParams: string;
 								};
@@ -747,448 +1304,12 @@ export type RawPlayerData = {
 					layoutId: string;
 					associatedPlayerBytesLayoutId: string;
 				};
-				clientForecastingAdRenderer?: {};
 			};
 			adSlotLoggingData: {
 				serializedSlotAdServingDataEntry: string;
 			};
 		};
 	}[];
-	adBreakHeartbeatParams?: string;
-	frameworkUpdates: {
-		entityBatchUpdate: {
-			mutations: {
-				entityKey: string;
-				type: string;
-				payload: {
-					offlineabilityEntity: {
-						key: string;
-						addToOfflineButtonState: string;
-					};
-				};
-			}[];
-			timestamp: {
-				seconds: string;
-				nanos: number;
-			};
-		};
-	};
-	captions?: {
-		playerCaptionsTracklistRenderer: {
-			captionTracks: {
-				baseUrl: string;
-				name: {
-					simpleText: string;
-				};
-				vssId: string;
-				languageCode: string;
-				isTranslatable: boolean;
-			}[];
-			audioTracks: {
-				captionTrackIndices: number[];
-				defaultCaptionTrackIndex: number;
-				visibility: string;
-				hasDefaultTrack: boolean;
-				captionsInitialState: string;
-			}[];
-			translationLanguages: {
-				languageCode: string;
-				languageName: {
-					simpleText: string;
-				};
-			}[];
-			defaultAudioTrackIndex: number;
-		};
-	};
-	annotations?: {
-		playerAnnotationsExpandedRenderer: {
-			featuredChannel: {
-				startTimeMs: string;
-				endTimeMs: string;
-				watermark: {
-					thumbnails: {
-						url: string;
-						width: number;
-						height: number;
-					}[];
-				};
-				trackingParams: string;
-				navigationEndpoint: {
-					clickTrackingParams: string;
-					commandMetadata: {
-						webCommandMetadata: {
-							url: string;
-							webPageType: string;
-							rootVe: number;
-							apiUrl: string;
-						};
-					};
-					browseEndpoint: {
-						browseId: string;
-					};
-				};
-				channelName: string;
-				subscribeButton: {
-					subscribeButtonRenderer: {
-						buttonText: {
-							runs: {
-								text: string;
-							}[];
-						};
-						subscribed: boolean;
-						enabled: boolean;
-						type: string;
-						channelId: string;
-						showPreferences: boolean;
-						subscribedButtonText: {
-							runs: {
-								text: string;
-							}[];
-						};
-						unsubscribedButtonText: {
-							runs: {
-								text: string;
-							}[];
-						};
-						trackingParams: string;
-						unsubscribeButtonText: {
-							runs: {
-								text: string;
-							}[];
-						};
-						serviceEndpoints: {
-							clickTrackingParams: string;
-							commandMetadata: {
-								webCommandMetadata: {
-									sendPost: boolean;
-									apiUrl?: string;
-								};
-							};
-							subscribeEndpoint?: {
-								channelIds: string[];
-								params: string;
-							};
-							signalServiceEndpoint?: {
-								signal: string;
-								actions: {
-									clickTrackingParams: string;
-									openPopupAction: {
-										popup: {
-											confirmDialogRenderer: {
-												trackingParams: string;
-												dialogMessages: {
-													runs: {
-														text: string;
-													}[];
-												}[];
-												confirmButton: {
-													buttonRenderer: {
-														style: string;
-														size: string;
-														isDisabled: boolean;
-														text: {
-															runs: {
-																text: string;
-															}[];
-														};
-														serviceEndpoint: {
-															clickTrackingParams: string;
-															commandMetadata: {
-																webCommandMetadata: {
-																	sendPost: boolean;
-																	apiUrl: string;
-																};
-															};
-															unsubscribeEndpoint: {
-																channelIds: string[];
-																params: string;
-															};
-														};
-														accessibility: {
-															label: string;
-														};
-														trackingParams: string;
-													};
-												};
-												cancelButton: {
-													buttonRenderer: {
-														style: string;
-														size: string;
-														isDisabled: boolean;
-														text: {
-															runs: {
-																text: string;
-															}[];
-														};
-														accessibility: {
-															label: string;
-														};
-														trackingParams: string;
-													};
-												};
-												primaryIsCancel: boolean;
-											};
-										};
-										popupType: string;
-									};
-								}[];
-							};
-						}[];
-						subscribeAccessibility: {
-							accessibilityData: {
-								label: string;
-							};
-						};
-						unsubscribeAccessibility: {
-							accessibilityData: {
-								label: string;
-							};
-						};
-						signInEndpoint: {
-							clickTrackingParams: string;
-							commandMetadata: {
-								webCommandMetadata: {
-									url: string;
-								};
-							};
-						};
-					};
-				};
-			};
-			allowSwipeDismiss: boolean;
-			annotationId: string;
-		};
-	}[];
-	endscreen?: {
-		endscreenRenderer: {
-			elements: {
-				endscreenElementRenderer: {
-					style: string;
-					image: {
-						thumbnails: {
-							url: string;
-							width: number;
-							height: number;
-						}[];
-					};
-					icon?: {
-						thumbnails: {
-							url: string;
-						}[];
-					};
-					left: number;
-					width: number;
-					top: number;
-					aspectRatio: number;
-					startMs: string;
-					endMs: string;
-					title: {
-						accessibility: {
-							accessibilityData: {
-								label: string;
-							};
-						};
-						simpleText: string;
-					};
-					metadata: {
-						simpleText: string;
-					};
-					callToAction?: {
-						simpleText: string;
-					};
-					dismiss?: {
-						simpleText: string;
-					};
-					endpoint: {
-						clickTrackingParams: string;
-						commandMetadata: {
-							webCommandMetadata: {
-								url: string;
-								webPageType: string;
-								rootVe: number;
-								apiUrl?: string;
-							};
-							interactionLoggingCommandMetadata?: {
-								loggingExpectations: {
-									screenCreatedLoggingExpectations: {
-										expectedParentScreens: {
-											screenVeType: number;
-										}[];
-									};
-								};
-							};
-						};
-						browseEndpoint?: {
-							browseId: string;
-						};
-						watchEndpoint?: {
-							videoId: string;
-							watchEndpointSupportedOnesieConfig: {
-								html5PlaybackOnesieConfig: {
-									commonConfig: {
-										url: string;
-									};
-								};
-							};
-							playlistId?: string;
-							loggingContext?: {
-								vssLoggingContext: {
-									serializedContextData: string;
-								};
-							};
-						};
-					};
-					hovercardButton?: {
-						subscribeButtonRenderer: {
-							buttonText: {
-								runs: {
-									text: string;
-								}[];
-							};
-							subscribed: boolean;
-							enabled: boolean;
-							type: string;
-							channelId: string;
-							showPreferences: boolean;
-							subscribedButtonText: {
-								runs: {
-									text: string;
-								}[];
-							};
-							unsubscribedButtonText: {
-								runs: {
-									text: string;
-								}[];
-							};
-							trackingParams: string;
-							unsubscribeButtonText: {
-								runs: {
-									text: string;
-								}[];
-							};
-							serviceEndpoints: {
-								clickTrackingParams: string;
-								commandMetadata: {
-									webCommandMetadata: {
-										sendPost: boolean;
-										apiUrl?: string;
-									};
-								};
-								subscribeEndpoint?: {
-									channelIds: string[];
-									params: string;
-								};
-								signalServiceEndpoint?: {
-									signal: string;
-									actions: {
-										clickTrackingParams: string;
-										openPopupAction: {
-											popup: {
-												confirmDialogRenderer: {
-													trackingParams: string;
-													dialogMessages: {
-														runs: {
-															text: string;
-														}[];
-													}[];
-													confirmButton: {
-														buttonRenderer: {
-															style: string;
-															size: string;
-															isDisabled: boolean;
-															text: {
-																runs: {
-																	text: string;
-																}[];
-															};
-															serviceEndpoint: {
-																clickTrackingParams: string;
-																commandMetadata: {
-																	webCommandMetadata: {
-																		sendPost: boolean;
-																		apiUrl: string;
-																	};
-																};
-																unsubscribeEndpoint: {
-																	channelIds: string[];
-																	params: string;
-																};
-															};
-															accessibility: {
-																label: string;
-															};
-															trackingParams: string;
-														};
-													};
-													cancelButton: {
-														buttonRenderer: {
-															style: string;
-															size: string;
-															isDisabled: boolean;
-															text: {
-																runs: {
-																	text: string;
-																}[];
-															};
-															accessibility: {
-																label: string;
-															};
-															trackingParams: string;
-														};
-													};
-													primaryIsCancel: boolean;
-												};
-											};
-											popupType: string;
-										};
-									}[];
-								};
-							}[];
-							subscribeAccessibility: {
-								accessibilityData: {
-									label: string;
-								};
-							};
-							unsubscribeAccessibility: {
-								accessibilityData: {
-									label: string;
-								};
-							};
-							signInEndpoint: {
-								clickTrackingParams: string;
-								commandMetadata: {
-									webCommandMetadata: {
-										url: string;
-									};
-								};
-							};
-						};
-					};
-					trackingParams: string;
-					isSubscribe?: boolean;
-					id: string;
-					playlistLength?: {
-						simpleText: string;
-					};
-					thumbnailOverlays?: {
-						thumbnailOverlayTimeStatusRenderer: {
-							text: {
-								accessibility: {
-									accessibilityData: {
-										label: string;
-									};
-								};
-								simpleText: string;
-							};
-							style: string;
-						};
-					}[];
-				};
-			}[];
-			startMs: string;
-			trackingParams: string;
-		};
-	};
 	adSlots?: {
 		adSlotRenderer: {
 			adSlotMetadata: {
@@ -1214,6 +1335,10 @@ export type RawPlayerData = {
 								pings: {
 									impressionPings: {
 										baseUrl: string;
+										attributionSrcMode?: string;
+										headers?: {
+											headerType: string;
+										}[];
 									}[];
 									errorPings: {
 										baseUrl: string;
@@ -1236,49 +1361,61 @@ export type RawPlayerData = {
 									closePings: {
 										baseUrl: string;
 									}[];
-									clickthroughPings: {
-										baseUrl: string;
-									}[];
 									fullscreenPings: {
 										baseUrl: string;
 									}[];
-									activeViewViewablePings: {
+									activeViewViewablePings?: {
 										baseUrl: string;
 									}[];
 									endFullscreenPings: {
 										baseUrl: string;
 									}[];
-									activeViewMeasurablePings: {
+									activeViewMeasurablePings?: {
 										baseUrl: string;
 									}[];
 									abandonPings: {
 										baseUrl: string;
+										attributionSrcMode?: string;
 									}[];
-									activeViewFullyViewableAudibleHalfDurationPings: {
+									activeViewFullyViewableAudibleHalfDurationPings?: {
 										baseUrl: string;
 									}[];
-									startPings: {
+									startPings?: {
 										baseUrl: string;
 									}[];
-									firstQuartilePings: {
+									firstQuartilePings?: {
 										baseUrl: string;
 									}[];
-									secondQuartilePings: {
+									secondQuartilePings?: {
 										baseUrl: string;
 									}[];
-									thirdQuartilePings: {
+									thirdQuartilePings?: {
 										baseUrl: string;
 									}[];
-									completePings: {
+									completePings?: {
 										baseUrl: string;
+										attributionSrcMode?: string;
 									}[];
-									activeViewTracking: {
+									activeViewTracking?: {
 										trafficType: string;
 									};
+									progressPings?: {
+										baseUrl: string;
+										offsetMilliseconds: number;
+										attributionSrcMode?: string;
+									}[];
+									skipPings?: {
+										baseUrl: string;
+										attributionSrcMode?: string;
+									}[];
+									clickthroughPings?: {
+										baseUrl: string;
+										attributionSrcMode: string;
+									}[];
 								};
 								clickthroughEndpoint: {
 									clickTrackingParams: string;
-									commandMetadata: {
+									commandMetadata?: {
 										webCommandMetadata: {
 											url: string;
 											webPageType: string;
@@ -1288,6 +1425,7 @@ export type RawPlayerData = {
 									urlEndpoint: {
 										url: string;
 										target: string;
+										attributionSrcMode: string;
 									};
 								};
 								csiParameters: {
@@ -1297,11 +1435,19 @@ export type RawPlayerData = {
 								playerVars: string;
 								elementId: string;
 								trackingParams: string;
+								legacyInfoCardVastExtension?: string;
+								sodarExtensionData: {
+									siub: string;
+									bgub: string;
+									scs: string;
+									bgp: string;
+								};
 								externalVideoId: string;
 								adLayoutLoggingData: {
 									serializedAdServingDataEntry: string;
 								};
 								layoutId: string;
+								skipOffsetMilliseconds?: number;
 							};
 						};
 						layoutExitNormalTriggers: {
@@ -1311,6 +1457,12 @@ export type RawPlayerData = {
 							};
 						}[];
 						layoutExitMuteTriggers: {
+							id: string;
+							skipRequestedTrigger: {
+								triggeringLayoutId: string;
+							};
+						}[];
+						layoutExitSkipTriggers?: {
 							id: string;
 							skipRequestedTrigger: {
 								triggeringLayoutId: string;
@@ -1338,12 +1490,186 @@ export type RawPlayerData = {
 			}[];
 		};
 	}[];
-	heartbeatParams?: {
-		intervalMilliseconds: string;
-		softFailOnError: boolean;
-		heartbeatServerData: string;
+	adBreakHeartbeatParams?: string;
+	frameworkUpdates?: {
+		entityBatchUpdate: {
+			mutations: {
+				entityKey: string;
+				type: string;
+				payload: {
+					offlineabilityEntity: {
+						key: string;
+						addToOfflineButtonState: string;
+					};
+				};
+			}[];
+			timestamp: {
+				seconds: string;
+				nanos: number;
+			};
+		};
 	};
-};
+	captions?: {
+		playerCaptionsTracklistRenderer: {
+			captionTracks: {
+				baseUrl: string;
+				name: {
+					runs?: {
+						text: string;
+					}[];
+					simpleText?: string;
+				};
+				vssId: string;
+				languageCode: string;
+				kind?: string;
+				isTranslatable: boolean;
+				trackName: string;
+				rtl?: boolean;
+			}[];
+			audioTracks: {
+				captionTrackIndices: number[];
+				defaultCaptionTrackIndex?: number;
+				visibility?: string;
+				hasDefaultTrack?: boolean;
+				audioTrackId?: string;
+				captionsInitialState?: string;
+			}[];
+			translationLanguages: {
+				languageCode: string;
+				languageName: {
+					runs?: {
+						text: string;
+					}[];
+					simpleText?: string;
+				};
+			}[];
+			defaultAudioTrackIndex: number;
+			openTranscriptCommand?: {
+				clickTrackingParams: string;
+				changeEngagementPanelVisibilityAction: {
+					targetId: string;
+					visibility: string;
+				};
+			};
+		};
+	};
+	endscreen?: {
+		endscreenRenderer: {
+			elements: {
+				endscreenElementRenderer: {
+					style: string;
+					image: {
+						thumbnails: {
+							url: string;
+							width: number;
+							height: number;
+						}[];
+					};
+					left: number;
+					width: number;
+					top: number;
+					aspectRatio: number;
+					startMs: string;
+					endMs: string;
+					title: {
+						runs?: {
+							text: string;
+						}[];
+						accessibility: {
+							accessibilityData: {
+								label: string;
+							};
+						};
+						simpleText?: string;
+					};
+					metadata: {
+						runs?: {
+							text: string;
+						}[];
+						simpleText?: string;
+					};
+					endpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							interactionLoggingCommandMetadata: {
+								loggingExpectations?: {
+									screenCreatedLoggingExpectations: {
+										expectedParentScreens: {
+											screenVeType: number;
+										}[];
+									};
+								};
+							};
+							webCommandMetadata?: {
+								url: string;
+								webPageType: string;
+								rootVe: number;
+							};
+						};
+						watchEndpoint: {
+							videoId: string;
+						};
+					};
+					trackingParams: string;
+					id: string;
+					thumbnailOverlays: {
+						thumbnailOverlayTimeStatusRenderer: {
+							text: {
+								runs?: {
+									text: string;
+								}[];
+								accessibility: {
+									accessibilityData: {
+										label: string;
+									};
+								};
+								simpleText?: string;
+							};
+							style: string;
+						};
+					}[];
+				};
+			}[];
+			startMs: string;
+			trackingParams: string;
+		};
+	};
+	paidContentOverlay?: {
+		paidContentOverlayRenderer: {
+			text: {
+				runs?: {
+					text: string;
+				}[];
+				simpleText?: string;
+			};
+			durationMs: string;
+			navigationEndpoint: {
+				clickTrackingParams: string;
+				urlEndpoint: {
+					url: string;
+					grwOpenInOverride: string;
+				};
+				commandMetadata?: {
+					webCommandMetadata: {
+						url: string;
+						webPageType: string;
+						rootVe: number;
+					};
+				};
+			};
+			icon: {
+				iconType: string;
+			};
+			showInPip: boolean;
+			trackingParams: string;
+		};
+	};
+	adParams?: string;
+	cpnInfo?: {
+		cpn: string;
+		cpnSource: string;
+	};
+}[];
 
 export type RawSearchData = {
 	responseContext: {
