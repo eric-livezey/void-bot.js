@@ -463,9 +463,13 @@ declare class SearchListResponse {
      */
     resultsPerPage: number;
     /**
-     * Returns a list of results that match the search criteria.
+     * The list of search results returned from the search.
      */
-    listItems(): Promise<SearchResult[]>;
+    items: SearchResult[];
+    /**
+     * Updates `items` with the next page of search results.
+     */
+    next(): Promise<SearchResult[]>;
 
     constructor(data: RawSearchData)
 }

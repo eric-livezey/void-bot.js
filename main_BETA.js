@@ -509,7 +509,7 @@ async function leaveCommand(interaction) {
 }
 
 /**
- * Plays the audio of a YouTube corresponding to the query in the specified voice channel.
+ * Plays the audio of a YouTube video corresponding to the query in the specified voice channel.
  * 
  * @param {ChatInputCommandInteraction} interaction The interaction
  * @param {string} query YouTube video or playlist URL or search query
@@ -902,6 +902,4 @@ CLIENT.on(Events.GuildDelete, (guild) => {
 
 // Code
 
-// await CLIENT.login(process.env.TOKEN);
-CLIENT = process.env.TOKEN;
-(await CLIENT.guilds.fetch("888445748293804165")).client = undefined;
+await CLIENT.login(process.env.TOKEN);
