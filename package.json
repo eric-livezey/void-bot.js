@@ -7,10 +7,10 @@
     "author": "Eric Livezey",
     "license": "MIT",
     "dependencies": {
+        "@discordjs/opus": "^0.9.0",
         "@discordjs/voice": "^0.16.1",
         "discord.js": "^14.14.1",
         "ffmpeg-static": "^5.2.0",
-        "opusscript": "^0.0.8",
         "sodium-native": "^4.0.10"
     }
 }
