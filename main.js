@@ -1,6 +1,6 @@
 import { AudioPlayer, AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
-import { readFileSync, readdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { Duration, now } from "./innertube/utils.js";
 import * as Videos from "./innertube/videos.js";
 import { getPlaylist, listSearchResults } from "./innertube/index.js";
@@ -15,6 +15,15 @@ const CLIENT = new Client({
     intents: [((1 << 17) - 1) | (1 << 20) | (1 << 21)],
     partials: [Partials.Channel]
 });
+
+if (!existsSync("./audio")) {
+    mkdirSync("./audio");
+}
+
+if (!existsSync("./innertube/cache.json")) {
+    writeFileSync("./innertube/cache.json", "{}");
+}
+
 /**
  * @type {{[id:string]:Videos.Video}}
  */
@@ -987,5 +996,15 @@ CLIENT.on(Events.MessageCreate, async (message) => {
         }
     }
 });
+
+CLIENT.on(Events.Error, (error) => {
+    console.error(`Error:\n${error.name}: ${error.message}\n\n Retrying Login...`);
+    try {
+        CLIENT.login(process.env.TOKEN);
+        console.log("Success");
+    } catch {
+        console.log("Failure");
+    }
+})
 
 CLIENT.login(process.env.TOKEN);
