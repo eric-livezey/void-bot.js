@@ -123,7 +123,7 @@ class Player {
             this.nowPlaying = new Track(await getVideo(track.video.id));
         }
         const stream = Readable.fromWeb((await fetch(await track.url)).body);
-        // Bot needs to retry network requests that fail, not yet implemented because I can't find a nice way to do it :(
+        // Bot needs to retry network requests that fail, not yet implemented
         this.audioResource = createAudioResource(stream, { inlineVolume: true, inputType: StreamType.WebmOpus });
         this.audioResource.volume.setVolume(this.volume);
         this.audioPlayer.play(this.audioResource);
@@ -635,9 +635,9 @@ async function volumeCommand(interaction, percentage) {
 async function nowPlayingCommand(interaction) {
     const player = getPlayer(interaction.guildId);
     if (player.nowPlaying === null) {
-        return interaction.reply("Nothing is playing");
+        return "Nothing is playing";
     } else {
-        return interaction.reply({ content: "**Now playing:**", embeds: [createVideoEmbed(player.nowPlaying.video, player.nowPlaying.startTime)] });
+        return { content: "**Now playing:**", embeds: [createVideoEmbed(player.nowPlaying.video, player.nowPlaying.startTime)] };
     }
 }
 
@@ -840,7 +840,10 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 break;
         }
         if (response) {
-            await interaction.reply(response).catch(async () => await interaction.user.send(response).catch((e) => console.error(e)));
+            await interaction.reply(response).catch(async () => {
+                response.content = "*An error occurred whist trying to respond to the interaction in the channel. Make sure the bot has the proper permissions to respond.*\n\n" + response.content;
+                await interaction.user.send(response).catch((e) => console.error(e))
+            });
         }
     }
     if (interaction.isAutocomplete()) {

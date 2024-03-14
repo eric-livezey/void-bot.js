@@ -846,7 +846,7 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
 
 CLIENT.on(Events.MessageCreate, async (message) => {
     if (message.channel.isDMBased()) {
-        // Handle DMs
+        // Handle DMs (do nothing currently)
     } else if (message.content.startsWith(PREFIX)) {
         // Parse command name and arguments
         const args = message.content.split(" ");
@@ -871,7 +871,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         // Resume
                         response = resumeCommand(message.guildId);
                     } else {
-                        response = await play(message.member, message.content.substring(6).trim());
+                        response = await play(message.member, message.content.substring(cmd.length + 1).trim());
                     }
                     break;
                 case "pause":
