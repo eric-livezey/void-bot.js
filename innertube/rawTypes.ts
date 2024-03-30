@@ -1669,7 +1669,7 @@ export type RawPlayerData = {
 		cpn: string;
 		cpnSource: string;
 	};
-}[];
+};
 
 export type RawSearchData = {
 	responseContext: {
@@ -4281,7 +4281,7 @@ export type RawSearchData = {
 												rootVe: number;
 											};
 										};
-										watchEndpoint: {
+										watchEndpoint?: {
 											videoId: string;
 											playlistId: string;
 											loggingContext: {
@@ -4297,6 +4297,9 @@ export type RawSearchData = {
 												};
 											};
 											params?: string;
+										};
+										watchPlaylistEndpoint?: {
+											playlistId: string;
 										};
 									};
 									trackingParams: string;
@@ -5133,7 +5136,7 @@ export type RawSearchData = {
 			enablePacfLoggingWeb: boolean;
 		};
 		appendContinuationItemsAction?: {
-			continuationItems: {
+			continuationItems?: {
 				itemSectionRenderer?: {
 					contents: {
 						videoRenderer?: {
@@ -5973,14 +5976,8 @@ export type RawSearchData = {
 	}[];
 };
 
-
-
-
-
-
-
 export type RawSearchResultData = {
-	channelRenderer?: {
+	channelRenderer: {
 		channelId: string;
 		title: {
 			simpleText: string;
@@ -6121,7 +6118,10 @@ export type RawSearchResultData = {
 			}[];
 		};
 	};
-	videoRenderer?: {
+}
+	|
+{
+	videoRenderer: {
 		videoId: string;
 		thumbnail: {
 			thumbnails: {
@@ -6535,7 +6535,7 @@ export type RawSearchResultData = {
 		}[];
 		detailedMetadataSnippets?: {
 			snippetText: {
-				runs: {
+				runs?: {
 					text: string;
 					bold?: boolean;
 				}[];
@@ -6798,7 +6798,10 @@ export type RawSearchResultData = {
 			}[];
 		};
 	};
-	playlistRenderer?: {
+}
+	|
+{
+	playlistRenderer: {
 		playlistId: string;
 		title: {
 			simpleText: string;
@@ -7041,6 +7044,398 @@ export type RawSearchResultData = {
 		publishedTimeText?: {
 			simpleText: string;
 		};
+	};
+}
+	|
+{
+	universalWatchCardRenderer: {
+		header: {
+			watchCardRichHeaderRenderer: {
+				title: {
+					simpleText: string;
+				};
+				titleNavigationEndpoint: {
+					clickTrackingParams: string;
+					commandMetadata: {
+						webCommandMetadata: {
+							url: string;
+							webPageType: string;
+							rootVe: number;
+							apiUrl: string;
+						};
+					};
+					browseEndpoint: {
+						browseId: string;
+					};
+				};
+				subtitle: {
+					simpleText: string;
+				};
+				colorSupportedDatas: {
+					basicColorPaletteData: {
+						backgroundColor: number;
+						foregroundTitleColor: number;
+						foregroundBodyColor: number;
+					};
+				};
+				trackingParams: string;
+				darkThemeColorSupportedDatas: {
+					basicColorPaletteData: {
+						backgroundColor: number;
+						foregroundTitleColor: number;
+						foregroundBodyColor: number;
+					};
+				};
+				style: string;
+				avatar?: {
+					thumbnails: {
+						url: string;
+						width: number;
+						height: number;
+					}[];
+					placeholderColor: number;
+				};
+				titleBadge?: {
+					metadataBadgeRenderer: {
+						icon: {
+							iconType: string;
+						};
+						style: string;
+						tooltip: string;
+						trackingParams: string;
+						accessibilityData: {
+							label: string;
+						};
+					};
+				};
+				callToActionButtons?: {
+					buttonRenderer: {
+						style: string;
+						size: string;
+						isDisabled: boolean;
+						text: {
+							runs: {
+								text: string;
+							}[];
+						};
+						navigationEndpoint: {
+							clickTrackingParams: string;
+							commandMetadata: {
+								webCommandMetadata: {
+									url: string;
+									webPageType: string;
+									rootVe: number;
+								};
+							};
+							signInEndpoint: {
+								nextEndpoint: {
+									clickTrackingParams: string;
+									commandMetadata: {
+										webCommandMetadata: {
+											url: string;
+											webPageType: string;
+											rootVe: number;
+										};
+									};
+									searchEndpoint: {
+										query: string;
+									};
+								};
+								continueAction: string;
+							};
+						};
+						trackingParams: string;
+					};
+				}[];
+			};
+		};
+		callToAction: {
+			watchCardHeroVideoRenderer: {
+				navigationEndpoint: {
+					clickTrackingParams: string;
+					commandMetadata: {
+						webCommandMetadata: {
+							url: string;
+							webPageType: string;
+							rootVe: number;
+						};
+					};
+					watchEndpoint?: {
+						videoId: string;
+						playlistId: string;
+						loggingContext: {
+							vssLoggingContext: {
+								serializedContextData: string;
+							};
+						};
+						watchEndpointSupportedOnesieConfig: {
+							html5PlaybackOnesieConfig: {
+								commonConfig: {
+									url: string;
+								};
+							};
+						};
+						params?: string;
+					};
+					watchPlaylistEndpoint?: {
+						playlistId: string;
+					};
+				};
+				trackingParams: string;
+				callToActionButton: {
+					callToActionButtonRenderer: {
+						label: {
+							simpleText: string;
+						};
+						icon: {
+							iconType: string;
+						};
+						style: string;
+					};
+				};
+				heroImage: {
+					singleHeroImageRenderer?: {
+						thumbnail: {
+							thumbnails: {
+								url: string;
+								width: number;
+								height: number;
+							}[];
+						};
+						style: string;
+					};
+					collageHeroImageRenderer?: {
+						leftThumbnail: {
+							thumbnails: {
+								url: string;
+								width: number;
+								height: number;
+							}[];
+						};
+						topRightThumbnail: {
+							thumbnails: {
+								url: string;
+								width: number;
+								height: number;
+							}[];
+						};
+						bottomRightThumbnail: {
+							thumbnails: {
+								url: string;
+								width: number;
+								height: number;
+							}[];
+						};
+					};
+				};
+				accessibility: {
+					accessibilityData: {
+						label: string;
+					};
+				};
+			};
+		};
+		sections: {
+			watchCardSectionSequenceRenderer: {
+				lists: {
+					verticalWatchCardListRenderer?: {
+						items: {
+							watchCardCompactVideoRenderer: {
+								title: {
+									simpleText: string;
+								};
+								subtitle: {
+									runs?: {
+										text: string;
+										navigationEndpoint: {
+											clickTrackingParams: string;
+											commandMetadata: {
+												webCommandMetadata: {
+													url: string;
+													webPageType: string;
+													rootVe: number;
+													apiUrl: string;
+												};
+											};
+											browseEndpoint: {
+												browseId: string;
+												canonicalBaseUrl: string;
+											};
+										};
+									}[];
+									simpleText?: string;
+								};
+								lengthText: {
+									accessibility: {
+										accessibilityData: {
+											label: string;
+										};
+									};
+									simpleText: string;
+								};
+								navigationEndpoint: {
+									clickTrackingParams: string;
+									commandMetadata: {
+										webCommandMetadata: {
+											url: string;
+											webPageType: string;
+											rootVe: number;
+										};
+									};
+									watchEndpoint: {
+										videoId: string;
+										playlistId?: string;
+										playerParams: string;
+										loggingContext?: {
+											vssLoggingContext: {
+												serializedContextData: string;
+											};
+										};
+										watchEndpointSupportedOnesieConfig: {
+											html5PlaybackOnesieConfig: {
+												commonConfig: {
+													url: string;
+												};
+											};
+										};
+										params?: string;
+									};
+								};
+								trackingParams: string;
+								style: string;
+								byline?: {
+									runs: {
+										text: string;
+										navigationEndpoint: {
+											clickTrackingParams: string;
+											commandMetadata: {
+												webCommandMetadata: {
+													url: string;
+													webPageType: string;
+													rootVe: number;
+													apiUrl: string;
+												};
+											};
+											browseEndpoint: {
+												browseId: string;
+												canonicalBaseUrl: string;
+											};
+										};
+									}[];
+								};
+							};
+						}[];
+						viewAllEndpoint?: {
+							clickTrackingParams: string;
+							commandMetadata: {
+								webCommandMetadata: {
+									url: string;
+									webPageType: string;
+									rootVe: number;
+									apiUrl: string;
+								};
+							};
+							browseEndpoint: {
+								browseId: string;
+							};
+						};
+						viewAllText?: {
+							runs: {
+								text: string;
+							}[];
+						};
+						trackingParams: string;
+					};
+					horizontalCardListRenderer?: {
+						cards: {
+							searchRefinementCardRenderer: {
+								thumbnail: {
+									thumbnails: {
+										url: string;
+										width: number;
+										height: number;
+									}[];
+								};
+								query: {
+									runs: {
+										text: string;
+									}[];
+								};
+								searchEndpoint: {
+									clickTrackingParams: string;
+									commandMetadata: {
+										webCommandMetadata: {
+											url: string;
+											webPageType: string;
+											rootVe: number;
+										};
+									};
+									watchPlaylistEndpoint: {
+										playlistId: string;
+									};
+								};
+								trackingParams: string;
+								searchRefinementCardRendererStyle: {
+									value: string;
+								};
+							};
+						}[];
+						trackingParams: string;
+						header: {
+							titleAndButtonListHeaderRenderer: {
+								title: {
+									accessibility: {
+										accessibilityData: {
+											label: string;
+										};
+									};
+									simpleText: string;
+								};
+								trackingParams: string;
+							};
+						};
+						previousButton: {
+							buttonRenderer: {
+								style: string;
+								size: string;
+								isDisabled: boolean;
+								icon: {
+									iconType: string;
+								};
+								trackingParams: string;
+							};
+						};
+						nextButton: {
+							buttonRenderer: {
+								style: string;
+								size: string;
+								isDisabled: boolean;
+								icon: {
+									iconType: string;
+								};
+								trackingParams: string;
+							};
+						};
+					};
+				}[];
+				trackingParams: string;
+				listTitles?: {
+					accessibility: {
+						accessibilityData: {
+							label: string;
+						};
+					};
+					simpleText: string;
+				}[];
+			};
+		}[];
+		collapsedLabel: {
+			simpleText?: string;
+			runs?: {
+				text: string;
+			}[];
+		};
+		trackingParams: string;
 	};
 };
 
@@ -7378,7 +7773,9 @@ export type RawBrowseData = {
 					text: string;
 				}[];
 			};
-			descriptionText?: {};
+			descriptionText?: {
+				simpleText: string;
+			};
 			ownerText?: {
 				runs: {
 					text: string;

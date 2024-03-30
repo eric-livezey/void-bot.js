@@ -37,14 +37,14 @@ async function request(path, body) {
     // Set authorization header if using OAuth
     const authHeader = useOAuth ? { authorization: "Bearer " + BEARER_TOKEN.access_token } : {};
     return await fetch(`https://www.youtube.com/youtubei/v1${path}` + (useOAuth ? "" : "?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"), {
+        method: "POST",
         headers: {
             "content-type": "application/json",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
             "x-youtube-client-version": client.version,
             ...authHeader
         },
-        body: JSON.stringify(body),
-        method: "POST"
+        body: JSON.stringify(body)
     });
 }
 
@@ -67,13 +67,7 @@ async function getJs(playerId) {
         // Find the signature timestamp
         const signatureTimestamp = js.match(/signatureTimestamp:(?<timestamp>[0-9]+)(,|\})/).groups["timestamp"];
         // Evaluate the code that will save a new object to the cache
-        eval(
-        `${functions};
-        JS_CACHE[playerId]={
-            decipher:(a)=>${decipher},
-            signatureTimestamp:${signatureTimestamp}
-        }`
-        );
+        eval(`${functions};JS_CACHE[playerId]={decipher:(a)=>${decipher},signatureTimestamp:${signatureTimestamp}}`);
     }
     return JS_CACHE[playerId];
 }
@@ -82,11 +76,21 @@ function decipher(js, signatureCipher) {
     return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
 
-const SearchResultType = {
-    VIDEO: "video",
-    CHANNEL: "channel",
-    PLAYLIST: "playlist"
-};
+const SearchResultType = Object.create(null);
+Object.defineProperties(SearchResultType, {
+    VIDEO: {
+        enumerable: true,
+        value: "video"
+    },
+    CHANNEL: {
+        enumerable: true,
+        value: "channel"
+    },
+    PLAYLIST: {
+        enumerable: true,
+        value: "playlist"
+    }
+});
 
 class Video {
     id;
@@ -114,93 +118,106 @@ class Video {
     liveStreamingDetails;
 
     constructor(data, js) {
-        this.id = data.videoDetails?.videoId;
-        this.publishedAt = data.microformat ? new Date(data.microformat.playerMicroformatRenderer.publishDate) : undefined;
-        this.channelId = data.videoDetails?.channelId;
-        this.title = data.videoDetails?.title;
-        this.description = data.videoDetails?.shortDescription;
-        this.thumbnails = data.videoDetails ? {
-            default: {
-                url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
-                width: 120,
-                height: 90
-            },
-            medium: {
-                url: `https://i.ytimg.com/vi/${this.id}/mqdefault.jpg`,
-                width: 320,
-                height: 180
-            },
-            high: {
-                url: `https://i.ytimg.com/vi/${this.id}/hqdefault.jpg`,
-                width: 480,
-                height: 360
-            },
-            standard: {
-                url: `https://i.ytimg.com/vi/${this.id}/sddefault.jpg`,
-                width: 640,
-                height: 480
-            },
-            maxres: {
-                url: `https://i.ytimg.com/vi/${this.id}/maxresdefault.jpg`,
-                width: 1280,
-                height: 720
+        if ("videoDetails" in data) {
+            const videoDetails = data.videoDetails;
+            this.id = videoDetails.videoId;
+            this.channelId = videoDetails.channelId;
+            this.title = videoDetails.title;
+            this.description = videoDetails.shortDescription;
+            this.thumbnails = {
+                default: {
+                    url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
+                    width: 120,
+                    height: 90
+                },
+                medium: {
+                    url: `https://i.ytimg.com/vi/${this.id}/mqdefault.jpg`,
+                    width: 320,
+                    height: 180
+                },
+                high: {
+                    url: `https://i.ytimg.com/vi/${this.id}/hqdefault.jpg`,
+                    width: 480,
+                    height: 360
+                },
+                standard: {
+                    url: `https://i.ytimg.com/vi/${this.id}/sddefault.jpg`,
+                    width: 640,
+                    height: 480
+                },
+                maxres: {
+                    url: `https://i.ytimg.com/vi/${this.id}/maxresdefault.jpg`,
+                    width: 1280,
+                    height: 720
+                }
+            };
+            this.channelTitle = videoDetails.author;
+            this.tags = videoDetails.keywords;
+            this.liveBroadcastContent = videoDetails.isLive ? "live" : videoDetails.isLiveContent ? "upcoming" : "none";
+            this.duration = (seconds => {
+                return {
+                    total: seconds,
+                    days: Math.floor(seconds / 86400),
+                    hours: Math.floor(seconds % 86400 / 3600),
+                    minutes: Math.floor(seconds % 3600 / 60),
+                    seconds: seconds % 60
+                }
+            })(Number(videoDetails.lengthSeconds));
+            this.privacyStatus = videoDetails.isUnpluggedCorpus ? "unlisted" : videoDetails.isPrivate || "messages" in data.playabilityStatus && data.playabilityStatus.messages[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public";
+            this.viewCount = Number(videoDetails.viewCount);
+        }
+        if ("microformat" in data) {
+            const microformat = data.microformat;
+            this.publishedAt = new Date(microformat.playerMicroformatRenderer.publishDate);
+            this.category = microformat.playerMicroformatRenderer.category;
+            this.regionRestriction = {
+                allowed: microformat.playerMicroformatRenderer.availableCountries
+            };
+            this.embedHtml = `\u003ciframe width=\"${microformat.playerMicroformatRenderer.embed.width}\" height=\"${microformat.playerMicroformatRenderer.embed.height}\" src=\"${microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e`;
+            if ("liveBroadcastDetails" in microformat.playerMicroformatRenderer) {
+                const liveBroadcastDetails = microformat.playerMicroformatRenderer.liveBroadcastDetails;
+                this.liveStreamingDetails = {
+                    actualStartTime: new Date(liveBroadcastDetails.startTimestamp),
+                };
+                if ("endTimestamp" in liveBroadcastDetails)
+                    this.liveStreamingDetails.actualEndTime = new Date(liveBroadcastDetails.endTimestamp);
             }
-        } : undefined;
-        this.channelTitle = data.videoDetails?.author;
-        this.tags = data.videoDetails?.keywords;
-        this.category = data.microformat?.playerMicroformatRenderer.category;
-        this.liveBroadcastContent = data.videoDetails?.isLive ? "live" : data.videoDetails?.isLiveContent ? "upcoming" : "none";
-        this.duration = data.videoDetails ? ((seconds) => {
-            return {
-                total: seconds,
-                days: Math.floor(seconds / 86400),
-                hours: Math.floor(seconds % 86400 / 3600),
-                minutes: Math.floor(seconds % 3600 / 60),
-                seconds: seconds % 60
-            }
-        })(Number(data.videoDetails.lengthSeconds)) : undefined;
+        }
+        if ("streamingData" in data) {
+            const streamingData = data.streamingData;
+            this.projection = streamingData.adaptiveFormats[0].projectionType.toLowerCase();
+            this.fileDetails = {
+                videoStreams: streamingData.adaptiveFormats.filter(value => value.mimeType.startsWith("video")).map(value => {
+                    return {
+                        widthPixels: value.width,
+                        heightPixels: value.height,
+                        frameRateFps: value.fps,
+                        aspectRatio: value.width / value.width,
+                        codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
+                        bitrateBps: value.bitrate,
+                        url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                        contentLength: value.contentLength
+                    }
+                }),
+                audioStreams: streamingData.adaptiveFormats.filter(value => value.mimeType.startsWith("audio")).map(value => {
+                    return {
+                        channelCount: value.audioChannels,
+                        codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
+                        bitrateBps: value.bitrate,
+                        url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                        contentLength: value.contentLength
+                    }
+                }),
+                durationMs: streamingData.adaptiveFormats[0].approxDurationMs,
+                dashManifestUrl: streamingData.dashManifestUrl,
+                hlsManifestUrl: streamingData.hlsManifestUrl
+            };
+        }
         this.dimension = null;
         this.definition = null;
-        this.regionRestriction = {
-            allowed: data.microformat?.playerMicroformatRenderer.availableCountries
-        };
-        this.ageRestricted = data.playabilityStatus?.reason === "Sign in to confirm your age";
-        this.projection = data.streamingData?.adaptiveFormats[0].projectionType.toLowerCase();
-        this.uploadStatus = data.playabilityStatus?.reason === "We're processing this video. Check back later." ? "uploaded" : "processed";
-        this.privacyStatus = data.videoDetails?.isUnpluggedCorpus ? "unlisted" : data.videoDetails?.isPrivate || data.playabilityStatus?.messages?.[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public";
-        this.embeddable = data.playabilityStatus?.playableInEmbed;
-        this.viewCount = Number(data.videoDetails?.viewCount);
-        this.embedHtml = data.microformat ? `\u003ciframe width=\"${data.microformat.playerMicroformatRenderer.embed.width}\" height=\"${data.microformat.playerMicroformatRenderer.embed.height}\" src=\"${data.microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e` : undefined;
-        this.fileDetails = {
-            videoStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("video") && value).map((value) => {
-                return {
-                    widthPixels: value.width,
-                    heightPixels: value.height,
-                    frameRateFps: value.fps,
-                    aspectRatio: value.width / value.width,
-                    codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                    bitrateBps: value.bitrate,
-                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                    contentLength: value.contentLength
-                }
-            }),
-            audioStreams: data.streamingData?.adaptiveFormats.filter((value) => value.mimeType.startsWith("audio")).map((value) => {
-                return {
-                    channelCount: value.audioChannels,
-                    codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                    bitrateBps: value.bitrate,
-                    url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                    contentLength: value.contentLength
-                }
-            }),
-            durationMs: data.streamingData?.adaptiveFormats[0].approxDurationMs,
-            dashManifestUrl: data.streamingData?.dashManifestUrl,
-            hlsManifestUrl: data.streamingData?.hlsManifestUrl
-        };
-        this.liveStreamingDetails = data.microformat?.playerMicroformatRenderer.liveBroadcastDetails ? {
-            actualStartTime: new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.startTimestamp),
-            actualEndTime: data.microformat.playerMicroformatRenderer.liveBroadcastDetails.endTimestamp ? new Date(data.microformat.playerMicroformatRenderer.liveBroadcastDetails?.endTimestamp) : undefined,
-        } : undefined;
+        this.ageRestricted = data.playabilityStatus.reason === "Sign in to confirm your age";
+        this.uploadStatus = data.playabilityStatus.reason === "We're processing this video. Check back later." ? "uploaded" : "processed";
+        this.embeddable = data.playabilityStatus.playableInEmbed;
     };
 }
 
@@ -216,7 +233,7 @@ class PlaylistItem {
 
     constructor(data) {
         this.id = data.videoId;
-        this.title = data.title.runs.map((value) => value.text).join();
+        this.title = data.title.runs.map(value => value.text).join();
         this.thumbnails = {
             default: {
                 url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
@@ -244,7 +261,7 @@ class PlaylistItem {
                 height: 720
             }
         };
-        this.videoOwnerChannelTitle = data.shortBylineText.runs.map((value) => value.text).join();
+        this.videoOwnerChannelTitle = data.shortBylineText.runs.map(value => value.text).join();
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
         this.position = Number(data.index.simpleText);
         this.videoId = this.id;
@@ -264,67 +281,76 @@ class Playlist {
     #contents;
 
     constructor(data) {
-        this.id = data.header?.playlistHeaderRenderer.playlistId;
-        this.channelId = data.header?.playlistHeaderRenderer.ownerEndpoint?.browseEndpoint.browseId;
-        this.title = data.header?.playlistHeaderRenderer.title.simpleText;
-        this.description = data.header?.playlistHeaderRenderer.description;
-        this.thumbnails = data.header ? ((thumbnailData) => {
-            const thumbnails = {};
-            if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
-                const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
-                thumbnails.default = {
-                    url: url.replace("hqdefault.jpg", "default.jpg"),
-                    width: 120,
-                    height: 90
+        if ("header" in data) {
+            const header = data.header;
+            this.id = header.playlistHeaderRenderer.playlistId;
+            if ("ownerEndpoint" in header.playlistHeaderRenderer)
+                this.channelId = header.playlistHeaderRenderer.ownerEndpoint.browseEndpoint.browseId;
+            this.title = header.playlistHeaderRenderer.title.simpleText;
+            if ("descriptionText" in header.playlistHeaderRenderer)
+                this.description = header.playlistHeaderRenderer.descriptionText.simpleText;
+            this.thumbnails = (thumbnailData => {
+                const thumbnails = {};
+                if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
+                    const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
+                    thumbnails.default = {
+                        url: url.replace("hqdefault.jpg", "default.jpg"),
+                        width: 120,
+                        height: 90
+                    }
+                    thumbnails.medium = {
+                        url: url.replace("hqdefault.jpg", "mqdefault.jpg"),
+                        width: 320,
+                        height: 180
+                    }
+                    thumbnails.high = {
+                        url: url,
+                        width: 480,
+                        height: 360
+                    }
+                    thumbnails.standard = {
+                        url: url.replace("hqdefault.jpg", "sddefault.jpg"),
+                        width: 640,
+                        height: 480
+                    }
+                    thumbnails.maxres = {
+                        url: url.replace("hqdefault.jpg", "maxresdefault.jpg"),
+                        width: 1280,
+                        height: 720
+                    }
+                } else {
+                    thumbnails.medium = thumbnailData[0];
+                    thumbnails.standard = thumbnailData[1];
+                    thumbnails.maxres = thumbnailData[2];
                 }
-                thumbnails.medium = {
-                    url: url.replace("hqdefault.jpg", "mqdefault.jpg"),
-                    width: 320,
-                    height: 180
-                }
-                thumbnails.high = {
-                    url: url,
-                    width: 480,
-                    height: 360
-                }
-                thumbnails.standard = {
-                    url: url.replace("hqdefault.jpg", "sddefault.jpg"),
-                    width: 640,
-                    height: 480
-                }
-                thumbnails.maxres = {
-                    url: url.replace("hqdefault.jpg", "maxresdefault.jpg"),
-                    width: 1280,
-                    height: 720
-                }
-            } else {
-                thumbnails.medium = thumbnailData[0];
-                thumbnails.standard = thumbnailData[1];
-                thumbnails.maxres = thumbnailData[2];
-            }
-            return thumbnails;
-        })(data.header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails) : undefined;
-        this.channelTitle = data.header?.playlistHeaderRenderer.ownerText ? data.header?.playlistHeaderRenderer.ownerText.runs.map((value) => value.text).join() : data.header?.playlistHeaderRenderer.subtitle?.simpleText;
-        this.privacyStatus = data.header ? data.header.playlistHeaderRenderer.privacy.toLowerCase() : "private";
-        this.itemCount = data.header ? Number(data.header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]) : undefined;
-        this.#contents = data.contents?.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents
+                return thumbnails;
+            })(header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails);
+            if ("ownerText" in header.playlistHeaderRenderer)
+                this.channelTitle = header.playlistHeaderRenderer.ownerText.runs.map(value => value.text).join();
+            else if ("subtitle" in header.playlistHeaderRenderer)
+                this.channelTitle = header.playlistHeaderRenderer.subtitle.simpleText;
+            this.privacyStatus = header.playlistHeaderRenderer.privacy.toLowerCase();
+            this.itemCount = Number(header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]);
+        } else {
+            this.privacyStatus = "private"
+        }
+        this.#contents = "contents" in data ? data.contents.twoColumnBrowseResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].itemSectionRenderer.contents[0].playlistVideoListRenderer.contents : null;
     }
 
     async listItems() {
-        if (!this.#contents) {
+        if (this.#contents === null) {
             return [];
         }
         var contents = this.#contents;
-        var items = contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer));
-        var continuation = this.#contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
-        while (continuation) {
-            /**
-             * @type {import("./rawTypes").RawBrowseContinuationData}
-             */
+        var items = contents.filter(value => "playlistVideoRenderer" in value).map(value => new PlaylistItem(value.playlistVideoRenderer));
+        var continuationContainer = this.#contents.find(value => "continuationItemRenderer" in value);
+        var continuation = continuationContainer ? continuationContainer.continuationItemRenderer.continuationEndpoint.continuationCommand.token : null;
+        while (continuation !== null) {
             const data = await (await request("/browse", { continuation: continuation })).json();
             contents = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems;
-            items = items.concat(contents.filter((value) => value.playlistVideoRenderer).map((value) => new PlaylistItem(value.playlistVideoRenderer)));
-            continuation = contents.find(value => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+            items.push(...contents.filter(value => "playlistVideoRenderer" in value).map(value => new PlaylistItem(value.playlistVideoRenderer)));
+            continuationContainer = contents.find(value => "continuationItemRenderer" in value);
+            continuation = continuationContainer ? continuationContainer.continuationItemRenderer.continuationEndpoint.continuationCommand.token : null;
         }
         return items;
     };
@@ -339,48 +365,127 @@ class SearchResult {
     channelTitle;
     liveBroadcastContent;
 
+    /** */
     constructor(data) {
-        const videoData = data.videoRenderer;
-        const channelData = data.channelRenderer;
-        const playlistData = data.playlistRenderer
-        this.id = {
-            kind: videoData ? SearchResultType.VIDEO : channelData ? SearchResultType.CHANNEL : SearchResultType.PLAYLIST,
-            videoId: videoData?.videoId,
-            channelId: channelData?.channelId,
-            playlistId: playlistData?.playlistId
-        };
-        this.channelId = videoData ? videoData.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId : channelData ? this.id.channelId : playlistData.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-        this.title = videoData ? videoData.title.runs.map((value) => value.text).join() : (channelData ? channelData : playlistData).title.simpleText;
-        this.description = videoData ? videoData.detailedMetadataSnippets?.[0].snippetText.runs?.map((value) => value.text).join() : channelData?.descriptionSnippet?.runs.map(value => value.text).join();
-        this.thumbnails = {
-            default: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/default.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url,
-                width: videoData || playlistData ? 120 : 88,
-                height: videoData || playlistData ? 90 : 88
-            },
-            medium: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/mqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
-                width: videoData || playlistData ? 320 : 240,
-                height: videoData || playlistData ? 180 : 240
-            },
-            high: {
-                url: videoData || playlistData ? `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/hqdefault.jpg` : "https:" + channelData.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
-                width: videoData || playlistData ? 480 : 800,
-                height: videoData || playlistData ? 360 : 800
-            },
-            standard: videoData || playlistData ? {
-                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/sddefault.jpg`,
-                width: 640,
-                height: 480
-            } : undefined,
-            maxres: videoData || playlistData ? {
-                url: `https://i.ytimg.com/vi/${(videoData ? this.id.videoId : playlistData.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId)}/maxresdefault.jpg`,
-                width: 1280,
-                height: 720
-            } : undefined
+        if ("videoRenderer" in data) {
+            const videoRenderer = data.videoRenderer;
+            this.id = {
+                type: SearchResultType.VIDEO,
+                videoId: videoRenderer.videoId
+            };
+            if ("browseEndpoint" in videoRenderer.ownerText.runs[0].navigationEndpoint)
+                this.channelId = videoRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+            this.title = videoRenderer.title.runs.map(value => value.text).join();
+            if ("detailedMetadataSnippets" in videoRenderer && "runs" in videoRenderer.detailedMetadataSnippets[0].snippetText)
+                this.description = videoRenderer.detailedMetadataSnippets[0].snippetText.runs.map(value => value.text).join();
+            this.thumbnails = {
+                default: {
+                    url: `https://i.ytimg.com/vi/${this.id.videoId}/default.jpg`,
+                    width: 120,
+                    height: 90
+                },
+                medium: {
+                    url: `https://i.ytimg.com/vi/${this.id.videoId}/mqdefault.jpg`,
+                    width: 320,
+                    height: 180
+                },
+                high: {
+                    url: `https://i.ytimg.com/vi/${this.id.videoId}/hqdefault.jpg`,
+                    width: 480,
+                    height: 360
+                },
+                standard: {
+                    url: `https://i.ytimg.com/vi/${this.id.videoId}/sddefault.jpg`,
+                    width: 640,
+                    height: 480
+                },
+                maxres: {
+                    url: `https://i.ytimg.com/vi/${this.id.videoId}/maxresdefault.jpg`,
+                    width: 1280,
+                    height: 720
+                }
+            };
+            this.channelTitle = videoRenderer.ownerText.runs.map(value => value.text).join();
+            if ("badges" in videoRenderer)
+                this.liveBroadcastContent = videoRenderer.badges.find(value => value.metadataBadgeRenderer.label === "LIVE") ? "live" : "none";
+        } else if ("channelRenderer" in data) {
+            const channelRenderer = data.channelRenderer;
+            this.id = {
+                type: SearchResultType.CHANNEL,
+                channelId: channelRenderer.channelId
+            };
+            this.channelId = this.id.channelId;
+            this.title = channelRenderer.title.simpleText;
+            if ("descriptionSnippet" in channelRenderer)
+                this.description = channelRenderer.descriptionSnippet.runs.map(value => value.text).join();
+            this.thumbnails = {
+                default: {
+                    url: "https:" + channelRenderer.thumbnail.thumbnails[0].url,
+                    width: 88,
+                    height: 88
+                },
+                medium: {
+                    url: "https:" + channelRenderer.thumbnail.thumbnails[0].url.replace("=s88", "=s240"),
+                    width: 240,
+                    height: 240
+                },
+                high: {
+                    url: "https:" + channelRenderer.thumbnail.thumbnails[0].url.replace("=s88", "=s800"),
+                    width: 800,
+                    height: 800
+                }
+            };
+            this.channelTitle = this.title;
+        } else if ("playlistRenderer" in data) {
+            const playlistRenderer = data.playlistRenderer
+            this.id = {
+                type: SearchResultType.PLAYLIST,
+                playlistId: playlistRenderer.playlistId
+            };
+            if ("browseEndpoint" in playlistRenderer.longBylineText.runs[0].navigationEndpoint)
+                this.channelId = playlistRenderer.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+            this.title = playlistRenderer.title.simpleText;
+            this.thumbnails = {
+                default: {
+                    url: `https://i.ytimg.com/vi/${playlistRenderer.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId}/default.jpg`,
+                    width: 120,
+                    height: 90
+                },
+                medium: {
+                    url: `https://i.ytimg.com/vi/${playlistRenderer.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId}/mqdefault.jpg`,
+                    width: 320,
+                    height: 180
+                },
+                high: {
+                    url: `https://i.ytimg.com/vi/${playlistRenderer.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId}/hqdefault.jpg`,
+                    width: 480,
+                    height: 360
+                },
+                standard: {
+                    url: `https://i.ytimg.com/vi/${playlistRenderer.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId}/sddefault.jpg`,
+                    width: 640,
+                    height: 480
+                }
+            };
+            this.channelTitle = playlistRenderer.longBylineText.runs[0].text;
+        } else if ("universalWatchCardRenderer" in data) {
+            const universalWatchCardRenderer = data.universalWatchCardRenderer;
+            if ("watchPlaylistEndpoint" in universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.navigationEndpoint)
+                this.id = {
+                    type: SearchResultType.PLAYLIST,
+                    playlistId: universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchPlaylistEndpoint.playlistId
+                };
+            this.title = universalWatchCardRenderer.header.watchCardRichHeaderRenderer.title.simpleText;
+            if ("singleHeroImageRenderer" in universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.heroImage && universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.heroImage.singleHeroImageRenderer.style == "SINGLE_HERO_IMAGE_STYLE_SQUARE")
+                this.thumbnails = {
+                    standard: {
+                        url: universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.heroImage.singleHeroImageRenderer.thumbnail.thumbnails[0].url,
+                        width: 640,
+                        height: 640
+                    }
+                };
+            this.channelTitle = universalWatchCardRenderer.header.watchCardRichHeaderRenderer.subtitle.simpleText;
         }
-        this.channelTitle = videoData ? videoData.ownerText.runs.map((value) => value.text).join() : channelData ? this.title : playlistData.longBylineText.runs[0].text;
-        this.liveBroadcastContent = videoData?.badges?.find((value) => value.metadataBadgeRenderer.label === "LIVE") ? "live" : "none";
     }
 }
 
@@ -392,35 +497,46 @@ class SearchListResponse {
     items;
 
     constructor(data) {
-        this.nextPageToken = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+        const continuation = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find(value => "continuationItemRenderer" in value);
+        if (continuation)
+            this.nextPageToken = continuation.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
         this.regionCode = "US";
         this.totalResults = Number(data.estimatedResults);
         this.resultsPerPage = null;
-        const items = data.contents?.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents
-            .find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
-            .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
-            .map((value) => new SearchResult(value));
-        if (!items) {
+        const itemSection = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find(value => "itemSectionRenderer" in value);
+        this.items = [];
+        if ("secondaryContents" in data.contents.twoColumnSearchResultsRenderer)
+            this.items.push(...data.contents.twoColumnSearchResultsRenderer.secondaryContents.secondarySearchContainerRenderer.contents.filter(value => "universalWatchCardRenderer" in value).map(value => new SearchResult(value)));
+        if (itemSection)
+            this.items.push(...itemSection.itemSectionRenderer.contents.filter(value => "videoRenderer" in value || "channelRenderer" in value || "playlistRenderer" in value).map(value => new SearchResult(value)));
+        else
             console.log(data);
-        }
-        this.items = items ? items : [];
     }
 
     async next() {
         if (!this.nextPageToken) {
             return null;
         }
-        const response = await request("/search", {
-            continuation: this.nextPageToken
-        })
-        const data = await (response.json());
-        const continuationItems = data.onResponseReceivedCommands?.find((value) => value.appendContinuationItemsAction)?.appendContinuationItemsAction.continuationItems
-        this.nextPageToken = continuationItems.find((value) => value.continuationItemRenderer)?.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
-        const newItems = continuationItems.find((value) => value.itemSectionRenderer)?.itemSectionRenderer.contents
-            .filter((value) => value.videoRenderer || value.channelRenderer || value.playlistRenderer)
-            .map((value) => new SearchResult(value));
-        this.items = this.items.concat(newItems);
-        return newItems;
+        const response = await request("/search", { continuation: this.nextPageToken });
+        const data = await response.json();
+        var continuation = null;
+        if ("onResponseReceivedCommands" in data)
+            continuation = data.onResponseReceivedCommands.find(value => "appendContinuationItemsAction" in value);
+        if (continuation !== null && "continuationItems" in continuation.appendContinuationItemsAction) {
+            const continuationItems = continuation.appendContinuationItemsAction.continuationItems;
+            const continuationItem = continuationItems.find(value => "continuationItemRenderer" in value);
+            if (continuationItem)
+                this.nextPageToken = continuationItem.continuationItemRenderer.continuationEndpoint.continuationCommand.token;
+            else
+                this.nextPageToken = undefined;
+            const itemSection = continuationItems.find(value => "itemSectionRenderer" in value);
+            if (itemSection) {
+                const newItems = itemSection.itemSectionRenderer.contents.filter(value => "videoRenderer" in value || "channelRenderer" in value || "playlistRenderer" in value).map(value => new SearchResult(value));
+                this.items.push(...newItems);
+                return newItems;
+            }
+        }
+        return [];
     }
 }
 
@@ -436,16 +552,19 @@ async function getVideo(id) {
         racyCheckOk: false,
         contentCheckOk: false
     })
-    if (response.status === 200) {
+    if (response.ok) {
         return new Video(await response.json(), js);
     } else {
         return null;
     }
 }
 
-async function getPlaylist(id) {
-    const response = await request("/browse", { browseId: "VL" + id });
-    if (response.status === 200) {
+async function getPlaylist(id, unavailable = false) {
+    const response = await request("/browse", {
+        browseId: "VL" + id,
+        params: unavailable ? "wgYCCAA%3D" : undefined
+    });
+    if (response.ok) {
         return new Playlist(await response.json());
     } else {
         return null;
@@ -457,7 +576,7 @@ async function listSearchResults(q, type) {
         query: q,
         params: type === SearchResultType.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultType.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultType.PLAYLIST ? "EgIQAw%3D%3D" : undefined
     })
-    if (response.status === 200) {
+    if (response.ok) {
         return new SearchListResponse(await response.json());
     } else {
         return null;

@@ -396,19 +396,29 @@ declare class SearchResult {
         /**
          * The type of the API resource.
          */
-        type: SearchResultType;
+        type: SearchResultType.VIDEO;
         /**
          * If the `id.type` property's value is {@link SearchResultType.VIDEO}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
          */
-        videoId?: string;
+        videoId: string;
+    } | {
+        /**
+         * The type of the API resource.
+         */
+        type: SearchResultType.CHANNEL;
         /**
          * If the `id.type` property's value is {@link SearchResultType.CHANNEL}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
          */
-        channelId?: string;
+        channelId: string;
+    } | {
+        /**
+         * The type of the API resource.
+         */
+        type: SearchResultType.PLAYLIST;
         /**
          * If the `id.type` property's value is {@link SearchResultType.PLAYLIST}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a playlist that matches the search query.
          */
-        playlistId?: string;
+        playlistId: string;
     };
     /**
      * The value that YouTube uses to uniquely identify the channel that published the resource that the search result identifies.
@@ -435,7 +445,7 @@ declare class SearchResult {
      * 
      * For a `video` resource, a value of `upcoming` indicates that the video is a live broadcast that has not yet started, while a value of `live` indicates that the video is an active live broadcast. For a channel resource, a value of `upcoming` indicates that the channel has a scheduled broadcast that has not yet started, while a value of `live` indicates that the channel has an active live broadcast.
      */
-    liveBroadcastContent: "live" | "upcoming" | "none";
+    liveBroadcastContent: "live" | "upcoming" | "none" | undefined;
 
     constructor(data: RawSearchResultData)
 }
@@ -485,8 +495,9 @@ declare function getVideo(id: string): Promise<Video | null>;
  * Returns the playlist with the matching ID.
  * 
  * @param id Specifies a YouTube playlist ID for the resource that is being retrieved. In a `playlist` resource, the id property specifies the playlist's YouTube playlist ID.
+ * @param unavailable Indicates whether unavailable videos should be included in the playlist.
  */
-declare function getPlaylist(id: string): Promise<Playlist | null>;
+declare function getPlaylist(id: string, unavailable: boolean): Promise<Playlist | null>;
 
 /**
  * Returns a collection of search results that match the query parameters specified in the API request. By default, a search result set identifies matching `video`, `channel`, and `playlist` resources, but you can also configure queries to only retrieve a specific type of resource.
