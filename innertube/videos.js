@@ -157,12 +157,9 @@ async function getJs(playerId) {
     // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
         // Fetch JS with player id
-        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
+        const js = await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text();
         // Find the object containing decipher functions
-        const mat = js.match(/var [A-Za-z0-9]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})((?!\}\}).)+\}\}/);
-        if (mat === null) {
-            console.log(js);
-        }
+        const mat = js.match(/var ((?!=).)+=\{((?!:).)+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a\.length\];a\[b%a\.length\]=c\}|\(a\)\{a\.reverse\(\)\}|\(a,b\)\{a\.splice\(0,b\)\})((?!\}\}).)+\}\}/s);
         const functions = mat[0];
         // Find the function for deciphering signature ciphers
         const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
