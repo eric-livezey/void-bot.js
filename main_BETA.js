@@ -1,10 +1,13 @@
 import { AudioPlayer, AudioPlayerStatus, AudioResource, StreamType, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { ChannelType, ChatInputCommandInteraction, Client, Colors, CommandInteraction, EmbedBuilder, Events, Partials, PermissionFlagsBits, Routes, VoiceChannel, formatEmoji, parseEmoji } from "discord.js";
-import { readFileSync, writeFileSync } from "fs";
+import { AttachmentBuilder, ChannelType, ChatInputCommandInteraction, Client, Colors, EmbedBuilder, Events, Partials, PermissionFlagsBits, Routes, formatEmoji, parseEmoji } from "discord.js";
+import { readFileSync, rmSync, writeFileSync } from "fs";
 import { Readable } from "stream";
 import { Playlist, SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
-import { Duration } from "./innertube/utils.js";
+import { Duration, download } from "./innertube/utils.js";
 import { getMusicSearchSuggestions } from "./innertube/videos.js";
+import { spawn } from "child_process";
+import * as Tracks from "./innertube/music/tracks.js";
+import * as Albums from "./innertube/music/albums.js";
 
 // Global Constants
 
@@ -30,7 +33,6 @@ const REACTION_ROLES = JSON.parse(readFileSync("./reactionRoles.json"));
 class Player {
     /**
      * The audio player this player uses to play audio
-     * @type {AudioPlayer}
      */
     audioPlayer;
     /**
@@ -60,7 +62,6 @@ class Player {
     queue;
     /**
      * Whether the now playing track should be looped
-     * @type {boolean}
      */
     loop;
     /**
@@ -189,12 +190,10 @@ class Player {
 class Track {
     /**
      * The video which the track corrresponds to
-     * @type {Video}
      */
     video;
     /**
      * Whether the track has been skipped
-     * @type {boolean}
      */
     skipped;
     /**
@@ -204,7 +203,6 @@ class Track {
     startTime;
     /**
      * The url of this track's file
-     * @type {Promise<URL>}
      */
     url;
 
@@ -229,7 +227,7 @@ class Track {
                     best = stream;
                 }
             }
-            return best.url;
+            return new URL(best.url);
         })(video.fileDetails.audioStreams);
     }
 }
@@ -253,7 +251,7 @@ function getPlayer(guildId) {
  * Get the emoji identifier for the specified emoji.
  * @param {{animated: boolean;name: string;id: string | null;}} emoji The emoji
  */
-function getEmojiIdentifier(emoji) {
+function emojiToEmojiIdentifier(emoji) {
     if (!emoji.id) {
         // emoji is unicode
         return encodeURIComponent(emoji.name);
@@ -464,9 +462,9 @@ async function playPlaylist(interaction, listId) {
  * Makes the bot join the voice channel of the member of the command, or the specified voice channel.
  * 
  * @param {ChatInputCommandInteraction} interaction 
- * @param {VoiceChannel | null} channel 
  */
-async function joinCommand(interaction, channel) {
+function joinCommand(interaction) {
+    var channel = interaction.options.getChannel("channel", false, [ChannelType.GuildVoice]);
     if (channel === null) {
         // Channel was not provided
         channel = interaction.member.voice.channel
@@ -480,12 +478,7 @@ async function joinCommand(interaction, channel) {
         if (!channel.guild.members.me.permissionsIn(channel).has(PermissionFlagsBits.Connect | PermissionFlagsBits.ViewChannel)) {
             return { content: "I do not have sufficient permissions to execute this command.\n**Required**:\n • `Connect`\n • `View Channel`", ephemeral: true };
         }
-        joinVoiceChannel({
-            channelId: channel.id,
-            guildId: channel.guildId,
-            adapterCreator: channel.guild.voiceAdapterCreator,
-            selfDeaf: false
-        });
+        joinVoiceChannel({ channelId: channel.id, guildId: channel.guildId, adapterCreator: channel.guild.voiceAdapterCreator, selfDeaf: false });
         return { content: `Connected to <#${channel.id}>.`, ephemeral: true };
     } else {
         return { content: `I am already connected to <#${channel.id}>.`, ephemeral: true };
@@ -512,13 +505,17 @@ async function leaveCommand(interaction) {
  * Plays the audio of a YouTube video corresponding to the query in the specified voice channel.
  * 
  * @param {ChatInputCommandInteraction} interaction The interaction
- * @param {string} query YouTube video or playlist URL or search query
  */
-async function playCommand(interaction, query) {
-    if (interaction.member.voice.channel === null) {
+async function playCommand(interaction) {
+    const query = interaction.options.getString("query", true);
+    const channel = interaction.member.voice.channel;
+    if (channel === null) {
         // Member is not in a voice channel
-        return { content: "You are not in a voice channel.", ephemeral: true };
-    } else if (interaction.member.voice.channel != interaction.guild.members.me.voice.channel) {
+        return { content: "You must be in a voice channel to use this command.", ephemeral: true };
+    } else if (channel != interaction.guild.members.me.voice.channel) {
+        if (!interaction.guild.members.me.permissionsIn(channel).has(PermissionFlagsBits.Connect | PermissionFlagsBits.ViewChannel)) {
+            return { content: "I do not have sufficient permissions to execute this command.\n**Required**:\n • `Connect`\n • `View Channel`", ephemeral: true };
+        }
         // Bot is not connected to member's voice channel
         joinVoiceChannel({
             channelId: interaction.member.voice.channelId,
@@ -544,19 +541,17 @@ async function playCommand(interaction, query) {
         }
     } else {
         // Query is a search query
-        var search = await listSearchResults(query, SearchResultType.VIDEO);
+        let search = await listSearchResults(query, SearchResultType.VIDEO);
         // Check if there are 0 total results
         if (search.totalResults === 0) {
             return { content: "There were no results for your query.", ephemeral: true };
         }
-        var attempts = 1;
-        while (search.items.length === 0) {
+        for (let attempts = 1; search.items.length === 0; attempts++) {
             if (attempts === 10) {
                 return { content: "Something went wrong with your search.", ephemeral: true };
             }
             // If the items list is still empty, try again
             search = await listSearchResults(query, SearchResultType.VIDEO);
-            attempts++;
         }
         videoId = search.items[0].id.videoId;
     }
@@ -619,9 +614,9 @@ async function skipCommand(interaction) {
  * Set the volume of the player
  * 
  * @param {ChatInputCommandInteraction} interaction 
- * @param {number} percentage 
  */
-async function volumeCommand(interaction, percentage) {
+async function volumeCommand(interaction) {
+    const percentage = interaction.options.getInteger("percentage", true);
     const player = getPlayer(interaction.guildId);
     player.setVolume(percentage / 100);
     return `Volume set to ${percentage}%.`;
@@ -644,18 +639,18 @@ async function nowPlayingCommand(interaction) {
 /**
  * Displays the Audio Streams for a specified YouTube video.
  * 
- * @param {CommandInteraction} interaction The interaction
- * @param {string} link A link to a YouTube video
+ * @param {ChatInputCommandInteraction} interaction The interaction
  */
-async function streamsCommand(interaction, link) {
+async function streamsCommand(interaction) {
+    const link = interaction.options.getString("link", true);
     const url = getUrl(link);
     if (url === null) {
-        return "That is not a valid URL.";
+        return { content: "That is not a valid URL.", ephemeral: true };
     }
     const videoId = extractVideoId(url);
     if (videoId === null) {
         // URL does not correspond to a YouTube video
-        return "That URL does not correspond to a YouTube video.";
+        return { content: "That URL does not correspond to a YouTube video.", ephemeral: true };
     }
     interaction.deferReply();
     const video = await getVideo(videoId);
@@ -685,10 +680,84 @@ async function streamsCommand(interaction, link) {
 }
 
 /**
+ * Download the video as an MP3.
+ * 
  * @param {ChatInputCommandInteraction} interaction 
- * @param {"add" | "remove"} subcommand 
  */
-async function reactionRolesCommand(interaction, subcommand) {
+async function downloadCommand(interaction) {
+    const link = interaction.options.getString("link", true);
+    const url = getUrl(link);
+    var videoId;
+    if (url !== null) {
+        videoId = extractVideoId(url);
+        if (videoId === null) {
+            // URL does not correspond to a YouTube video
+            return { content: "That URL does not correspond to a YouTube video.", ephemeral: true };
+        }
+    } else {
+        return { content: "That is not a valid URL.", ephemeral: true };
+    }
+    interaction.deferReply();
+    const video = await getVideo(videoId);
+    if (video === null || video.privacyStatus === "private" || video.ageRestricted || video.id === undefined) {
+        // Track cannot be played
+        interaction.editReply({ content: "**Issue Getting Track:**", embeds: [createVideoEmbed(video)] });
+        return null;
+    }
+    const vidPath = await download(new Track(video).url, `${videoId}.webm`);
+    if (vidPath === null) {
+        interaction.editReply("Something went wrong.");
+        return null;
+    }
+    const args = ["-i", vidPath]
+    if (url.hostname.startsWith("music.")) {
+        const track = await Tracks.get(video.id); // Fetch YouTube Music track info
+        const artists = track.artists.map(artist => artist.title); // Map artists to only the title of the artists
+        const playlist = await getPlaylist((await Albums.get(track.album.browseId)).playlistId); // Get the YouTube playlist associated with the album
+        var pos;
+        for (const listItem of await playlist.listItems()) { // Find the position of the track
+            if (video.id == listItem.id) {
+                pos = listItem.position;
+                break;
+            }
+        }
+        const channelTitle = playlist.channelTitle.replace(" • Album", ""); // Remove " • Album" from playlist channel title
+        const albumArtists = channelTitle.split(", "); // Get list of artists
+        var albumArtistsText = albumArtists[0];
+        for (var i = 1; i < albumArtists.length; i++) { // Append additional artists
+            if (i < albumArtists.length - 1) {
+                albumArtistsText += ", " + albumArtists[i];
+            } else {
+                albumArtistsText += " & " + albumArtists[i];
+            }
+        }
+        // Execute ffmpeg command to download it as an mp3
+        args.push("-i", playlist.thumbnails.maxres.url, "-map", "0:0", "-map", "1:0", "-id3v2_version", '3', "-metadata:s:v", "title=Album cover", "-metadata:s:v", "comment=Cover (front)", "-metadata", `title=${track.title}`, "-metadata", `artist=${artists.join(";")}`, "-metadata", `album=${playlist.title.replace("Album - ", "")}`, "-metadata", `track=${pos}/${playlist.itemCount}`, "-metadata", `date=${track.year}`, "-metadata", `album_artist=${albumArtistsText}`);
+    }
+    const path = `${videoId}.mp3`;
+    args.push(path);
+    const proc = spawn("./node_modules/ffmpeg-static/ffmpeg.exe", args);
+    proc.stderr.on("data", (chunk) => {
+        if (String(chunk).trimEnd().endsWith("[y/N]")) {
+            proc.stdin.write("y\n");
+        }
+    });
+    await new Promise((resolve) => {
+        proc.on("close", () => {
+            rmSync(vidPath);
+            resolve();
+        })
+    });
+    interaction.editReply({ files: [new AttachmentBuilder(readFileSync(path)).setName(path)] });
+    rmSync(path);
+    return null;
+}
+
+/**
+ * @param {ChatInputCommandInteraction} interaction 
+ */
+async function reactionRolesCommand(interaction) {
+    const subcommand = interaction.options.getSubcommand();
     if (subcommand === "add" && !interaction.guild.members.me.permissionsIn(interaction.channel).has(PermissionFlagsBits.ManageRoles | PermissionFlagsBits.ReadMessageHistory | PermissionFlagsBits.AddReactions)) {
         // Bot does not possess enough permissions for add
         return { content: "I do not have sufficient permissions to execute this command.\n**Required**:\n • `Manage Roles`\n • `Read Message History`\n • `Add Reactions`", ephemeral: true };
@@ -700,7 +769,7 @@ async function reactionRolesCommand(interaction, subcommand) {
         return { content: "Invalid `message-id`.", ephemeral: true };
     }
     // Parse emoji
-    const emoji = interaction.options.getString("reaction") ? parseEmoji(interaction.options.getString("reaction")) : undefined;
+    const emoji = interaction.options.getString("reaction") !== null ? parseEmoji(interaction.options.getString("reaction", true)) : null;
     switch (subcommand) {
         case "add":
             if (!emoji || emoji.id && !interaction.guild.emojis.cache.has(emoji.id)) {
@@ -709,7 +778,7 @@ async function reactionRolesCommand(interaction, subcommand) {
             }
             // Get the role
             const role = interaction.options.getRole("role", true);
-            if (REACTION_ROLES[interaction.guildId]?.[interaction.channelId]?.[message.id]?.[getEmojiIdentifier(emoji)]) {
+            if (REACTION_ROLES[interaction.guildId]?.[interaction.channelId]?.[message.id]?.[emojiToEmojiIdentifier(emoji)]) {
                 // Reaction role already exists
                 return { content: "Reaction role already exists.", ephemeral: true };
             }
@@ -732,23 +801,23 @@ async function reactionRolesCommand(interaction, subcommand) {
                 return { content: "Something went wrong.", ephemeral: true };
             }
             // Create the actual reaction role
-            createReactionRole(interaction.guildId, interaction.channelId, message.id, getEmojiIdentifier(emoji), role.id);
+            createReactionRole(interaction.guildId, interaction.channelId, message.id, emojiToEmojiIdentifier(emoji), role.id);
             // Reaction role creation was successful
             return { content: "Reaction role successfully created.", ephemeral: true };
         case "remove":
             // Store emojis to remove bot's reactions for
             const emojis = [];
-            if (!emoji) {
+            if (emoji === null) {
                 if (!REACTION_ROLES[interaction.guildId]?.[interaction.channelId]?.[message.id]) {
                     // No reaction roles on the specified message
                     return { content: "There are no reaction roles on that message.", ephemeral: true };
                 }
-                for (const key of Object.keys(REACTION_ROLES[interaction.guildId][interaction.channelId][message.id])) {
+                for (const key in REACTION_ROLES[interaction.guildId][interaction.channelId][message.id]) {
                     // Push emojis
                     emojis.push(parseEmoji(key));
                 }
             } else {
-                if (emoji && !REACTION_ROLES[interaction.guildId]?.[interaction.channelId]?.[message.id]?.[getEmojiIdentifier(emoji)]) {
+                if (!REACTION_ROLES[interaction.guildId]?.[interaction.channelId]?.[message.id]?.[emojiToEmojiIdentifier(emoji)]) {
                     // Reaction role does not exist
                     return { content: "Reaction role does not exist.", ephemeral: true };
                 }
@@ -757,10 +826,11 @@ async function reactionRolesCommand(interaction, subcommand) {
             }
             // Remove bot reaction's
             for (const e of emojis) {
-                CLIENT.rest.delete(Routes.channelMessageOwnReaction(interaction.channelId, message.id, getEmojiIdentifier(e))).catch(/* catch errors */);
+                if (e !== null)
+                    CLIENT.rest.delete(Routes.channelMessageOwnReaction(interaction.channelId, message.id, emojiToEmojiIdentifier(e)));
             }
             // Delete the reaction role
-            deleteReactionRole(interaction.guildId, interaction.channelId, message.id, emoji ? getEmojiIdentifier(emoji) : undefined);
+            deleteReactionRole(interaction.guildId, interaction.channelId, message.id, emoji ? emojiToEmojiIdentifier(emoji) : undefined);
             // Reaction role deletion was successful
             return { content: `Reaction role${emojis.length > 1 ? "s" : ""} successfully removed.`, ephemeral: true };
     }
@@ -791,7 +861,7 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
         switch (interaction.commandId) {
             case "1069696259042050132":
                 // Join command
-                response = await joinCommand(interaction, interaction.options.getChannel("channel", false, [ChannelType.GuildVoice]));
+                response = joinCommand(interaction);
                 break;
             case "1069697352593584138":
                 // Leave command
@@ -799,7 +869,7 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 break;
             case "1080503738264997908":
                 // Play command
-                response = await playCommand(interaction, interaction.options.getString("query", true));
+                response = await playCommand(interaction);
                 break;
             case "1168907698163679383":
                 // Pause command
@@ -818,7 +888,7 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 break;
             case "1163880754133090357":
                 // Volume command
-                response = await volumeCommand(interaction, interaction.options.getInteger("percentage", true));
+                response = await volumeCommand(interaction);
                 break;
             case "1153333937746227313":
                 // Now-Playing command
@@ -829,11 +899,15 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 break;
             case "1153099855732940950":
                 // Streams command
-                response = await streamsCommand(interaction, interaction.options.getString("link", true));
+                response = await streamsCommand(interaction);
+                break;
+            case "1227503333971988520":
+                // Download command
+                response = await downloadCommand(interaction);
                 break;
             case "1038664021987033229":
                 // Reaction-Roles command
-                response = await reactionRolesCommand(interaction, interaction.options.getSubcommand(true));
+                response = await reactionRolesCommand(interaction);
                 break;
             case "1038320425312198696":
                 // Clear command
@@ -855,10 +929,26 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
     }
 })
 
+CLIENT.on(Events.VoiceStateUpdate, (oldState, newState) => {
+    if (oldState.member.id == CLIENT.user.id && oldState.channelId !== null && newState.channelId === null) {
+        // Bot left a voice channel
+        var player = getPlayer(oldState.guild.id);
+        if (player.nowPlaying !== null) {
+            player.queue.splice(0, player.queue.length);
+            player.nowPlaying = null;
+            player.audioPlayer.stop();
+        }
+        player.voiceConnection = getVoiceConnection(oldState.guild.id);
+        if (player.voiceConnection !== undefined) {
+            player.voiceConnection.destroy();
+        }
+    }
+});
+
 CLIENT.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (user.bot) return;
     // Handle reaction roles
-    const roleId = REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[reaction.emoji.identifier];
+    const roleId = REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[emojiToEmojiIdentifier(reaction.emoji)];
     if (roleId && !(await reaction.message.guild.members.fetch(user.id)).roles.cache.has(roleId)) {
         await CLIENT.rest.put(Routes.guildMemberRole(reaction.message.guildId, user.id, roleId));
     }
@@ -867,14 +957,14 @@ CLIENT.on(Events.MessageReactionAdd, async (reaction, user) => {
 CLIENT.on(Events.MessageReactionRemove, async (reaction, user) => {
     if (user.bot) return;
     // Handle reaction roles
-    const roleId = REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[reaction.emoji.identifier];
+    const roleId = REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[emojiToEmojiIdentifier(reaction.emoji)];
     if (roleId && (await reaction.message.guild.members.fetch(user.id)).roles.cache.has(roleId)) {
         await CLIENT.rest.delete(Routes.guildMemberRole(reaction.message.guildId, user.id, roleId));
     }
 });
 
 CLIENT.on(Events.MessageReactionRemoveEmoji, (reaction) => {
-    if (REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[reaction.emoji.identifier]) {
+    if (REACTION_ROLES[reaction.message.guildId]?.[reaction.message.channelId]?.[reaction.message.id]?.[emojiToEmojiIdentifier(reaction.emoji)]) {
         deleteReactionRole(reaction.message.guildId, reaction.message.channelId, reaction.message.id, reaction.emoji.identifier)
     };
 })
@@ -898,7 +988,7 @@ CLIENT.on(Events.ChannelDelete, (channel) => {
 });
 
 CLIENT.on(Events.GuildDelete, (guild) => {
-    if (REACTION_ROLES[guild.id]) {
+    if (guild.id in REACTION_ROLES) {
         deleteReactionRole(guild.id);
     }
 });

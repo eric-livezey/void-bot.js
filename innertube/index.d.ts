@@ -63,7 +63,7 @@ declare class Video {
     /**
      * The ID that YouTube uses to uniquely identify the video.
      */
-    id: string;
+    id?: string;
     /**
      * The date and time that the video was published. Note that this time might be different than the time that the video was uploaded. For example, if a video is uploaded as a private video and then made public at a later time, this property will specify the time that the video was made public.
      * 
@@ -71,23 +71,23 @@ declare class Video {
      * - If a video is uploaded as a private video and the video metadata is retrieved by the channel owner, then the property value specifies the date and time that the video was uploaded.
      * - If a video is uploaded as an unlisted video, the property value also specifies the date and time that the video was uploaded. In this case, anyone who knows the video's unique video ID can retrieve the video metadata.
      */
-    publishedAt: Date;
+    publishedAt?: Date;
     /**
      * The ID that YouTube uses to uniquely identify the channel that the video was uploaded to.
      */
-    channelId: string;
+    channelId?: string;
     /**
      * The video's title. The property value has a maximum length of 100 characters and may contain all valid UTF-8 characters except `<` and `>`.
      */
-    title: string;
+    title?: string;
     /**
      * The video's description. The property value has a maximum length of 5000 bytes and may contain all valid UTF-8 characters except `<` and `>`.
      */
-    description: string;
+    description?: string;
     /**
      * A map of thumbnail images associated with the video. For each object in the map, the key is the name of the thumbnail image, and the value is an object that contains other information about the thumbnail.
      */
-    thumbnails: Thumbnails;
+    thumbnails?: Thumbnails;
     /**
      * Channel title for the channel that the video belongs to.
      */
@@ -97,19 +97,19 @@ declare class Video {
      * - The property value is a list, and commas between items in the list count toward the limit.
      * - If a tag contains a space, the API server handles the tag value as though it were wrapped in quotation marks, and the quotation marks count toward the character limit. So, for the purposes of character limits, the tag **Foo-Baz** contains seven characters, but the tag **Foo Baz** contains nine characters.
      */
-    tags: string[];
+    tags?: string[];
     /**
      * The YouTube video category associated with the video. 
      */
-    category: string;
+    category?: string;
     /**
      * Indicates if the video is an upcoming/active live broadcast. Or it's "none" if the video is not an upcoming/active live broadcast.
      */
-    liveBroadcastContent: "live" | "none" | "upcoming";
+    liveBroadcastContent?: "live" | "none" | "upcoming";
     /**
      * The length of the video.
      */
-    duration: {
+    duration?: {
         /**
          * Total length in seconds.
          */
@@ -142,7 +142,7 @@ declare class Video {
     /**
      * The `regionRestriction` object contains information about the countries where a video is (or is not) viewable. The object will contain either the `contentDetails.regionRestriction.allowed` property or the `contentDetails.regionRestriction.blocked` property.
      */
-    regionRestriction: {
+    regionRestriction?: {
         /**
          * A list of region codes that identify countries where the video is viewable. If this property is present and a country is not listed in its value, then the video is blocked from appearing in that country. If this property is present and contains an empty list, the video is blocked in all countries.
          */
@@ -159,7 +159,7 @@ declare class Video {
     /**
      * Specifies the projection format of the video.
      */
-    projection: "360" | "rectangular";
+    projection?: "360" | "rectangular";
     /**
      * The status of the uploaded video.
      */
@@ -167,24 +167,24 @@ declare class Video {
     /**
      * The video's privacy status.
      */
-    privacyStatus: "private" | "public" | "unlisted";
+    privacyStatus?: "private" | "public" | "unlisted";
     /**
      * This value indicates whether the video can be embedded on another website.
      */
-    embeddable: boolean;
+    embeddable?: boolean;
     /**
      * The number of times the video has been viewed.
      */
-    viewCount: number;
+    viewCount?: number;
     /**
      * An `<iframe>` tag that embeds a player that plays the video.
      * - If the video's aspect ratio is unknown, the embedded player defaults to a 4:3 format.
      */
-    embedHtml: string;
+    embedHtml?: string;
     /**
      * The `fileDetails` object encapsulates information about the video file that was uploaded to YouTube, including the file's resolution, duration, audio and video codecs, stream bitrates, and more.
      */
-    fileDetails: {
+    fileDetails?: {
         /**
          * A list of video streams contained in the uploaded video file. Each item in the list contains detailed metadata about a video stream.
          */
@@ -267,7 +267,7 @@ declare class Video {
     /**
      * The `liveStreamingDetails` object contains metadata about a live video broadcast. The object will only be present in a `video` resource if the video is an upcoming, live, or completed live broadcast.
      */
-    getliveStreamingDetails?: {
+    liveStreamingDetails?: {
         /**
          * The time that the broadcast actually started. This value will not be available until the broadcast begins.
          */
@@ -351,23 +351,23 @@ declare class Playlist {
     /**
      * The ID that YouTube uses to uniquely identify the channel that published the playlist.
      */
-    channelId: string;
+    channelId: string | undefined;
     /**
      * The playlist's title.
      */
-    title: string;
+    title: string | undefined;
     /**
      * The playlist's description.
      */
-    description: string;
+    description: string | undefined;
     /**
      * A map of thumbnail images associated with the playlist. For each object in the map, the key is the name of the thumbnail image, and the value is an object that contains other information about the thumbnail.
      */
-    thumbnails: Thumbnails;
+    thumbnails: Thumbnails | undefined;
     /**
      * The channel title of the channel that the video belongs to.
      */
-    channelTitle: string;
+    channelTitle: string | undefined;
     /**
      * The playlist's privacy status.
      */
@@ -375,7 +375,7 @@ declare class Playlist {
     /**
      * The number of videos in the playlist.
      */
-    itemCount: number;
+    itemCount: number | undefined;
 
     /**
      * Returns a collection of playlist items from this playlist.
@@ -431,15 +431,15 @@ declare class SearchResult {
     /**
      * A description of the search result.
      */
-    description: string;
+    description: string | undefined;
     /**
      * A map of thumbnail images associated with the search result. For each object in the map, the key is the name of the thumbnail image, and the value is an object that contains other information about the thumbnail.
      */
-    thumbnails: Thumbnails;
+    thumbnails: Thumbnails | undefined;
     /**
      * The title of the channel that published the resource that the search result identifies.
      */
-    channelTitle: string;
+    channelTitle: string | undefined;
     /**
      * An indication of whether a video or channel resource has live broadcast content.
      * 
@@ -497,7 +497,7 @@ declare function getVideo(id: string): Promise<Video | null>;
  * @param id Specifies a YouTube playlist ID for the resource that is being retrieved. In a `playlist` resource, the id property specifies the playlist's YouTube playlist ID.
  * @param unavailable Indicates whether unavailable videos should be included in the playlist.
  */
-declare function getPlaylist(id: string, unavailable: boolean): Promise<Playlist | null>;
+declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlist | null>;
 
 /**
  * Returns a collection of search results that match the query parameters specified in the API request. By default, a search result set identifies matching `video`, `channel`, and `playlist` resources, but you can also configure queries to only retrieve a specific type of resource.
@@ -505,7 +505,7 @@ declare function getPlaylist(id: string, unavailable: boolean): Promise<Playlist
  * @param q Specifies the query term to search for.
  * @param type Restricts the search query to only retrieve a particular type of resource.
  */
-declare function listSearchResults(q: string, type: SearchResultType): Promise<SearchListResponse | null>;
+declare function listSearchResults(q: string, type?: SearchResultType): Promise<SearchListResponse | null>;
 
 /**
  * Returns an object representing a device code and verification URL for a linking device. You must visit `verificationUrl` and enter `userCode` before `expires` in order for the `deviceCode` to be valid.

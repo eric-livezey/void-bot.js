@@ -1,5 +1,9 @@
 import { Duration, download, httpsRequest, requestAPI, requestMusicAPI } from "./utils.js";
 
+/**
+ * @typedef {{decipher:(cipher:string)=>string;signatureTimestamp:number;}} JS
+ * @type {{[key:string]:JS;}}
+ */
 const JS_CACHE = {};
 
 export class Video {
@@ -92,7 +96,7 @@ export class Video {
             fileSize: undefined,
             fileType: undefined,
             container: undefined,
-            videoStreams: ((adaptiveFormats, id) => {
+            videoStreams: ((adaptiveFormats) => {
                 const arr = [];
                 for (var adaptiveFormat of adaptiveFormats) {
                     if (adaptiveFormat.mimeType.startsWith("video/")) {
@@ -106,54 +110,29 @@ export class Video {
                             bitrateBps: adaptiveFormat.bitrate,
                             rotation: undefined,
                             vendor: undefined,
-                            async download(path = `${id}.webm`) {
-                                const result = await download(await url, path, "POST");
-                                if (result != null) {
-                                    return result;
-                                } else {
-                                    for (var stream of (await get(id)).fileDetails.videoStreams) {
-                                        if (stream.widthPixels == adaptiveFormat.width && stream.heightPixels == adaptiveFormat.height && stream.frameRateFps == adaptiveFormat.fps && stream.codec == adaptiveFormat.mimeType.substring(adaptiveFormat.mimeType.indexOf("\"") + 1, adaptiveFormat.mimeType.length - 1)) {
-                                            return await stream.download(path);
-                                        }
-                                    }
-                                }
-                            }
+                            url: url
                         })
                     }
                 }
                 return arr;
-            })(data.streamingData.adaptiveFormats, this.id),
-            audioStreams: ((adaptiveFormats, id) => {
+            })(data.streamingData.adaptiveFormats),
+            audioStreams: ((adaptiveFormats) => {
                 const arr = [];
                 for (var adaptiveFormat of adaptiveFormats) {
                     if (adaptiveFormat.mimeType.startsWith("audio/")) {
-                        const url = adaptiveFormat.url ? new URL(adaptiveFormat.url) : decipher(new URLSearchParams(adaptiveFormat.signatureCipher), js);
+                        const url = adaptiveFormat.url ? adaptiveFormat.url : decipher(new URLSearchParams(adaptiveFormat.signatureCipher), js);
                         arr.push({
                             channelCount: adaptiveFormat.audioChannels,
                             codec: adaptiveFormat.mimeType.substring(adaptiveFormat.mimeType.indexOf("\"") + 1, adaptiveFormat.mimeType.length - 1),
                             bitrateBps: adaptiveFormat.bitrate,
                             vendor: undefined,
                             contentLength: adaptiveFormat.contentLength,
-                            async download(path = `${id}.webm`) {
-                                const result = await download(await url, path, "POST");
-                                if (result != null) {
-                                    return result;
-                                } else {
-                                    for (var stream of (await get(id)).fileDetails.audioStreams) {
-                                        if (stream.channelCount == adaptiveFormat.audioChannels && stream.codec == adaptiveFormat.mimeType.substring(adaptiveFormat.mimeType.indexOf("\"") + 1, adaptiveFormat.mimeType.length - 1) && stream.bitrateBps == adaptiveFormat.bitrate) {
-                                            return await stream.download(path);
-                                        }
-                                    }
-                                }
-                            },
-                            async getUrl() {
-                                return await url;
-                            }
+                            url: url
                         })
                     }
                 }
                 return arr;
-            })(data.streamingData.adaptiveFormats, this.id),
+            })(data.streamingData.adaptiveFormats),
             durationMs: Number(data.streamingData.adaptiveFormats[0].approxDurationMs),
             bitrateBps: undefined,
             creationTime: undefined
@@ -165,41 +144,42 @@ export class Video {
  * @param {string} videoId 
  */
 async function getPlayerId(videoId) {
-    const html = String((await httpsRequest(`https://www.youtube.com/watch?v=${videoId}`)).body);
-    var startIndex = html.search(/\/s\/player\/.+\/player_ias\.vflset\/en_US\/base\.js/) + 10;
-    return html.substring(startIndex, html.indexOf("/", startIndex));
+    // Fetch source video HTML
+    const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
+    // Find the player id
+    return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
 }
 
 /**
  * @param {string} playerId 
  */
 async function getJs(playerId) {
+    // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
-        const js = String((await httpsRequest(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).body);
-        const f = js.search(/var [A-Za-z]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})/);
-        const d = js.indexOf("function(a){a=a.split(\"\")");
-        const s = js.indexOf("signatureTimestamp:") + 19;
-        const c = js.indexOf(",", s);
-        const b = js.indexOf("}", s);
-        JS_CACHE[playerId] = {
-            functions: js.substring(f, js.indexOf("}}", f) + 2),
-            decipherFunction: js.substring(d, js.indexOf("return a.join(\"\")}", d) + 18),
-            signatureTimestamp: Number(js.substring(s, c < b && c != -1 ? c : b))
-        };
+        // Fetch JS with player id
+        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
+        // Find the object containing decipher functions
+        const mat = js.match(/var [A-Za-z0-9]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})((?!\}\}).)+\}\}/);
+        if (mat === null) {
+            console.log(js);
+        }
+        const functions = mat[0];
+        // Find the function for deciphering signature ciphers
+        const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
+        // Find the signature timestamp
+        const signatureTimestamp = js.match(/signatureTimestamp:(?<timestamp>[0-9]+)(,|\})/).groups["timestamp"];
+        // Evaluate the code that will save a new object to the cache
+        eval(`${functions};JS_CACHE[playerId]={decipher:(a)=>${decipher},signatureTimestamp:${signatureTimestamp}}`);
     }
     return JS_CACHE[playerId];
 }
 
 /**
- * @param {URLSearchParams} signatureCipher
- * @param {{functions:string,decipherFunction:string,signatureTimestamp:number}} js 
+ * @param {JS} js 
+ * @param {URLSearchParams} signatureCipher 
  */
-async function decipher(signatureCipher, js) {
-    var s = signatureCipher.get("s");
-    const sp = signatureCipher.get("sp");
-    const url = signatureCipher.get("url");
-    eval(`${js.functions};s=(${js.decipherFunction})(s)`);
-    return new URL(`${url}&${sp}=${encodeURIComponent(s)}`);
+function decipher(signatureCipher, js) {
+    return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
 
 export async function get(id) {

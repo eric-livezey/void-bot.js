@@ -1,9 +1,9 @@
-import { AudioPlayer, AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
+import { AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
-import { Duration, now } from "./innertube/utils.js";
+import { Duration, download, now } from "./innertube/utils.js";
 import * as Videos from "./innertube/videos.js";
-import { getPlaylist, listSearchResults } from "./innertube/index.js";
+import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
@@ -30,7 +30,7 @@ if (!existsSync("./innertube/cache.json")) {
 const CACHE = JSON.parse(readFileSync("./innertube/cache.json"));
 
 /**
- * @type {{[guildId:string]:{audioPlayer:AudioPlayer,voiceConnection:VoiceConnection}}}
+ * @type {{[guildId:string]:Player}}
  */
 const PLAYERS = {};
 
@@ -63,12 +63,13 @@ function getUrl(s) {
  * @returns The video ID if the url is valid, otherwise `null`.
  */
 function extractVideoId(url) {
-    if (/^https?:\/\/((www|music)\.)?youtube\.com\/watch\?[A-Za-z0-9-._~&=]+$/.test(url.toString())) {
+    const str = url.host + url.pathname;
+    if (/^((www|music)\.)?youtube\.com\/watch$/.test(str) && url.searchParams.has("v")) {
         // URL is a regular video link
         return url.searchParams.get("v");
-    } else if (/^https?:\/\/(youtu\.be|(www\.)?youtube\.com\/shorts)\/[A-Za-z0-9_-]{11}(\?[A-Za-z0-9-._~&=]+)?$/.test(url.toString())) {
+    } else if (/^(youtu\.be|(www\.)?youtube\.com\/shorts)\/[A-Za-z0-9_-]{11}?$/.test(str)) {
         // URL is a short link or YouTube short
-        if (url.pathname.startsWith("/shorts")) {
+        if (url.pathname.startsWith("/shorts/")) {
             // URL is a YouTube short
             return url.pathname.substring(8);
         } else {
@@ -88,7 +89,7 @@ function extractVideoId(url) {
  * @returns The playlist ID if the url is valid, otherwise `null`.
  */
 function extractPlaylistId(url) {
-    if (/^https?:\/\/((www|music)\.)?youtube\.com\/playlist\?[A-Za-z0-9-._~&=]+$/.test(url.toString())) {
+    if (/^((www|music)\.)?youtube\.com\/playlist$/.test(url.host + url.pathname) && url.searchParams.has("list")) {
         // URL is a YouTube playlist link
         return url.searchParams.get("list");
     } else {
@@ -134,6 +135,16 @@ class Player {
         this.audioPlayer = createAudioPlayer();
         this.audioPlayer.once(AudioPlayerStatus.Playing, () => {
             this.voiceConnection = getVoiceConnection(guildId);
+            this.voiceConnection.on("error", () => {
+                console.log(`[${now()}]`, "voice connection error, attempting to rejoin...");
+                while (this.voiceConnection.rejoinAttempts < 5)
+                    if (this.voiceConnection.rejoin()) {
+                        console.log(`[${now()}]`, "rejoin successful");
+                        return;
+                    }
+                console.log(`[${now()}]`, "rejoin failed, destroying voice connection");
+                this.voiceConnection.destroy();
+            })
             this.playerSubscription = this.voiceConnection.subscribe(this.audioPlayer);
         });
         this.nowPlaying = null;
@@ -222,7 +233,6 @@ class Player {
 
 /**
  * @param {string} guildId 
- * @returns {Player}
  */
 function getPlayer(guildId) {
     if (PLAYERS[guildId]) {
@@ -269,25 +279,32 @@ class Track {
         this.thumbnail = video.snippet.thumbnails.maxres ? video.snippet.thumbnails.maxres.url : video.snippet.thumbnails.high.url;
         this.skipped = false;
         if (video.fileDetails) {
-            this.path = new Promise(async (resolve, reject) => {
+            this.path = new Promise(async (resolve) => {
                 if (readdirSync("audio").includes(video.id + ".webm")) {
                     resolve("audio/" + video.id + ".webm");
                     return;
                 }
-                var bestAudioStream;
-                for (var audioStream of video.fileDetails.audioStreams) {
-                    if (!bestAudioStream) {
-                        bestAudioStream = audioStream;
-                    } else if (audioStream.codec != "opus") {
+                if (!(video instanceof Videos.Video))
+                    video = await Videos.get(video.id);
+                let best;
+                for (let stream of video.fileDetails.audioStreams) {
+                    if (!best) {
+                        best = stream;
+                    } else if (stream.codec != "opus") {
                         continue;
-                    } else if (audioStream.bitrateBps > bestAudioStream.bitrateBps) {
-                        bestAudioStream = audioStream;
+                    } else if (stream.bitrateBps > best.bitrateBps) {
+                        best = stream;
                     }
                 }
-                resolve(await bestAudioStream.download("audio/" + video.id + ".webm").catch((reason) => {
-                    console.error(`[${now()}] ` + reason);
-                    reject(reason);
-                }));
+                var path = null;
+                for (let tries = 0; tries < 5; tries++) {
+                    if ((path = await download(new URL(best.url), "audio/" + video.id + ".webm")) !== null) {
+                        resolve(path);
+                        return;
+                    }
+                }
+                console.log(video.id + "failed to download audio from " + best.url);
+                resolve(path);
             })
         } else {
             this.path = null;
@@ -323,7 +340,7 @@ async function playPlaylist(player, listId) {
         };
         var totalAdded = 0;
         for (var listItem of await playlist.listItems()) {
-            var video
+            let video;
             if (CACHE[listItem.id]) {
                 // Video has been cached
                 video = CACHE[listItem.id];
@@ -402,6 +419,16 @@ async function connectCommand(member, channelId) {
     return new Promise(async (resolve) => {
         vc.on(VoiceConnectionStatus.Ready, () => {
             // Successful connection
+            vc.on("error", () => {
+                console.log(`[${now()}]`, "voice connection error, attempting to rejoin...");
+                while (vc.rejoinAttempts < 5)
+                    if (vc.rejoin()) {
+                        console.log(`[${now()}]`, "rejoin successful");
+                        return;
+                    }
+                console.log(`[${now()}]`, "rejoin failed, destroying voice connection");
+                vc.destroy();
+            })
             resolve("Connected to <#" + channelId + ">.");
         });
         // Try to fetch channel by ID
@@ -473,7 +500,7 @@ async function play(member, query) {
         }
     } else {
         // Query is a search query
-        var search = await listSearchResults(query, "video");
+        var search = await listSearchResults(query, SearchResultType.VIDEO);
         // Check if there are 0 results
         if (search.totalResults === 0) {
             return "There were no results for your query.";
@@ -585,8 +612,8 @@ async function stopCommand(guild) {
  * @param {Guild} guild 
  */
 async function skipCommand(guild) {
-    var player = getPlayer(guild.id);
-    var track = player.nowPlaying;
+    const player = getPlayer(guild.id);
+    const track = player.nowPlaying;
     if (player.skip()) {
         return {
             content: "**Skipped:**",
@@ -601,7 +628,7 @@ async function skipCommand(guild) {
  * @param {Guild} guild 
  */
 function nowPlayingCommand(guild) {
-    var player = getPlayer(guild.id);
+    const player = getPlayer(guild.id);
     if (player.nowPlaying) {
         return { content: "**Now playing:**", embeds: [player.nowPlaying.embed()] };
     } else {
@@ -613,15 +640,15 @@ function nowPlayingCommand(guild) {
  * @param {Message} message 
  */
 function queueCommand(message) {
-    var player = getPlayer(message.guild.id);
+    const player = getPlayer(message.guild.id);
     if (player.queue.length == 0) {
         return nowPlayingCommand(message.guild);
     }
     var totalSeconds = player.nowPlaying.duration.total;
-    for (var i = 0; i < player.queue.length; i++) {
+    for (let i = 0; i < player.queue.length; i++) {
         totalSeconds += player.queue[i].duration.total;
     }
-    var eb = new EmbedBuilder()
+    const eb = new EmbedBuilder()
         .setAuthor({ name: "Now Playing:" })
         .setTitle(player.nowPlaying.title)
         .setURL(player.nowPlaying.url)
@@ -715,7 +742,7 @@ function infoCommand(guild, index) {
 }
 
 function shuffleCommand(guild) {
-    var player = getPlayer(guild.id);
+    let player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty";
     }
@@ -996,15 +1023,5 @@ CLIENT.on(Events.MessageCreate, async (message) => {
         }
     }
 });
-
-CLIENT.on(Events.Error, (error) => {
-    console.error(`Error:\n${error.name}: ${error.message}\n\n Retrying Login...`);
-    try {
-        CLIENT.login(process.env.TOKEN);
-        console.log("Success");
-    } catch {
-        console.log("Failure");
-    }
-})
 
 CLIENT.login(process.env.TOKEN);

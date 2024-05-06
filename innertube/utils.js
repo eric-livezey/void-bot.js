@@ -143,18 +143,28 @@ export async function requestMusicAPI(path, body) {
     return response;
 }
 
-export async function download(url, path, method = "GET", headers = {}) {
-    const contentLength = (await httpsRequest({ host: url.hostname, path: `${url.pathname}?${url.searchParams}`, method: "HEAD" })).headers["content-length"];
-    if (contentLength == 0) {
+export async function download(url, path) {
+    const contentLength = (await fetch(url, { method: "HEAD" })).headers.get("content-length");
+    if (contentLength === null || contentLength === 0) {
         return null;
     }
-    const n = Math.floor(contentLength / 100);
+    /* sending 100 asynchronous HTTP requests is faster than downloading it all at once due to YouTube's throttling */
     const data = new Array(100);
+    const n = Math.floor(contentLength / data.length);
     for (var i = 0; i < data.length; i++) {
-        data[i] = httpsRequest({ hostname: url.hostname, path: `${url.pathname}?${url.searchParams}`, method: method, headers: { range: `bytes=${n * i}-${i < 99 ? n * (i + 1) - 1 : contentLength}`, ...headers } });
+        data[i] = fetch(url, { headers: { range: `bytes=${n * i}-${i < (data.length - 1) ? n * (i + 1) - 1 : contentLength}` } }).catch(() => {
+            return null;
+        });
     }
     for (var i = 0; i < data.length; i++) {
-        data[i] = (await data[i]).body;
+        data[i] = await data[i];
+        if (data[i] == null)
+            return null;
+        data[i] = Buffer.from(await (await data[i]).arrayBuffer());
+    }
+    const buffer = Buffer.concat(data);
+    if (buffer.length == 0) {
+        return null;
     }
     writeFileSync(path, Buffer.concat(data));
     return path;

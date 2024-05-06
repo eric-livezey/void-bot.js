@@ -508,8 +508,7 @@ export class Video {
 			 * The content length of the audio stream in bytes.
 			 */
 			contentLength: number,
-			download(path?: string): Promise<string | null>,
-			getUrl(): Promise<URL>
+			url: string
 		}[],
 		/**
 		 * The length of the uploaded video in milliseconds.

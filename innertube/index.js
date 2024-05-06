@@ -7,15 +7,26 @@ const CLIENTS = {
 const CLIENT_ID = "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com";
 const CLIENT_SECRET = "SboVhoG9s0rNafixCSGGKXAT";
 
+/**
+ * @typedef {{decipher:(cipher:string)=>string;signatureTimestamp:number;}} JS
+ * @type {{[key:string]:JS;}}
+ */
 const JS_CACHE = {};
 
+/**
+ * @type {{access_token:string;expires:number;refresh_token:string;} | {}}
+ */
 const BEARER_TOKEN = {};
 
+/**
+ * @param {string} path 
+ * @param {*} body 
+ */
 async function request(path, body) {
     var useOAuth = false;
     var client = CLIENTS.WEB;
     // Check if bearer token is set
-    if (BEARER_TOKEN.access_token) {
+    if ("access_token" in BEARER_TOKEN) {
         // Check if bearer token is still valid
         if (new Date().getTime() >= BEARER_TOKEN.expires) {
             await refreshBearerToken();
@@ -48,6 +59,9 @@ async function request(path, body) {
     });
 }
 
+/**
+ * @param {string} videoId 
+ */
 async function getPlayerId(videoId) {
     // Fetch source video HTML
     const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
@@ -55,13 +69,16 @@ async function getPlayerId(videoId) {
     return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
 }
 
+/**
+ * @param {string} playerId 
+ */
 async function getJs(playerId) {
     // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
         // Fetch JS with player id
-        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
+        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text());
         // Find the object containing decipher functions
-        const functions = js.match(/var [A-Za-z0-9]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a.length\];a\[b%a.length\]=c\}|\(a\)\{a.reverse\(\)\}|\(a,b\)\{a.splice\(0,b\)\})((?!\}\}).)+\}\}/)[0];
+        const functions = js.match(/var [A-Za-z0-9]+=\{[A-Za-z0-9]+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a\.length\];a\[b%a\.length\]=c\}|\(a\)\{a\.reverse\(\)\}|\(a,b\)\{a\.splice\(0,b\)\})((?!\}\}).)+\}\}/s)[0];
         // Find the function for deciphering signature ciphers
         const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
         // Find the signature timestamp
@@ -72,10 +89,17 @@ async function getJs(playerId) {
     return JS_CACHE[playerId];
 }
 
+/**
+ * @param {JS} js 
+ * @param {URLSearchParams} signatureCipher 
+ */
 function decipher(js, signatureCipher) {
     return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
 }
 
+/**
+ * @type {{readonly VIDEO:import("./index.d.ts").SearchResultType.VIDEO;readonly CHANNEL:import("./index.d.ts").SearchResultType.CHANNEL;readonly PLAYLIST:import("./index.d.ts").SearchResultType.PLAYLIST;}}
+ */
 const SearchResultType = Object.create(null);
 Object.defineProperties(SearchResultType, {
     VIDEO: {
@@ -117,6 +141,10 @@ class Video {
     fileDetails;
     liveStreamingDetails;
 
+    /**
+     * @param {import("./rawTypes").RawPlayerData} data 
+     * @param {JS} js 
+     */
     constructor(data, js) {
         if ("videoDetails" in data) {
             const videoDetails = data.videoDetails;
@@ -231,9 +259,12 @@ class PlaylistItem {
     videoId;
     privacyStatus;
 
+    /**
+     * @param {import("./rawTypes").RawPlaylistItemData} data 
+     */
     constructor(data) {
         this.id = data.videoId;
-        this.title = data.title.runs.map(value => value.text).join();
+        this.title = data.title.runs.map(value => value.text).join(" ");
         this.thumbnails = {
             default: {
                 url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
@@ -261,7 +292,7 @@ class PlaylistItem {
                 height: 720
             }
         };
-        this.videoOwnerChannelTitle = data.shortBylineText.runs.map(value => value.text).join();
+        this.videoOwnerChannelTitle = data.shortBylineText.runs.map(value => value.text).join(" ");
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
         this.position = Number(data.index.simpleText);
         this.videoId = this.id;
@@ -280,6 +311,9 @@ class Playlist {
     itemCount;
     #contents;
 
+    /**
+     * @param {import("./rawTypes").RawBrowseData} data 
+     */
     constructor(data) {
         if ("header" in data) {
             const header = data.header;
@@ -326,7 +360,7 @@ class Playlist {
                 return thumbnails;
             })(header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails);
             if ("ownerText" in header.playlistHeaderRenderer)
-                this.channelTitle = header.playlistHeaderRenderer.ownerText.runs.map(value => value.text).join();
+                this.channelTitle = header.playlistHeaderRenderer.ownerText.runs.map(value => value.text).join(" ");
             else if ("subtitle" in header.playlistHeaderRenderer)
                 this.channelTitle = header.playlistHeaderRenderer.subtitle.simpleText;
             this.privacyStatus = header.playlistHeaderRenderer.privacy.toLowerCase();
@@ -346,6 +380,9 @@ class Playlist {
         var continuationContainer = this.#contents.find(value => "continuationItemRenderer" in value);
         var continuation = continuationContainer ? continuationContainer.continuationItemRenderer.continuationEndpoint.continuationCommand.token : null;
         while (continuation !== null) {
+            /**
+             * @type {import("./rawTypes").RawBrowseContinuationData}
+             */
             const data = await (await request("/browse", { continuation: continuation })).json();
             contents = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems;
             items.push(...contents.filter(value => "playlistVideoRenderer" in value).map(value => new PlaylistItem(value.playlistVideoRenderer)));
@@ -365,7 +402,9 @@ class SearchResult {
     channelTitle;
     liveBroadcastContent;
 
-    /** */
+    /**
+     * @param {import("./rawTypes").RawSearchResultData} data 
+     */
     constructor(data) {
         if ("videoRenderer" in data) {
             const videoRenderer = data.videoRenderer;
@@ -375,9 +414,9 @@ class SearchResult {
             };
             if ("browseEndpoint" in videoRenderer.ownerText.runs[0].navigationEndpoint)
                 this.channelId = videoRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-            this.title = videoRenderer.title.runs.map(value => value.text).join();
+            this.title = videoRenderer.title.runs.map(value => value.text).join(" ");
             if ("detailedMetadataSnippets" in videoRenderer && "runs" in videoRenderer.detailedMetadataSnippets[0].snippetText)
-                this.description = videoRenderer.detailedMetadataSnippets[0].snippetText.runs.map(value => value.text).join();
+                this.description = videoRenderer.detailedMetadataSnippets[0].snippetText.runs.map(value => value.text).join(" ");
             this.thumbnails = {
                 default: {
                     url: `https://i.ytimg.com/vi/${this.id.videoId}/default.jpg`,
@@ -405,7 +444,7 @@ class SearchResult {
                     height: 720
                 }
             };
-            this.channelTitle = videoRenderer.ownerText.runs.map(value => value.text).join();
+            this.channelTitle = videoRenderer.ownerText.runs.map(value => value.text).join(" ");
             if ("badges" in videoRenderer)
                 this.liveBroadcastContent = videoRenderer.badges.find(value => value.metadataBadgeRenderer.label === "LIVE") ? "live" : "none";
         } else if ("channelRenderer" in data) {
@@ -417,7 +456,7 @@ class SearchResult {
             this.channelId = this.id.channelId;
             this.title = channelRenderer.title.simpleText;
             if ("descriptionSnippet" in channelRenderer)
-                this.description = channelRenderer.descriptionSnippet.runs.map(value => value.text).join();
+                this.description = channelRenderer.descriptionSnippet.runs.map(value => value.text).join(" ");
             this.thumbnails = {
                 default: {
                     url: "https:" + channelRenderer.thumbnail.thumbnails[0].url,
@@ -468,7 +507,7 @@ class SearchResult {
                 }
             };
             this.channelTitle = playlistRenderer.longBylineText.runs[0].text;
-        } else if ("universalWatchCardRenderer" in data) {
+        } else {
             const universalWatchCardRenderer = data.universalWatchCardRenderer;
             if ("watchPlaylistEndpoint" in universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.navigationEndpoint)
                 this.id = {
@@ -496,6 +535,9 @@ class SearchListResponse {
     resultsPerPage;
     items;
 
+    /**
+     * @param {import("./rawTypes").RawSearchData} data 
+     */
     constructor(data) {
         const continuation = data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents.find(value => "continuationItemRenderer" in value);
         if (continuation)
@@ -517,8 +559,10 @@ class SearchListResponse {
         if (!this.nextPageToken) {
             return null;
         }
-        const response = await request("/search", { continuation: this.nextPageToken });
-        const data = await response.json();
+        /**
+         * @type {import("./rawTypes").RawSearchData}
+         */
+        const data = await (await request("/search", { continuation: this.nextPageToken })).json();
         var continuation = null;
         if ("onResponseReceivedCommands" in data)
             continuation = data.onResponseReceivedCommands.find(value => "appendContinuationItemsAction" in value);
@@ -540,6 +584,9 @@ class SearchListResponse {
     }
 }
 
+/**
+ * @param {string} id 
+ */
 async function getVideo(id) {
     const js = await getJs(await getPlayerId(id));
     const response = await request("/player", {
@@ -559,6 +606,10 @@ async function getVideo(id) {
     }
 }
 
+/**
+ * @param {string} id
+ * @param {boolean} unavailable
+ */
 async function getPlaylist(id, unavailable = false) {
     const response = await request("/browse", {
         browseId: "VL" + id,
@@ -571,7 +622,11 @@ async function getPlaylist(id, unavailable = false) {
     }
 }
 
-async function listSearchResults(q, type) {
+/**
+ * @param {string} q 
+ * @param {import("./index.d.ts").SearchResultType} type 
+ */
+async function listSearchResults(q, type = null) {
     const response = await request("/search", {
         query: q,
         params: type === SearchResultType.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultType.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultType.PLAYLIST ? "EgIQAw%3D%3D" : undefined
@@ -586,7 +641,7 @@ async function listSearchResults(q, type) {
 async function getDeviceCode() {
     // Arbitrarily subtract 30 seconds to account for time discrepencies
     const start = new Date().getTime() - 30000;
-    const response = await (await fetch("https://oauth2.googleapis.com/device/code", {
+    const data = await (await fetch("https://oauth2.googleapis.com/device/code", {
         headers: {
             "content-type": "application/json",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
@@ -598,13 +653,16 @@ async function getDeviceCode() {
         method: "POST"
     })).json();
     return {
-        deviceCode: response.device_code,
-        userCode: response.user_code,
-        expires: start + response.expires_in * 1000,
-        verificationUrl: response.verification_url
+        deviceCode: data.device_code,
+        userCode: data.user_code,
+        expires: start + data.expires_in * 1000,
+        verificationUrl: data.verification_url
     };
 }
 
+/**
+ * @param {string} deviceCode 
+ */
 async function setBearerToken(deviceCode) {
     // Arbitrarily subtract 30 seconds to account for time discrepencies
     const start = new Date().getTime() - 30000;
