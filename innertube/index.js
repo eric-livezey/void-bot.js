@@ -70,15 +70,23 @@ async function getPlayerId(videoId) {
 }
 
 /**
+ * @param {string} html 
+ */
+function extractPlayerId(html) {
+    // Find the player id
+    return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
+}
+
+/**
  * @param {string} playerId 
  */
 async function getJs(playerId) {
     // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
         // Fetch JS with player id
-        const js = await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text();
+        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
         // Find the object containing decipher functions
-        const functions = js.match(/var ((?!=).)+=\{((?!:).)+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a\.length\];a\[b%a\.length\]=c\}|\(a\)\{a\.reverse\(\)\}|\(a,b\)\{a\.splice\(0,b\)\})((?!\}\}).)+\}\}/s)[0];
+        const functions = js.match(/var ((?!=).)+=\{((?!:).)+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a\.length\];a\[b%a\.length\]=c\}|\(a\)\{a\.reverse\(\)\}|\(a,b\)\{a\.splice\(0,b\)\})((?!\}\}).)+\}\}/)[0];
         // Find the function for deciphering signature ciphers
         const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
         // Find the signature timestamp
@@ -588,19 +596,33 @@ class SearchListResponse {
  * @param {string} id 
  */
 async function getVideo(id) {
-    const js = await getJs(await getPlayerId(id));
-    const response = await request("/player", {
-        videoId: id,
-        playbackContext: {
-            contentPlaybackContext: {
-                signatureTimestamp: js.signatureTimestamp
-            }
-        },
-        racyCheckOk: false,
-        contentCheckOk: false
-    })
+    // const js = await getJs(await getPlayerId(id));
+    // const response = await request("/player", {
+    //     videoId: id,
+    //     playbackContext: {
+    //         contentPlaybackContext: {
+    //             signatureTimestamp: js.signatureTimestamp
+    //         }
+    //     },
+    //     racyCheckOk: false,
+    //     contentCheckOk: false
+    // })
+    const response = await fetch(`https://www.youtube.com/watch?v=${id}`);
     if (response.ok) {
-        return new Video(await response.json(), js);
+        // return new Video(await response.json(), js);
+        const js = await getJs(await getPlayerId(id));
+        const text = await response.text();
+        var start = text.indexOf("var ytInitialPlayerResponse = ") + "var ytInitialPlayerResponse = ".length;
+        var i = start + 1;
+        for (var p = 1; i < text.length && p > 0; i++) {
+            const c = text.charAt(i);
+            if (c == '{')
+                p++;
+            else if (c == '}')
+                p--;
+        }
+        const ytInitialPlayerResponse = text.substring(start, i);
+        return new Video(JSON.parse(ytInitialPlayerResponse), js);
     } else {
         return null;
     }
@@ -717,5 +739,10 @@ export {
     getPlaylist,
     listSearchResults,
     getDeviceCode,
-    setBearerToken
+    setBearerToken,
+
+    extractPlayerId,
+    getPlayerId,
+    getJs,
+    decipher
 }

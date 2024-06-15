@@ -65,7 +65,6 @@ function applyOperation(leftOperand, rightOperand, operator) {
 /**
  * 
  * @param {string} expression 
- * @returns {number}
  */
 function evaluate(expression) {
     const tokens = expression.split(/([()^*/%+-])/g);
@@ -75,7 +74,7 @@ function evaluate(expression) {
         const token = tokens[i].trim();
         if (token.match(/^\s*$/)) {
             continue;
-        } else if (token.match(/^[0-9]+(\.[0-9]+)?$/)) {
+        } else if (/[0-9]+(\.[0-9]+)?$/.test(token)) {
             if (!operands.length == 0 && operators.length == 0) {
                 throw new Error(`Misplaced operands: "${expression}"`);
             }
@@ -84,7 +83,7 @@ function evaluate(expression) {
             operands.push(Math.PI);
         } else if (token == "e") {
             operands.push(Math.E);
-        } else if (token.match(/^\(|sqrt|cbrt|cos|sin|tan|acos|asin|atan|cosh|sinh|tanh|ln|log$/)) {
+        } else if (/^\(|sqrt|cbrt|cos|sin|tan|acos|asin|atan|cosh|sinh|tanh|ln|log$/.test(token)) {
             if (!operands.length == 0 && operators.length == 0) {
                 throw new Error(`Misplaced operands: "${expression}"`);
             }
@@ -106,11 +105,11 @@ function evaluate(expression) {
             }
             operators.pop();
             if (!operators.length == 0) {
-                if (operators[operators.length - 1].match(/^sqrt|cbrt|cos|sin|tan|acos|asin|atan|cosh|sinh|tanh|ln|log$/)) {
+                if (/^sqrt|cbrt|cos|sin|tan|acos|asin|atan|cosh|sinh|tanh|ln|log$/.test(operators[operators.length - 1])) {
                     operands.push(applyFunction(operands.pop(), operators.pop()));
                 }
             }
-        } else if (token.match(/^[\^*/%+-]$/)) {
+        } else if (/^[\^*/%+-]$/.test(token)) {
             while (!operators.length == 0
                 && precedenceOf(operators[operators.length - 1].charAt(0)) >= precedenceOf(token.charAt(0))) {
                 const rightOperand = operands.pop();

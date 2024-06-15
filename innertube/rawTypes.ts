@@ -169,8 +169,8 @@ export type RawPlayerData = {
 			url?: string;
 			mimeType: string;
 			bitrate: number;
-			width?: number;
-			height?: number;
+			width: number;
+			height: number;
 			initRange?: {
 				start: string;
 				end: string;
@@ -207,9 +207,15 @@ export type RawPlayerData = {
 			};
 			targetDurationSec?: number;
 			maxDvrDurationSec?: number;
+			distinctParams?: string;
 		}[];
+		streamingUrlTemplate?: string;
 		dashManifestUrl?: string;
 		hlsManifestUrl?: string;
+		licenseInfos?: {
+			drmFamily?: string;
+			url?: string;
+		};
 	};
 	heartbeatParams?: {
 		softFailOnError: boolean;
@@ -481,6 +487,12 @@ export type RawPlayerData = {
 			allowSwipeDismiss: boolean;
 			annotationId?: string;
 		};
+		playerAnnotationsUrlsRenderer?: {
+			adsOnly?: boolean;
+			allowInPlaceSwitch?: boolean;
+			loadPolicy?: string;
+			invideoUrl?: any;
+		}
 	}[];
 	playerConfig?: {
 		audioConfig: {
@@ -7763,7 +7775,7 @@ export type RawBrowseData = {
 		};
 	};
 	header?: {
-		playlistHeaderRenderer: {
+		playlistHeaderRenderer?: {
 			playlistId: string;
 			title: {
 				simpleText: string;

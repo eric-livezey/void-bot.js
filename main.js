@@ -1,10 +1,10 @@
 import { AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials } from "discord.js";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials, PermissionsBitField, VoiceChannel } from "discord.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { Duration, download, now } from "./innertube/utils.js";
-import * as Videos from "./innertube/videos.js";
-import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
+import { SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
+import EventEmitter from "events";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
@@ -25,7 +25,7 @@ if (!existsSync("./innertube/cache.json")) {
 }
 
 /**
- * @type {{[id:string]:Videos.Video}}
+ * @type {{[id:string]:Video}}
  */
 const CACHE = JSON.parse(readFileSync("./innertube/cache.json"));
 
@@ -98,231 +98,485 @@ function extractPlaylistId(url) {
     }
 }
 
+function timelog(msg) {
+    console.log(`[${now()}]`, msg);
+}
+
 // Player
 
-class Player {
-    audioPlayer;
+class Player extends EventEmitter {
     /**
-     * @type {VoiceConnection | undefined}
+     * The id of guild which the player is for
      */
-    voiceConnection;
+    id;
     /**
-     * @type {PlayerSubscription | undefined}
+     * @type {PlayerSubscription | null}
      */
-    playerSubscription;
+    #subscription;
+    #player;
     /**
-     * @type {?Track}
+     * The `AudioPlayer` instance of this player
+     * 
+     * @readonly
+     */
+    get player() {
+        return this.#player;
+    };
+    /**
+     * @type {VoiceConnection | null}
+     */
+    #connection;
+    /**
+     * The voice connection the player is currently subscribed to.
+     */
+    get connection() {
+        if (this.#connection === null || this.#connection.state.status === VoiceConnectionStatus.Destroyed)
+            this.connection = getVoiceConnection(this.id) || null;
+        return this.#connection;
+    }
+    set connection(value) {
+        // unsubscribe from the old connection if it exists
+        if (this.#subscription)
+            this.#subscription.unsubscribe();
+        if (value === null || value.state.status === VoiceConnectionStatus.Destroyed || value.state.status === VoiceConnectionStatus.Disconnected) {
+            // stop
+            this.stop();
+        } else if (value instanceof VoiceConnection) {
+            this.connection = null;
+            // subscribe and handle state change
+            this.#subscription = value.subscribe(this.player);
+            value.on("stateChange", (oldState, newState) => {
+                if (newState.status === VoiceConnectionStatus.Destroyed || newState.status === VoiceConnectionStatus.Disconnected) this.stop();
+            });
+            value.on("error", (e) => {
+                this.emit("error", e);
+                this.stop();
+            });
+        } else {
+            throw new TypeError("connection must be an instance of VoiceConnection or null");
+        }
+        this.#connection = value;
+    }
+    /**
+     * The currently playing track
+     * 
+     * @type {Track&{readonly resource:AudioResource<null>|null,readonly elapsed:number;start:number;pause:number;}}
      */
     nowPlaying;
     /**
+     * A list of tracks in the queue
+     * 
      * @type {Track[]}
      */
     queue;
+    /**
+     * Whether player should loop the current track
+     * 
+     * @type {boolean}
+     */
     loop;
     /**
-     * @type {AudioResource<null> | null}
-     */
-    audioResource;
-    /**
+     * The volume of the player as a decimal
+     * 
      * @type {number}
      */
-    volume;
+    #volume;
+    get volume() {
+        return this.#volume;
+    }
+    set volume(value) {
+        this.#volume = value;
+        if (this.playing())
+            this.nowPlaying.resource.volume.setVolume(value);
+    }
 
     /**
-     * @param {string} guildId 
+     * @param {string} id 
      */
-    constructor(guildId) {
-        this.audioPlayer = createAudioPlayer();
-        this.audioPlayer.once(AudioPlayerStatus.Playing, () => {
-            this.voiceConnection = getVoiceConnection(guildId);
-            this.voiceConnection.on("error", () => {
-                console.log(`[${now()}]`, "voice connection error, attempting to rejoin...");
-                while (this.voiceConnection.rejoinAttempts < 5)
-                    if (this.voiceConnection.rejoin()) {
-                        console.log(`[${now()}]`, "rejoin successful");
-                        return;
-                    }
-                console.log(`[${now()}]`, "rejoin failed, destroying voice connection");
-                this.voiceConnection.destroy();
-            })
-            this.playerSubscription = this.voiceConnection.subscribe(this.audioPlayer);
-        });
+    constructor(id) {
+        super();
+        this.id = id;
+        this.#player = createAudioPlayer();
+        this.#connection = null;
+        this.connection = getVoiceConnection(id) || null;
         this.nowPlaying = null;
         this.queue = [];
         this.loop = false;
-        this.audioResource = null;
         this.volume = 1;
-        this.audioPlayer.on(AudioPlayerStatus.Idle, async () => {
-            if (this.nowPlaying !== null) {
-                // Something is playing
-                if (this.nowPlaying.skipped || !this.loop) {
-                    // Current track was skipped or is over
-                    if (this.queue.length > 0) {
-                        // Play next track in the queue
-                        this.nowPlaying = null;
-                        await this.play(this.queue.shift());
-                    } else {
-                        // Queue is finished
-                        this.nowPlaying = null;
-                    }
-                } else {
-                    // Current track is being looped
-                    await this.play(this.nowPlaying);
+        this.player.on("stateChange", (oldState, newState) => {
+            // play next track when the track finished
+            if (oldState.status === AudioPlayerStatus.Playing && newState.status === AudioPlayerStatus.Idle)
+                this.#next();
+        });
+        this.player.on("error", (e) => {
+            // skip on error
+            this.skip();
+            this.emit("error", e);
+        });
+    }
+
+    async #next() {
+        return this.loop ? await this.play(new Track(this.nowPlaying.video)) : this.queue.length > 0 ? await this.play(this.queue.shift()) : (this.stop(), false);
+    }
+
+    ready() {
+        return this.connection !== null && this.connection.state.status !== VoiceConnectionStatus.Destroyed && this.connection.state.status !== VoiceConnectionStatus.Disconnected;
+    }
+
+    playing() {
+        return this.nowPlaying !== null;
+    }
+
+    paused() {
+        return this.player.state.status === AudioPlayerStatus.Paused;
+    }
+
+    /**
+     * @param {Track} track
+     */
+    async play(track) {
+        const path = await track.path;
+        if (path === null) {
+            await this.skip();
+            this.emit("error", new Error(`could not download audio for ${track.url}`));
+            return false;
+        }
+        if (!this.ready()) {
+            this.stop();
+            this.emit("error", new Error("the audio connection was invalidated"));
+            return false;
+        }
+        const resource = createAudioResource(path, { inlineVolume: true });
+        resource.volume.setVolume(this.volume);
+        this.player.play(resource);
+        if (this.paused())
+            this.player.unpause();
+        Object.defineProperties(track, {
+            "resource": {
+                value: resource
+            },
+            "elapsed": {
+                get: () => {
+                    return resource.playbackDuration;
                 }
             }
-        })
+        });
+        this.nowPlaying = track;
+        return true;
+    }
+
+    pause() {
+        return this.playing() && !this.paused() && this.player.pause();
+    }
+
+    unpause() {
+        return this.playing() && this.paused() && this.player.unpause();
+    }
+
+    async skip() {
+        this.loop = false;
+        return await this.#next();
+    }
+
+    stop() {
+        this.queue = [];
+        this.nowPlaying = null;
+        this.loop = false;
+        this.player.stop(true);
     }
 
     /**
      * @param {Track} track 
      */
-    async play(track) {
-        this.nowPlaying = track;
-        try {
-            this.audioResource = createAudioResource(await track.path, { inlineVolume: true });
-            this.audioResource.volume.setVolume(this.volume);
-            this.audioPlayer.play(this.audioResource);
-            this.nowPlaying.startTime = Date.now();
-            return true;
-        } catch {
-            // Something went wrong, reset and return false
-            this.nowPlaying = null;
-            this.audioResource = null;
-            return false;
-        }
-    }
-
-    pause() {
-        if (this.nowPlaying && this.audioPlayer.pause()) {
-            this.nowPlaying.pausedAt = Date.now();
-            return true;
-        }
+    async enqueue(track) {
+        if (!this.playing())
+            return await this.play(track);
+        this.queue.push(track);
         return false;
     }
-
-    resume() {
-        if (this.nowPlaying && this.audioPlayer.unpause()) {
-            this.nowPlaying.startTime = this.nowPlaying.startTime + (Date.now() - this.nowPlaying.pausedAt);
-            this.nowPlaying.pausedAt = null;
-            return true;
-        }
-        return false;
-    }
-
-    skip() {
-        if (this.nowPlaying) {
-            this.nowPlaying.skipped = true;
-            this.resume();
-            return this.audioPlayer.stop();
-        } else {
-            return false;
-        }
-    }
-
-    /**
-     * Set the volume percentage
-     * @param {number} volume the new volume
-     */
-    setVolume(volume) {
-        this.volume = volume;
-        if (this.audioResource) {
-            this.audioResource.volume.setVolume(volume);
-        }
-    }
-}
-
-/**
- * @param {string} guildId 
- */
-function getPlayer(guildId) {
-    if (PLAYERS[guildId]) {
-        return PLAYERS[guildId];
-    }
-    PLAYERS[guildId] = new Player(guildId);
-    return PLAYERS[guildId];
 }
 
 class Track {
-    id;
-    title;
+    video;
     url;
     duration;
-    author;
-    authorUrl;
-    thumbnail;
-    skipped;
     /**
-     * @type {number | null}
-     */
-    startTime;
-    /**
-     * @type {number | null}
-     */
-    pausedAt;
-    /**
-     * @type {Promise<string>}
+     * @type {Promise<string | null>}
      */
     path;
 
     /**
-     * @param {Videos.Video} video
+     * @param {Video} video 
      */
     constructor(video) {
-        this.id = video.id;
-        this.title = video.snippet.title;
-        this.url = "https://www.youtube.com/watch?v=" + video.id;
-        this.startTime = null;
-        this.pausedAt = null;
-        this.duration = video.contentDetails.duration;
-        this.author = video.snippet.channelTitle;
-        this.authorUrl = "https://www.youtube.com/channel/" + video.snippet.channelId;
-        this.thumbnail = video.snippet.thumbnails.maxres ? video.snippet.thumbnails.maxres.url : video.snippet.thumbnails.high.url;
-        this.skipped = false;
-        if (video.fileDetails) {
-            this.path = new Promise(async (resolve) => {
-                if (readdirSync("audio").includes(video.id + ".webm")) {
-                    resolve("audio/" + video.id + ".webm");
-                    return;
-                }
-                if (!(video instanceof Videos.Video))
-                    video = await Videos.get(video.id);
-                let best;
+        this.video = video;
+        this.url = `https://www.youtube.com/watch?v=${video.id}`;
+        this.duration = new Duration(video.duration.total);
+        this.path = new Promise(async (resolve) => {
+            const path = `./audio/${video.id}.webm`;
+            // check if file is already downloaded
+            if (!existsSync(path)) {
+                if (!(video instanceof Video))
+                    video = await getVideo(video.id);
+                if (video === null)
+                    // couldn't fetch the video
+                    resolve(null);
+                let best = null;
                 for (let stream of video.fileDetails.audioStreams) {
-                    if (!best) {
+                    if (best === null)
                         best = stream;
-                    } else if (stream.codec != "opus") {
+                    else if (stream.codec != "opus")
                         continue;
-                    } else if (stream.bitrateBps > best.bitrateBps) {
+                    else if (stream.bitrateBps > best.bitrateBps)
                         best = stream;
-                    }
                 }
-                var path = null;
-                for (let tries = 0; tries < 5; tries++) {
-                    if ((path = await download(new URL(best.url), "audio/" + video.id + ".webm")) !== null) {
-                        resolve(path);
-                        return;
-                    }
-                }
-                console.log(video.id + "failed to download audio from " + best.url);
-                resolve(path);
-            })
-        } else {
-            this.path = null;
-        }
-    }
-
-    embed() {
-        return new EmbedBuilder()
-            .setTitle(this.title)
-            .setURL(this.url)
-            .setThumbnail(this.thumbnail)
-            .setAuthor({ name: this.author, url: this.authorUrl })
-            .addFields({ name: "Duration", value: (this.startTime ? new Duration(Math.floor((this.pausedAt ? this.pausedAt - this.startTime : (Date.now() - this.startTime)) / 1000)).format() + "/" : "") + this.duration.format() })
-            .data;
+                if (best === null)
+                    // no valid streams
+                    resolve(null);
+                // try up to five times to download from the url
+                let success = false;
+                for (let tries = 0; !success && tries < 5; tries++)
+                    if (await download(new URL(best.url), path) !== null)
+                        success = true;
+                if (!success)
+                    // audio failed to download
+                    resolve(null);
+            }
+            resolve(path);
+        });
     }
 }
 
+/**
+ * @param {string} id 
+ */
+function getPlayer(id) {
+    if (!(id in PLAYERS)) {
+        PLAYERS[id] = new Player(id);
+        PLAYERS[id].on("error", (error) => {
+            console.error(error);
+        });
+    }
+    return PLAYERS[id];
+}
+
+/**
+ * @param {import("discord.js").VoiceBasedChannel} channel 
+ */
+function createVoiceConnection(channel) {
+    const connection = joinVoiceChannel({
+        channelId: channel.id,
+        guildId: channel.guildId,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+        selfDeaf: false
+    });
+    connection.on("error", () => {
+        timelog("A voice connection error occurred.\nAttempting to rejoin...");
+        connection.rejoinAttempts = 0;
+        while (connection.rejoinAttempts < 5) {
+            if (connection.rejoin()) {
+                timelog("Rejoin was successful.");
+                return;
+            }
+        }
+        timelog("Rejoin failed after 5 attempts with the following error:");
+        connection.destroy();
+        console.error(e);
+    });
+    return connection;
+}
+
+/**
+ * @param {string} id 
+ */
+async function retrieveVideo(id) {
+    if (!(id in CACHE) || CACHE[id] === null || !("duration" in CACHE[id])) {
+        CACHE[id] = await getVideo(id);
+        writeFileSync("./innertube/cache.json", JSON.stringify(CACHE));
+    }
+    return CACHE[id]
+}
+
+/**
+ * Creates an embed for the specified video object
+ * 
+ * @param {Video} video A YouTube video object for which to create an embed
+ * @param {number | undefined} elapsed The time at which the video started playing
+ * @returns An embed representing the video object
+ */
+function createVideoEmbed(video, elapsed) {
+    const eb = new EmbedBuilder();
+    if (!video.id) {
+        // Video is unavailable error
+        eb
+            .setColor(Colors.Red)
+            .setTitle("Unavailable Video")
+            .setDescription("The video is unavailable.");
+    } else if (video.privacyStatus === "private") {
+        // Video is private error
+        eb
+            .setColor(Colors.Red)
+            .setTitle("Private Video")
+            .setDescription("The video is private.");
+    } else {
+        if (video.ageRestricted) {
+            // Video is age restricted error, but we can still display the video info
+            eb
+                .setColor(Colors.Red)
+                .setDescription("The video is age restricted.");
+        }
+        // Video is playable
+        eb
+            .setTitle(video.title || "Unknown Title")
+            .setURL(video.id ? "https://www.youtube.com/watch?v=" + video.id : null)
+            .setAuthor({ name: video.channelTitle || "Unknown Channel", url: video.channelId ? "https://www.youtube.com/channel/" + video.channelId : undefined })
+            .setThumbnail(video.thumbnails?.maxres?.url || null)
+            .addFields({ name: "Duration", value: video.duration ? (elapsed ? new Duration(Math.floor(elapsed / 1000)).format() + "/" : "") + new Duration(video.duration.total).format() : "Unknown Duration" });
+    }
+    return eb.data;
+}
+
 // Commands
+
+/**
+ * 
+ * 
+ * @param {GuildMember | null} member the member who issued the command
+ * @param {string} query a search query or URL to play
+ */
+async function play(member, query) {
+    // Voice connection
+    if (member === null)
+        return "This command must be used in a server.";
+    if (member.voice.channel === null)
+        return "You must be in a voice channel to use the command."
+    if ((await member.guild.members.fetchMe()) === null)
+        await member.guild.members.fetchMe();
+    if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
+        if ((await member.guild.members.fetchMe()).permissionsIn(member.voice.channel).has(PermissionsBitField.Flags.Connect | PermissionsBitField.Flags.Speak))
+            createVoiceConnection(member.voice.channel);
+        else
+            return "I lack sufficient permission to execute this command.";
+    // Retrieve video ID from query
+    const player = getPlayer(member.guild.id);
+    let id = null;
+    // Check if the query is a URL
+    const url = getUrl(query);
+    if (url !== null) {
+        // Attempt to extract the video ID
+        id = extractVideoId(url);
+        if (id === null) {
+            // Attempt to extract a playlist ID
+            const listId = extractPlaylistId(url);
+            if (listId !== null)
+                return await playPlaylist(player, listId);
+            // Invalid URL
+            return "That URL does not correspond to a YouTube video or playlist.";
+        }
+    } else {
+        // Search
+        let search = await listSearchResults(query, SearchResultType.VIDEO);
+        if (search.totalResults === 0)
+            // No results
+            return "There were no valid results for your query.";
+        // Retry the search in case innertube returns an incorrect response
+        for (let attempts = 0; search.items.length === 0 && attempts < 10; attempts++)
+            search = await listSearchResults(query, SearchResultType.VIDEO);
+        if (search.items.length === 0)
+            // Innertube returned an empty response 10 times
+            return "Something went wrong whilst trying to search for your query.";
+        // Retrieve the id of the first search result
+        id = search.items[0].id.videoId;
+    }
+    // Get the video
+    const video = await retrieveVideo(id);
+    if (video === null)
+        // The video could not retrieved
+        return "An error occurred whilst trying to retrieve the requested video.";
+    let content = "";
+    let embed = createVideoEmbed(video);
+    if (!video.id || !video.fileDetails || video.privacyStatus === "private" || video.ageRestricted)
+        // An error occurred
+        content = "**Issue Playing Track:**";
+    else
+        if (await player.enqueue(new Track(video)))
+            // Track played immediately
+            content = "**Now Playing:**", embed = createVideoEmbed(video, player.nowPlaying.elapsed);
+        else
+            // Track was queued
+            content = "**Added to the Queue**";
+    return { content: content, embeds: [embed] }
+}
+
+/**
+ * @param {GuildMember | null} member the member who issued the command;
+ */
+async function skip(member) {
+    if (member === null)
+        return "This command must be used in a server.";
+    if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
+        return "You must be in the same voice channel as the bot to use the command."
+    const player = getPlayer(member.guild.id);
+    if (!player.playing())
+        return "Nothing is playing."
+    const track = player.nowPlaying;
+    await player.skip();
+    return { content: "**Skipped:**", embeds: [createVideoEmbed(track.video, track.elapsed)] };
+}
+
+/**
+ * @param {GuildMember} member 
+ * @returns 
+ */
+async function stop(member) {
+    if (member === null)
+        return "This command must be used in a server.";
+    if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
+        return "You must be in the same voice channel as the bot to use the command."
+    const player = getPlayer(member.guild.id);
+    if (!player.playing())
+        return "Nothing is playing."
+    player.stop();
+    return "Playback stopped.";
+}
+
+/**
+ * @param {GuildMember} member 
+ * @returns 
+ */
+async function pause(member) {
+    if (member === null)
+        return "This command must be used in a server.";
+    if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
+        return "You must be in the same voice channel as the bot to use the command."
+    const player = getPlayer(member.guild.id);
+    if (!player.playing())
+        return "Nothing is playing."
+    if (player.paused()) {
+        unpause(member);
+        return "Playback resumed."
+    }
+    player.pause();
+    return "Playback paused."
+}
+
+/**
+ * @param {GuildMember | null} member 
+ * @returns 
+ */
+async function unpause(member) {
+    if (member === null)
+        return "This command must be used in a server.";
+    const player = getPlayer(member.guild.id);
+    if (!player.playing())
+        return "Nothing is playing."
+    if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
+        return "You must be in the same voice channel as the bot to use the command."
+    if (!player.paused())
+        return "Playback is not paused.";
+    player.unpause();
+    return "Playback paused."
+}
 
 /**
  * 
@@ -331,66 +585,39 @@ class Track {
  * @returns 
  */
 async function playPlaylist(player, listId) {
-    return new Promise(async (resolve) => {
-        // Get the playlist by id
-        var playlist = await getPlaylist(listId);
-        if (playlist === null) {
-            resolve("That is not a valid YouTube playlist link.");
-            return;
-        };
-        var totalAdded = 0;
-        for (var listItem of await playlist.listItems()) {
-            let video;
-            if (CACHE[listItem.id]) {
-                // Video has been cached
-                video = CACHE[listItem.id];
-                if (typeof video == "object") {
-                    // Cached video does not have proper duration object so make it one
-                    video.contentDetails.duration = new Duration(video.contentDetails.duration.total);
-                }
-            } else {
-                // Video was not cached, fetch it
-                video = await Videos.get(listItem.id);
-                if (video != null && video != "PRIVATE") {
-                    // Update the cache
-                    CACHE[listItem.id] = video;
-                    writeFileSync("./innertube/cache.json", JSON.stringify(CACHE));
-                }
-            }
-            if (typeof video == "string" || video == null) {
-                continue;
-            }
-            var track = new Track(video);
-            if (!track.path) {
-                continue;
-            }
-            if (player.nowPlaying !== null) {
-                // Something is already playing, add it to the queue
-                player.queue.push(track);
-            } else {
-                // Nothing is playing, play it
-                if (!player.play(track)) {
-                    continue;
-                }
-            }
-            totalAdded++;
+    // Get the playlist by id
+    const playlist = await getPlaylist(listId);
+    if (playlist === null) {
+        "That is not a valid YouTube playlist link.";
+        return;
+    };
+    let totalAdded = 0;
+    for (const listItem of await playlist.listItems()) {
+        if (!player.ready()) {
+            player.stop();
+            return "An voice connection error occurred whilst adding the playlist.";
         }
-        resolve({
-            content: "**Added " + totalAdded + " tracks to the queue:**",
-            embeds: [new EmbedBuilder()
-                .setTitle(playlist.title)
-                .setURL("https://www.youtube.com/playlist?list=" + listId)
-                .setThumbnail(playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url)
-                .setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined }).data]
-        });
-    })
+        const video = await retrieveVideo(listItem.id)
+        if (video === null || !video.id || !video.fileDetails || video.ageRestricted || video.privacyStatus === "private")
+            continue;
+        await player.enqueue(new Track(video));
+        totalAdded++;
+    }
+    return {
+        content: "**Added " + totalAdded + " tracks to the queue:**",
+        embeds: [new EmbedBuilder()
+            .setTitle(playlist.title)
+            .setURL("https://www.youtube.com/playlist?list=" + listId)
+            .setThumbnail(playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url)
+            .setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined }).data]
+    };
 }
 
 /**
  * @param {GuildMember} member 
  * @param {string | undefined} channelId 
  */
-async function connectCommand(member, channelId) {
+async function connect(member, channelId) {
     if (!channelId) {
         // No channel ID provided
         if (member.voice.channelId !== null) {
@@ -405,57 +632,36 @@ async function connectCommand(member, channelId) {
         // Channel ID is a mention
         channelId = channelId.substring(2, channelId.length - 1);
     }
-    if ((await member.guild.members.fetch(CLIENT.user.id)).voice.channelId == channelId) {
+    if ((await member.guild.members.fetchMe()).voice.channelId === channelId) {
         // Bot is already connected to specified channel
         return "I am already connected to <#" + channelId + ">.";
     }
+    const channel = await new Promise((resolve) => {
+        resolve(member.guild.channels.fetch(channelId).catch(() => { resolve(null) }));
+    })
+    if (channel === null)
+        return "*" + channelId + "* is not a valid channel ID.";
+    if (channel.type != ChannelType.GuildVoice)
+        resolve("<#" + channelId + "> is not a voice channel.")
     // Join specified channel
-    var vc = joinVoiceChannel({
-        channelId: channelId,
-        guildId: member.guild.id,
-        adapterCreator: member.guild.voiceAdapterCreator,
-        selfDeaf: false
-    });
+    const vc = createVoiceConnection(channel);
     return new Promise(async (resolve) => {
-        vc.on(VoiceConnectionStatus.Ready, () => {
+        vc.once(VoiceConnectionStatus.Ready, () => {
             // Successful connection
-            vc.on("error", () => {
-                console.log(`[${now()}]`, "voice connection error, attempting to rejoin...");
-                while (vc.rejoinAttempts < 5)
-                    if (vc.rejoin()) {
-                        console.log(`[${now()}]`, "rejoin successful");
-                        return;
-                    }
-                console.log(`[${now()}]`, "rejoin failed, destroying voice connection");
-                vc.destroy();
-            })
             resolve("Connected to <#" + channelId + ">.");
         });
-        // Try to fetch channel by ID
-        var channel = await member.guild.channels.fetch(channelId).catch(() => {
-            // Invalid channel ID
-            resolve("*" + channelId + "* is not a valid channel ID.");
-        });
-        if (channel) {
-            // Channel exists
-            if (channel.type != ChannelType.GuildVoice) {
-                // Channel is a not a voice channel
-                resolve("<#" + channelId + "> is not a voice channel.")
-            }
-        }
     })
 }
 
 /**
  * @param {Guild} guild 
  */
-async function disconnectCommand(guild) {
+async function disconnect(guild) {
     // Get voice connection for guild
-    var vc = getVoiceConnection(guild.id);
-    if (!vc) {
+    var vc = getVoiceConnection(guild.id) || null;
+    if (vc === null)
         // Bot is not connected to a voice channel
         return "I am not connected to a voice channel.";
-    }
     var channelId = (await guild.members.fetchMe()).voice.channelId;
     vc.disconnect();
     vc.destroy();
@@ -464,216 +670,36 @@ async function disconnectCommand(guild) {
 }
 
 /**
- * @param {GuildMember} member 
- * @param {string} query 
- */
-async function play(member, query) {
-    if (member.voice.channel === null) {
-        // Member is not in a voice channel
-        return "You are not in a voice channel."
-    } else if (member.voice.channel != member.guild.members.me.voice.channel) {
-        // Bot not connected to member's voice channel
-        joinVoiceChannel({
-            channelId: member.voice.channelId,
-            guildId: member.guild.id,
-            adapterCreator: member.guild.voiceAdapterCreator,
-            selfDeaf: false
-        });
-    }
-    const player = getPlayer(member.guild.id);
-    player.voiceConnection = getVoiceConnection(member.guild.id);
-    player.playerSubscription = player.voiceConnection.subscribe(player.audioPlayer);
-    var videoId;
-    const url = getUrl(query);
-    if (url !== null) {
-        // Query is a URL
-        videoId = extractVideoId(url);
-        if (videoId === null) {
-            // URL does not correspond to a YouTube video, try it as a playlist
-            const listId = extractPlaylistId(url);
-            if (listId !== null) {
-                // URL corresponds to a playlist
-                return await playPlaylist(player, listId);
-            }
-            // URL does not correspond to a YouTube video or playlist
-            return "That URL does not correspond to a YouTube video or playlist.";
-        }
-    } else {
-        // Query is a search query
-        var search = await listSearchResults(query, SearchResultType.VIDEO);
-        // Check if there are 0 results
-        if (search.totalResults === 0) {
-            return "There were no results for your query.";
-        }
-        // Arbitrarily try 25 times since innertube items is sometimes 0
-        var attempt = 1;
-        while (search.items.length === 0) {
-            if (attempt === 25) {
-                return "Something went wrong.";
-            }
-            search = await listSearchResults(query, "video");
-            attempt++;
-        }
-        // Get the video ID of the first search result
-        videoId = search.items[0].id.videoId;
-    }
-    return new Promise(async (resolve) => {
-        var video
-        if (CACHE[videoId]) {
-            // Video has been cached
-            video = CACHE[videoId];
-            if (typeof video == "object") {
-                video.contentDetails.duration = new Duration(video.contentDetails.duration.total);
-            }
-        } else {
-            // Video was not cached, fetch it
-            video = await Videos.get(videoId);
-            if (video !== null && video != "PRIVATE") {
-                // Update the cache
-                CACHE[videoId] = video;
-                writeFileSync("./innertube/cache.json", JSON.stringify(CACHE));
-            }
-        }
-        if (video === null) {
-            // Video is unavailable
-            resolve({ content: "**Issue playing track:**", embeds: [{ color: Colors.Red, description: "The video is unavailable.", title: "Unavailable Video" }] });
-            return;
-        } else if (video == "PRIVATE") {
-            // Video is private
-            resolve({ content: "**Issue playing track:**", embeds: [{ color: Colors.Red, description: "The video is private.", title: "Private Video" }] });
-            return;
-        }
-        var track = new Track(video);
-        if (video.contentDetails.contentRating.ytRating == "ytAgeRestricted") {
-            // Video is age restricted
-            resolve({ content: "**Issue playing track:**", embeds: [{ color: Colors.Red, description: "The video is age restricted.", ...track.embed() }] });
-        } else if (player.nowPlaying !== null) {
-            // Something is already playing, add it to the queue
-            player.queue.push(track);
-            resolve({ content: "**Added to the queue:**", embeds: [track.embed()] });
-        } else {
-            // Nothing is playing, play it
-            if (!player.play(track)) {
-                resolve("Something went wrong.");
-                console.log(track);
-            } else {
-                resolve({ content: "**Now playing:**", embeds: [track.embed()] });
-            }
-        }
-    });
-}
-
-
-/**
- * @param {string} guildId 
- */
-function pauseCommand(guildId) {
-    const player = getPlayer(guildId);
-    if (player.pause()) {
-        return { content: "**Paused:**", embeds: [player.nowPlaying.embed()] };
-    } else if (player.nowPlaying === null) {
-        return "There is nothing playing.";
-    } else {
-        return "The track is already paused.";
-    }
-}
-
-/**
- * @param {string} guildId guild ID 
- */
-function resumeCommand(guildId) {
-    const player = getPlayer(guildId);
-    if (player.resume()) {
-        return { content: "**Resumed:**", embeds: [player.nowPlaying.embed()] };
-    } else if (player.nowPlaying === null) {
-        return "There is nothing playing.";
-    } else {
-        return "The track is not paused.";
-    }
-}
-
-/**
  * @param {Guild} guild 
  */
-async function stopCommand(guild) {
-    var player = getPlayer(guild.id);
-    if (player.nowPlaying) {
-        player.queue.splice(0, player.queue.length);
-        player.nowPlaying = null;
-        player.loop = false;
-        player.audioPlayer.stop();
-        return "Audio stopped."
-    } else {
-        return "Nothing is playing."
-    }
-}
-
-/**
- * @param {Guild} guild 
- */
-async function skipCommand(guild) {
+function nowPlaying(guild) {
     const player = getPlayer(guild.id);
-    const track = player.nowPlaying;
-    if (player.skip()) {
-        return {
-            content: "**Skipped:**",
-            embeds: [track.embed()]
-        };
-    } else {
-        return "There is nothing playing.";
-    }
-}
-
-/**
- * @param {Guild} guild 
- */
-function nowPlayingCommand(guild) {
-    const player = getPlayer(guild.id);
-    if (player.nowPlaying) {
-        return { content: "**Now playing:**", embeds: [player.nowPlaying.embed()] };
-    } else {
+    if (!player.playing())
         return "Nothing is playing.";
-    }
+    return { content: "**Now playing:**", embeds: [createVideoEmbed(player.nowPlaying.video, player.nowPlaying.elapsed)] };
 }
 
 /**
  * @param {Message} message 
  */
-function queueCommand(message) {
+function queue(message) {
     const player = getPlayer(message.guild.id);
-    if (player.queue.length == 0) {
-        return nowPlayingCommand(message.guild);
-    }
-    var totalSeconds = player.nowPlaying.duration.total;
-    for (let i = 0; i < player.queue.length; i++) {
-        totalSeconds += player.queue[i].duration.total;
-    }
+    if (player.queue.length === 0)
+        return nowPlaying(message.guild);
+    let total = player.nowPlaying.duration.total;
+    for (let i = 0; i < player.queue.length; i++)
+        total += player.queue[i].duration.total;
     const eb = new EmbedBuilder()
         .setAuthor({ name: "Now Playing:" })
-        .setTitle(player.nowPlaying.title)
-        .setURL(player.nowPlaying.url)
-        .setDescription(new Duration(Math.floor((player.nowPlaying.pausedAt ? player.nowPlaying.pausedAt - player.nowPlaying.startTime : (Date.now() - player.nowPlaying.startTime)) / 1000)).format() + "/" + player.nowPlaying.duration.format())
-        .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(totalSeconds).format() + ")" });
-    for (var i = 0; i < player.queue.length && i < 25; i++) {
-        eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: player.queue[i].duration.format() });
-    }
+        .setTitle(player.nowPlaying.video.title)
+        .setURL(`https://www.youtube.com/watch?v=${player.nowPlaying.video.id}`)
+        .setDescription(new Duration(Math.floor(player.nowPlaying.elapsed / 1000)).format() + "/" + player.nowPlaying.duration.format())
+        .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(total).format() + ")" });
+    for (var i = 0; i < player.queue.length && i < 25; i++)
+        eb.addFields({ name: i + 1 + ": " + player.queue[i].video.title, value: player.queue[i].duration.format() });
     var response = { embeds: [eb.data] }
-    if (player.queue.length > 25) {
-        response.components = [
-            {
-                type: 1,
-                components: [
-                    {
-                        type: 2,
-                        emoji: { id: null, name: "➡️", animated: false },
-                        style: 2,
-                        custom_id: message.id + ".2"
-                    }
-                ]
-
-            }
-        ]
-    }
+    if (player.queue.length > 25)
+        response.components = [{ type: 1, components: [{ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: message.id + ".2" }] }];
     return response;
 }
 
@@ -681,73 +707,68 @@ function queueCommand(message) {
  * @param {Guild} guild
  * @param {number} index 
  */
-function removeCommand(guild, index) {
-    var player = getPlayer(guild.id);
-    if (player.queue.length == 0) {
+function remove(guild, index) {
+    const player = getPlayer(guild.id);
+    if (player.queue.length === 0)
         return "The queue is empty.";
-    }
-    if (index < 1 | index > player.queue.length) {
+    if (index < 1 | index > player.queue.length)
         return `${index} is not a valid index in the queue.`;
-    }
-    var track = player.queue.splice(index - 1, 1)[0];
-    return { content: "**Removed:**", embeds: [track.embed()] };
+    const track = player.queue.splice(index - 1, 1)[0];
+    return { content: "**Removed:**", embeds: [createVideoEmbed(track.video)] };
 }
+
 
 /**
  * @param {Guild} guild
  * @param {number} source 
  * @param {number} destination 
  */
-function moveCommand(guild, source, destination) {
-    var player = getPlayer(guild.id);
-    if (player.queue.length == 0) {
+function move(guild, source, destination) {
+    const player = getPlayer(guild.id);
+    if (player.queue.length == 0)
         return "The queue is empty.";
-    }
-    if (source < 1 | source > player.queue.length) {
+    if (source < 1 | source > player.queue.length)
         return `${source} is not a valid index in the queue.`;
-    }
-    if (destination < 1 | destination > player.queue.length) {
+    if (destination < 1 | destination > player.queue.length)
         return `${destination} is not a valid index in the queue.`;
-    }
-    if (source == destination) {
+    if (source == destination)
         return "Indices must not be equal.";
-    }
-    var track = player.queue.splice(source - 1, 1)[0];
-    if (source > destination) {
-        player.queue.splice(destination - 1, 0, track);
-    } else {
-        player.queue.splice(destination - 1, 0, track);
-    }
-    return `Moved \`${track.title}\` to index ${destination} in the queue.`;
+    const track = player.queue.splice(source - 1, 1)[0];
+    player.queue.splice(destination - 1, 0, track);
+    return `Moved \`${track.video.title}\` to index ${destination} in the queue.`;
 }
 
 /**
  * @param {Guild} guild 
  */
-function loopCommand(guild) {
-    var player = getPlayer(guild.id);
+function loop(guild) {
+    const player = getPlayer(guild.id);
     player.loop = !player.loop;
     return "Loop " + (player.loop ? "enabled." : "disabled.")
 }
 
-function infoCommand(guild, index) {
-    var player = getPlayer(guild.id);
-    if (player.queue.length == 0) {
+/**
+ * @param {Guild} guild 
+ * @param {number} index 
+ */
+function info(guild, index) {
+    const player = getPlayer(guild.id);
+    if (player.queue.length == 0)
         return "The queue is empty.";
-    }
-    if (index < 1 | index > player.queue.length) {
+    if (index < 1 || index > player.queue.length)
         return `${index} is not a valid index in the queue.`;
-    }
-    return { embeds: [player.queue[index - 1].embed()] };
+    return { embeds: [createVideoEmbed(player.queue[index - 1].video)] };
 }
 
-function shuffleCommand(guild) {
+/**
+ * @param {Guild} guild 
+ */
+function shuffle(guild) {
     let player = getPlayer(guild.id);
     if (player.queue.length == 0) {
         return "The queue is empty";
     }
     let currentIndex = player.queue.length, randomIndex;
-
     while (currentIndex > 0) {
         randomIndex = Math.floor(Math.random() * currentIndex);
         currentIndex--;
@@ -755,7 +776,6 @@ function shuffleCommand(guild) {
         [player.queue[currentIndex], player.queue[randomIndex]] = [
             player.queue[randomIndex], player.queue[currentIndex]];
     }
-
     return "Queue shuffled.";
 }
 
@@ -764,9 +784,9 @@ function shuffleCommand(guild) {
  * @param {Guild} guild 
  * @param {number} percentage 
  */
-async function volumeCommand(guild, percentage) {
+async function volume(guild, percentage) {
     const player = getPlayer(guild.id);
-    player.setVolume(percentage / 100);
+    player.volume = percentage / 100;
     return `Volume set to ${percentage}%.`;
 }
 
@@ -774,33 +794,12 @@ async function volumeCommand(guild, percentage) {
 
 CLIENT.once(Events.ClientReady, async (client) => {
     // Ready
-    console.log(`[${now()}] Logged in as ${client.user.tag}`);
+    timelog(`Logged in as ${client.user.tag}`);
     // Update voice connections
-    for (var guild of CLIENT.guilds.cache.values()) {
-        var channelId = (await guild.members.fetch(CLIENT.user.id)).voice.channelId;
-        if (channelId) {
-            joinVoiceChannel({
-                channelId: channelId,
-                guildId: guild.id,
-                adapterCreator: guild.voiceAdapterCreator,
-                selfDeaf: false
-            })
-        }
-    }
-});
-
-CLIENT.on(Events.VoiceStateUpdate, (oldState, newState) => {
-    if (oldState.member.id == CLIENT.user.id && oldState.channelId !== null && newState.channelId === null) {
-        // Bot left a voice channel
-        var player = getPlayer(oldState.guild.id);
-        if (player.nowPlaying) {
-            player.queue.splice(0, player.queue.length);
-            player.nowPlaying = null;
-            player.audioPlayer.stop();
-        }
-        player.voiceConnection = getVoiceConnection(oldState.guild.id);
-        if (player.voiceConnection) {
-            player.voiceConnection.destroy();
+    for (const guild of CLIENT.guilds.cache.values()) {
+        const channel = (await guild.members.fetch(CLIENT.user.id)).voice.channel;
+        if (channel !== null) {
+            createVoiceConnection(channel);
         }
     }
 });
@@ -816,7 +815,7 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
         }
         if (player.queue.length == 0) {
             // The queue is empty
-            var response = nowPlayingCommand(interaction.guild)
+            var response = nowPlaying(interaction.guild)
             if (typeof response == "string") {
                 // Clear embeds
                 response = { content: response, embeds: [] };
@@ -827,41 +826,29 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
             return;
         }
         var totalSeconds = player.nowPlaying.duration.total;
-        for (var i = 0; i < player.queue.length; i++) {
+        for (var i = 0; i < player.queue.length; i++)
             totalSeconds += player.queue[i].duration.total;
-        }
         var eb = new EmbedBuilder()
             .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(totalSeconds).format() + ")" });
         if (page == 1) {
             // Include now playing if on first page
             eb.setAuthor({ name: "Now Playing:" })
-                .setTitle(player.nowPlaying.title)
+                .setTitle(player.nowPlaying.video.title)
                 .setURL(player.nowPlaying.url)
-                .setDescription(new Duration(Math.floor((player.nowPlaying.pausedAt ? player.nowPlaying.pausedAt - player.nowPlaying.startTime : (Date.now() - player.nowPlaying.startTime)) / 1000)).format() + "/" + player.nowPlaying.duration.format())
+                .setDescription(new Duration(Math.floor(player.nowPlaying.elapsed / 1000)).format() + "/" + player.nowPlaying.duration.format())
         }
         // Append up to 25 tracks to the queue message
         for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
-            eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: player.queue[i].duration.format() });
+            eb.addFields({ name: i + 1 + ": " + player.queue[i].video.title, value: player.queue[i].duration.format() });
         }
         var response = { embeds: [eb.data], components: [{ type: 1, components: [] }] }
         if (page > 1) {
             // Add a last page button
-            response.components[0].components.push({
-                type: 2,
-                emoji: { id: null, name: "⬅️", animated: false },
-                style: 2,
-                custom_id: interaction.customId.split(".")[0] + "." + (page - 1)
-            });
+            response.components[0].components.push({ type: 2, emoji: { id: null, name: "⬅️", animated: false }, style: 2, custom_id: interaction.customId.split(".")[0] + "." + (page - 1) });
         }
         if (player.queue.length > 25 * page) {
             // Add a next page button
-            response.components[0].components.push(
-                {
-                    type: 2,
-                    emoji: { id: null, name: "➡️", animated: false },
-                    style: 2,
-                    custom_id: interaction.customId.split(".")[0] + "." + (page + 1)
-                })
+            response.components[0].components.push({ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: interaction.customId.split(".")[0] + "." + (page + 1) })
         }
         if (response.components[0].components.length == 0) {
             // No components
@@ -885,47 +872,48 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "join":
                 case "connect":
                     // Connect
-                    response = await connectCommand(message.member, args.length <= 1 ? args[0] : undefined);
+                    response = await connect(message.member, args.length <= 1 ? args[0] : undefined);
                     break;
                 case "leave":
                 case "disconnect":
                     // Disconnect
-                    response = await disconnectCommand(message.guild);
+                    response = await disconnect(message.guild);
                     break;
                 case "play":
                     // Play
                     if (args.length < 1) {
                         // Resume
-                        response = resumeCommand(message.guildId);
+                        response = await unpause(message.member);
                     } else {
                         response = await play(message.member, message.content.substring(cmd.length + 1).trim());
                     }
                     break;
                 case "pause":
                     // Pause
-                    response = pauseCommand(message.guildId);
+                    response = await pause(message.member);
                     break;
+                case "unpause":
                 case "resume":
                     // Resume
-                    response = resumeCommand(message.guildId);
+                    response = await unpause(message.member);
                     break;
                 case "stop":
                     // Stop
-                    response = await stopCommand(message.guild);
+                    response = await stop(message.member);
                     break;
                 case "skip":
                     // Skip
-                    response = await skipCommand(message.guild);
+                    response = await skip(message.member);
                     break;
                 case "now-playing":
                 case "np":
                     // Now Playing
-                    response = nowPlayingCommand(message.guild);
+                    response = nowPlaying(message.guild);
                     break;
                 case "queue":
                 case "q":
                     // Queue
-                    response = queueCommand(message);
+                    response = queue(message);
                     break;
                 case "remove":
                     // Remove
@@ -935,29 +923,26 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+$/.test(args[0])) {
                         response = "Index must be a integer.";
                     } else {
-                        response = removeCommand(message.guild, Number(args[0]));
+                        response = remove(message.guild, Number(args[0]));
                     }
                     break;
                 case "move":
                     // Move
-                    if (args.length < 1) {
+                    if (args.length < 1)
                         response = "You must provide source and destination indexes.";
-                    }
-                    else if (args.length < 2) {
+                    else if (args.length < 2)
                         response = "You must provide a destination index";
-                    }
-                    else if (!/^[0-9]+$/.test(args[0]) || !/^[0-9]+$/.test(args[1])) {
+                    else if (!/^[0-9]+$/.test(args[0]) || !/^[0-9]+$/.test(args[1]))
                         response = "Both indexes must be integers.";
-                    } else {
-                        response = moveCommand(message.guild, Number(args[0]), Number(args[1]))
-                    }
+                    else
+                        response = move(message.guild, Number(args[0]), Number(args[1]))
                     break;
                 case "shuffle":
-                    response = shuffleCommand(message.guild);
+                    response = shuffle(message.guild);
                     break;
                 case "loop":
                     // Loop
-                    response = loopCommand(message.guild);
+                    response = loop(message.guild);
                     break;
                 case "info":
                 case "i":
@@ -968,7 +953,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+$/.test(args[0])) {
                         response = "Index must be an integer.";
                     } else {
-                        response = infoCommand(message.guild, Number(args[0]));
+                        response = info(message.guild, Number(args[0]));
                     }
                     break;
                 case "volume":
@@ -978,7 +963,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+(\.[0-9]+)?$/.test(args[0])) {
                         response = "percentage must be a number.";
                     } else {
-                        response = await volumeCommand(message.guild, Number(args[0]));
+                        response = await volume(message.guild, Number(args[0]));
                     }
                     break;
                 case "evaluate":
@@ -1008,7 +993,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "loop", value: "Loops the currently playing track." },
                             { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
                             { name: "evaluate|eval [expression]", value: "Evaluate a mathematical expression." },
-                            { name: "volume [percentage]", value: "Set the volume to the specified percentage" },
+                            { name: "volume [percentage]", value: "Set the volume to the specified percentage." },
                             { name: "help", value: "Display this message." }).data]
                     };
                     break;
@@ -1018,7 +1003,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             }
             await message.channel.send(response);
         } catch (e) {
-            console.error(`[${now()}] Uncaught Error:`);
+            console.error(`[${now()}] Uncaught Error on "${cmd}":`);
             console.error(e);
         }
     }

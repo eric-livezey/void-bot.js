@@ -143,12 +143,15 @@ export async function requestMusicAPI(path, body) {
     return response;
 }
 
+const downloads = [];
+const busy = null;
+
 export async function download(url, path) {
     const contentLength = (await fetch(url, { method: "HEAD" })).headers.get("content-length");
     if (contentLength === null || contentLength === 0) {
         return null;
     }
-    /* sending 100 asynchronous HTTP requests is faster than downloading it all at once due to YouTube's throttling */
+    /* sending 100 asynchronous HTTP requests is somwhow faster than downloading it all at once due to YouTube's throttling */
     const data = new Array(100);
     const n = Math.floor(contentLength / data.length);
     for (var i = 0; i < data.length; i++) {
@@ -160,7 +163,10 @@ export async function download(url, path) {
         data[i] = await data[i];
         if (data[i] == null)
             return null;
-        data[i] = Buffer.from(await (await data[i]).arrayBuffer());
+        const arrayBuffer = await data[i].arrayBuffer();
+        if (!(arrayBuffer instanceof ArrayBuffer))
+            return null;
+        data[i] = Buffer.from(arrayBuffer);
     }
     const buffer = Buffer.concat(data);
     if (buffer.length == 0) {
