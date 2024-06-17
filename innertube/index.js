@@ -99,10 +99,13 @@ async function getJs(playerId) {
 
 /**
  * @param {JS} js 
- * @param {URLSearchParams} signatureCipher 
+ * @param {URLSearchParams} cipher 
  */
-function decipher(js, signatureCipher) {
-    return `${signatureCipher.get("url")}&${signatureCipher.get("sp")}=${encodeURIComponent(js.decipher(signatureCipher.get("s")))}`;
+function decipher(js, cipher) {
+    const url = new URL(cipher.get("url"));
+    url.searchParams.set("alr", "yes");
+    url.searchParams.set(cipher.get("sp"), encodeURIComponent(js.decipher(cipher.get("s"))));
+    return url.toString();
 }
 
 /**
@@ -610,8 +613,8 @@ async function getVideo(id) {
     const response = await fetch(`https://www.youtube.com/watch?v=${id}`);
     if (response.ok) {
         // return new Video(await response.json(), js);
-        const js = await getJs(await getPlayerId(id));
         const text = await response.text();
+        const js = await getJs(extractPlayerId(text));
         var start = text.indexOf("var ytInitialPlayerResponse = ") + "var ytInitialPlayerResponse = ".length;
         var i = start + 1;
         for (var p = 1; i < text.length && p > 0; i++) {
@@ -621,8 +624,8 @@ async function getVideo(id) {
             else if (c == '}')
                 p--;
         }
-        const ytInitialPlayerResponse = text.substring(start, i);
-        return new Video(JSON.parse(ytInitialPlayerResponse), js);
+        const ytInitialPlayerResponse = JSON.parse(text.substring(start, i));
+        return new Video(ytInitialPlayerResponse, js);
     } else {
         return null;
     }

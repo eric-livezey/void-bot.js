@@ -91,7 +91,7 @@ declare class Video {
     /**
      * Channel title for the channel that the video belongs to.
      */
-    channelTitle: string;
+    channelTitle?: string;
     /**
      * A list of keyword tags associated with the video. Tags may contain spaces. The property value has a maximum length of 500 characters. Note the following rules regarding the way the character limit is calculated:
      * - The property value is a list, and commas between items in the list count toward the limit.
