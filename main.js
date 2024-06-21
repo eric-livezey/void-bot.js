@@ -1,6 +1,6 @@
 import { AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { ChannelType, Client, Colors, Embed, EmbedBuilder, Events, Guild, GuildMember, Message, MessageFlags, Partials, PermissionsBitField } from "discord.js";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { Duration, now } from "./innertube/utils.js";
 import { SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
