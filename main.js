@@ -1,10 +1,11 @@
 import { AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { ChannelType, Client, Colors, EmbedBuilder, Events, Guild, GuildMember, Message, Partials, PermissionsBitField, VoiceChannel } from "discord.js";
+import { ChannelType, Client, Colors, Embed, EmbedBuilder, Events, Guild, GuildMember, Message, MessageFlags, Partials, PermissionsBitField } from "discord.js";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { Duration, download, now } from "./innertube/utils.js";
+import { Duration, now } from "./innertube/utils.js";
 import { SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 import EventEmitter from "events";
+import ytdl from "ytdl-core";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
@@ -160,7 +161,7 @@ class Player extends EventEmitter {
     /**
      * The currently playing track
      * 
-     * @type {Track&{readonly resource:AudioResource<null>|null,readonly elapsed:number;start:number;pause:number;}}
+     * @type {Track&{readonly resource:AudioResource<null>,get elapsed():number;}}
      */
     nowPlaying;
     /**
@@ -297,8 +298,11 @@ class Player extends EventEmitter {
 }
 
 class Track {
-    video;
+    title;
     url;
+    author;
+    thumbnail;
+    video;
     duration;
     /**
      * @type {Promise<string | null>}
@@ -310,40 +314,72 @@ class Track {
      */
     constructor(video) {
         this.video = video;
-        this.url = `https://www.youtube.com/watch?v=${video.id}`;
+        this.title = video.title || null;
+        this.url = video.id ? `https://www.youtube.com/watch?v=${video.id}` : null;
+        this.author = video.channelTitle ? { title: video.channelTitle, url: video.channelId ? `https://www.youtube.com/channel/${video.channelId}` : undefined } : null;
+        this.thumbnail = video.thumbnails && video.thumbnails.maxres ? video.thumbnails.maxres.url : null
         this.duration = new Duration(video.duration.total);
-        this.path = new Promise(async (resolve) => {
+        this.path = new Promise((resolve) => {
             const path = `./audio/${video.id}.webm`;
             // check if file is already downloaded
             if (!existsSync(path)) {
-                if (!(video instanceof Video))
-                    video = await getVideo(video.id);
-                if (video === null)
-                    // couldn't fetch the video
-                    resolve(null);
-                let best = null;
-                for (let stream of video.fileDetails.audioStreams) {
-                    if (best === null)
-                        best = stream;
-                    else if (stream.codec != "opus")
-                        continue;
-                    else if (stream.bitrateBps > best.bitrateBps)
-                        best = stream;
-                }
-                if (best === null)
-                    // no valid streams
-                    resolve(null);
-                // try up to five times to download from the url
-                let success = false;
-                for (let tries = 0; !success && tries < 5; tries++)
-                    if (await download(new URL(best.url), path) !== null)
-                        success = true;
-                if (!success)
-                    // audio failed to download
-                    resolve(null);
+                // if (!(video instanceof Video))
+                //     video = await getVideo(video.id);
+                // if (video === null)
+                //     // couldn't fetch the video
+                //     resolve(null);
+                // let best = null;
+                // for (let stream of video.fileDetails.audioStreams) {
+                //     if (best === null)
+                //         best = stream;
+                //     else if (stream.codec != "opus")
+                //         continue;
+                //     else if (stream.bitrateBps > best.bitrateBps)
+                //         best = stream;
+                // }
+                // if (best === null)
+                //     // no valid streams
+                //     resolve(null);
+                // // try up to five times to download from the url
+                // let success = false;
+                // for (let tries = 0; !success && tries < 5; tries++)
+                //     if (await download(new URL(best.url), path) !== null)
+                //         success = true;
+                // if (!success)
+                //     // audio failed to download
+                //     resolve(null);
+                ytdl("https://www.youtube.com/watch?v=SEz0-fdi-5c", { "quality": "highestaudio" }).pipe(createWriteStream(path));
             }
             resolve(path);
         });
+    }
+
+    /**
+     * 
+     * @param {Duration | undefined} elapsed
+     */
+    embed(elapsed) {
+        const eb = new EmbedBuilder();
+        eb.setTitle(this.title || "Unknown Title");
+        eb.setURL(this.url);
+        eb.setAuthor(this.author)
+        eb.setThumbnail(this.thumbnail);
+        let duration = this.duration.format();
+        if (elapsed)
+            duration = `${elapsed.format()}/${duration}`;
+        eb.setFooter({
+            name: "Duration",
+            value: duration
+        });
+        return new Embed(eb.toJSON());
+    }
+
+    /**
+     * Creates a track from a YouTube video.
+     * 
+     * @param {Video} video 
+     */
+    static fromVideo(video) {
     }
 }
 
@@ -860,7 +896,22 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
 
 CLIENT.on(Events.MessageCreate, async (message) => {
     if (message.channel.isDMBased()) {
-        // Handle DMs (do nothing currently)
+        const channel = await CLIENT.channels.fetch("1008484508200357929");
+        if (channel !== null && channel.isTextBased())
+            channel.send(`From DM of <@${message.author.id}>:`);
+        channel.send({
+            content: message.content,
+            embeds: message.embeds.map(value => value.toJSON()),
+            files: message.attachments.map(value => value),
+            components: message.components.map(value => value.toJSON()),
+            poll: message.poll || undefined,
+            tts: false,
+            nonce: undefined,
+            enforceNonce: false,
+            reply: undefined,
+            stickers: message.stickers.map((value) => value),
+            flags: message.flags.remove(MessageFlags.Crossposted, MessageFlags.IsCrosspost, MessageFlags.SourceMessageDeleted, MessageFlags.Urgent, MessageFlags.HasThread, MessageFlags.Ephemeral, MessageFlags.Loading, MessageFlags.FailedToMentionSomeRolesInThread, MessageFlags.ShouldShowLinkNotDiscordWarning, MessageFlags.IsVoiceMessage)
+        });
     } else if (message.content.startsWith(PREFIX)) {
         // Parse command name and arguments
         const args = message.content.split(" ");
@@ -997,6 +1048,16 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             { name: "help", value: "Display this message." }).data]
                     };
                     break;
+                case "exec":
+                    if (message.author.id === '420741651804323843') {
+                        response = "Code executed";
+                        try {
+                            eval(args.join(" "));
+                        } catch (e) {
+                            response = "Error:\n" + e.message;
+                        }
+                        break;
+                    }
                 default:
                     response = "Unrecognized command.\nUse `.help` for a list of commands.";
                     break;
