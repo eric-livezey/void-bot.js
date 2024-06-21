@@ -348,9 +348,10 @@ class Track {
                 // if (!success)
                 //     // audio failed to download
                 //     resolve(null);
-                ytdl("https://www.youtube.com/watch?v=SEz0-fdi-5c", { "quality": "highestaudio" }).pipe(createWriteStream(path));
+                ytdl(`https://www.youtube.com/watch?v=${video.id}`, { "quality": "highestaudio" }).pipe(createWriteStream(path)).once("close", () => {resolve(path)});
+            } else {
+                resolve(path);
             }
-            resolve(path);
         });
     }
 
