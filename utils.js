@@ -31,16 +31,6 @@ function zFill(arg, length) {
     return `${("00" + arg).slice(-1 * length)}`;
 }
 
-function createReadOnlyObject(properties) {
-    const obj = Object.create(null);
-
-    for (const entry of Object.entries(properties)) {
-        Object.defineProperty(obj, entry[0], { value: entry[1] });
-    }
-
-    return obj;
-}
-
 function formatDuration(seconds) {
     return new Duration(seconds).format();
 }
@@ -52,6 +42,5 @@ function formatDurationMillis(millis) {
 export {
     Duration,
     formatDuration,
-    formatDurationMillis,
-    createErrorEmbed
+    formatDurationMillis
 }

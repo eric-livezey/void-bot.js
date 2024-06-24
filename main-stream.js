@@ -8,7 +8,7 @@ import { Player, Track, getPlayer } from "./player.js";
 import ytdl from "ytdl-core";
 import { formatDuration, formatDurationMillis } from "./utils.js";
 
-process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
+Object.assign(process.env, JSON.parse(readFileSync("./env.json")));
 
 // Global Variables
 const PREFIX = ".";
@@ -18,10 +18,10 @@ const CLIENT = new Client({
     partials: [Partials.Channel]
 });
 
-const YT_HEADERS = {
-    "Cookie": "GPS=1; YSC=Y3luw7uGfnI; VISITOR_INFO1_LIVE=EIHHCh_n-Mg; VISITOR_PRIVACY_METADATA=CgJVUxIEGgAgLQ%3D%3D; __Secure-1PSIDTS=sidts-CjIB3EgAEuWdW0K8-m8ocDVBqFzJVn3_C4kD96JG4ZBbd5UN9YUHOvE2vKHCFp8vq3SZ6RAA; __Secure-3PSIDTS=sidts-CjIB3EgAEuWdW0K8-m8ocDVBqFzJVn3_C4kD96JG4ZBbd5UN9YUHOvE2vKHCFp8vq3SZ6RAA; HSID=AJLEpxUldX71qbVjH; SSID=A0MemZy_gtUcTRpnF; APISID=Q3cCxcDtRgnSpVRr/Aqy84vpwhj8P3LWE4; SAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; __Secure-1PAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; __Secure-3PAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; SID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5Asvzd4bLYxSTKIBtoI7eklQACgYKAQMSARMSFQHGX2MivO84D2nurf58rTfsXoIlNRoVAUF8yKolpR30KTxoDElSliQnaTsQ0076; __Secure-1PSID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5AH1wyu22vqio3vgunUz7HvQACgYKAUQSARMSFQHGX2MiqoBXZ4nFc4JgHzCwI419-hoVAUF8yKq40ueyB4tF4AWcsPyEdd9K0076; __Secure-3PSID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5AZaxYFGRVqUYqPP2SJociiQACgYKAakSARMSFQHGX2MiKfhH3C4_JnwNg7Mmc0P3PBoVAUF8yKq0Cj7cyQLk9_EZtGjbMgkO0076; LOGIN_INFO=AFmmF2swRQIhAPHvsI2dhvUBVVp5ptvKcMLxD3l-J2T55oF_wXnyTkGvAiBddnJp_yiI3zSkQsT9trh8b4zqaI55Xvx8sp6HNdi7Bw:QUQ3MjNmeWtDc2ZSLWJyVlNUQlNSR19mQng1OWRiWngzZHE0d2FlWnltMllTbi01bzNWcDlSV0hhcGNhaUhrMUp2Ul9HNkw4WXB5dVlFcW9GbENkekhlYVpqZTVmZUd2N2JIcTI5X3JzY1hNVHA4Q1NHal9QZWdGekFWOUgzWWRrMWpZMVk4MDlOSVZ4QXNrZHVVTEFnUDFwcWdfN2stcWdB; PREF=tz=America.New_York&f5=30000&f7=100; SIDCC=AKEyXzUFKjb1WSX6lnYzU0Iq13Ye9150PuzFtP0v9yEQ2JaXVkcZYPh0pJd_goUOsxaa1Ui_; __Secure-1PSIDCC=AKEyXzVeW5tU1-s1X7IjgU3ySn27BMbohmj7VHIG4QiKPZImRgvUtXk8NYn1G70P0ra1ZM7W6g; __Secure-3PSIDCC=AKEyXzU3olmGR3Y2K0Cl7dGy0WSsxXyoq_hh4Miuu12U5ChaPMgU63-waWWgYztJ6Q5VqxIZ",
-    "X-Youtube-Identity-Token": "QUFFLUhqbHV6QjVDVHFQSHloaHJORHZLamNFXzAxWTZxd3w\u003d"
-};
+const YT_HEADERS = "COOKIE" in process.env && "ID" in process.env ? {
+    "Cookie": process.env.COOKIE,
+    "X-Youtube-Identity-Token": process.env.ID
+} : undefined;
 
 // Utility Functions
 

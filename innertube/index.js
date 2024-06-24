@@ -2,11 +2,6 @@ import { MimeType } from "./utils.js";
 
 const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
-const cli = {
-    WEB: { id: 1, name: "WEB", version: "2.20230914.04.00" },
-    ANDROID_EMBED: { name: "ANDROID", version: "16.20", screen: "EMBED" }
-}
-
 // Client secrets for YouTube on TV
 const CLIENT_ID = "861556708454-d6dlm3lh05idd8npek18k6be8ba3oc68.apps.googleusercontent.com";
 const CLIENT_SECRET = "SboVhoG9s0rNafixCSGGKXAT";
