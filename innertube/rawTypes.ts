@@ -1,3 +1,111 @@
+interface StereoLayout {
+	readonly STEREO_LAYOUT_UNKNOWN: 0;
+	readonly STEREO_LAYOUT_LEFT_RIGHT: 1;
+	readonly STEREO_LAYOUT_TOP_BOTTOM: 2;
+}
+
+interface ProjectionType {
+	readonly EQUIRECTANGULAR: 0;
+	readonly MESH: 1;
+	readonly UNKNOWN: null;
+}
+
+interface VideoQuality {
+	readonly auto: 0;
+	readonly tiny: 144;
+	readonly light: 144;
+	readonly small: 240;
+	readonly medium: 360;
+	readonly large: 480;
+	readonly hd720: 720;
+	readonly hd1080: 1080;
+	readonly hd1440: 1440;
+	readonly hd2160: 2160;
+	readonly hd2880: 2880;
+	readonly highres: 4320;
+}
+
+interface ColorTransferCharacteristics {
+	readonly COLOR_TRANSFER_CHARACTERISTICS_BT709: "bt709";
+	readonly COLOR_TRANSFER_CHARACTERISTICS_BT2020_10: "bt2020";
+	readonly COLOR_TRANSFER_CHARACTERISTICS_SMPTEST2084: "smpte2084";
+	readonly COLOR_TRANSFER_CHARACTERISTICS_ARIB_STD_B67: "arib-std-b67";
+	readonly COLOR_TRANSFER_CHARACTERISTICS_UNKNOWN: null;
+	readonly COLOR_TRANSFER_CHARACTERISTICS_UNSPECIFIED: null;
+}
+
+interface ColorPrimaries {
+	readonly COLOR_PRIMARIES_BT709: "bt709";
+	readonly COLOR_PRIMARIES_BT2020: "bt2020";
+	readonly COLOR_PRIMARIES_UNKNOWN: null;
+	readonly COLOR_PRIMARIES_UNSPECIFIED: null;
+}
+
+interface StreamType {
+	readonly FAIRPLAY: "fairplay";
+	readonly PLAYREADY: "playready";
+	readonly WIDEVINE: "widevine";
+	readonly CLEARKEY: null;
+	readonly FLASHACCESS: null;
+	readonly UNKNOWN: null;
+	readonly WIDEVINE_CLASSIC: null;
+}
+
+type Range = {
+	start: string;
+	end: string;
+}
+
+type AudioTrack = {
+	displayName: string;
+	id: string;
+	audioIsDefault: boolean;
+}
+
+type ColorInfo = {
+	primaries: keyof ColorPrimaries;
+	transferCharacteristics?: keyof ColorTransferCharacteristics;
+}
+
+type Format = {
+	mimeType?: string;
+	itag?: number;
+	xtags?: string;
+	captionTrack?: { displayName?: string; vssId?: string; languageCode?: string; kind?: string; id?: string; };
+	bitrate?: number;
+	contentLength?: number;
+	lastModified?: number;
+	drmFamilies?: string[];
+	type?: keyof StreamType;
+	targetDurationSec?: number;
+	maxDvrDurationSec?: number;
+	initRange?: Range;
+	indexRange?: Range;
+	cipher?: string;
+	signatureCipher?: string;
+	url?: string;
+}
+
+type VideoFormat = Format & {
+	width?: number;
+	height?: number;
+	fps?: number;
+	qualityLabel?: keyof VideoQuality;
+	colorInfo?: ColorInfo;
+	projectionType?: keyof ProjectionType;
+	stereoLayout?: keyof StereoLayout;
+}
+
+type AudioFormat = Format & {
+	audioSampleRate?: number;
+	audioTrack?: AudioTrack;
+	audioChannels?: number;
+	spatialAudioType?: string;
+	isDrc?: boolean;
+	loudnessDb?: number;
+	trackAbsoluteLoudnessLkfs?: number;
+}
+
 export type RawPlayerData = {
 	responseContext: {
 		visitorData: string;
@@ -143,79 +251,33 @@ export type RawPlayerData = {
 		messages?: string[];
 	};
 	streamingData?: {
-		expiresInSeconds: string;
-		formats?: {
-			itag: number;
-			mimeType: string;
-			bitrate: number;
-			width: number;
-			height: number;
-			lastModified: string;
-			quality: string;
-			fps: number;
-			qualityLabel: string;
-			projectionType: string;
-			audioQuality: string;
-			approxDurationMs: string;
-			audioSampleRate: string;
-			audioChannels: number;
-			signatureCipher?: string;
-			url?: string;
-			contentLength?: string;
-			averageBitrate?: number;
-		}[];
-		adaptiveFormats: {
-			itag: number;
-			url?: string;
-			mimeType: string;
-			bitrate: number;
-			width: number;
-			height: number;
-			initRange?: {
-				start: string;
-				end: string;
-			};
-			indexRange?: {
-				start: string;
-				end: string;
-			};
-			lastModified?: string;
-			contentLength?: string;
-			quality: string;
-			fps?: number;
-			qualityLabel?: string;
-			projectionType: string;
-			averageBitrate?: number;
-			approxDurationMs?: string;
-			type?: string;
-			highReplication?: boolean;
-			audioQuality?: string;
-			audioSampleRate?: string;
-			audioChannels?: number;
-			loudnessDb?: number;
-			signatureCipher?: string;
-			colorInfo?: {
-				primaries: string;
-				transferCharacteristics: string;
-				matrixCoefficients: string;
-			};
-			xtags?: string;
-			audioTrack?: {
-				displayName: string;
-				id: string;
-				audioIsDefault: boolean;
-			};
-			targetDurationSec?: number;
-			maxDvrDurationSec?: number;
-			distinctParams?: string;
-		}[];
+		adaptiveFormats?: ((AudioFormat | VideoFormat) & {
+			distinctParams?: string
+		})[];
 		streamingUrlTemplate?: string;
+		formats?: (AudioFormat & VideoFormat)[];
+		hlsFormats?: {
+			itag: number;
+			mimeType: string;
+			url: string;
+			bitrate: number;
+			width: number;
+			height: number;
+			fps: number;
+			audioTrack?: AudioTrack;
+			drmFamilies?: string[];
+			colorInfo?: ColorInfo;
+			audioChannels?: number;
+		}[];
+		licenseInfos?: {
+			drmFamily: string;
+			url: string;
+		}[];
+		drmParams?: string;
 		dashManifestUrl?: string;
 		hlsManifestUrl?: string;
-		licenseInfos?: {
-			drmFamily?: string;
-			url?: string;
-		};
+		probeUrl?: string;
+		serverAbrStreamingUrl?: string;
 	};
 	heartbeatParams?: {
 		softFailOnError: boolean;

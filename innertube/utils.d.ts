@@ -1,6 +1,16 @@
 import { IncomingHttpHeaders, OutgoingHttpHeaders } from "http";
 import { RequestOptions } from "https";
 
+declare class MimeType {
+    readonly type: string;
+    readonly subtype: string;
+    readonly parameters: Map<string, string>;
+
+    constructor(type: string, subtype: string, parameters: { [key: string]: string });
+
+    static parse(str: string): MimeType;
+}
+
 export class Duration {
     total: number;
     seconds: number;
@@ -37,11 +47,6 @@ export function requestAPI(path: string, body: any): Promise<{
     body: any
 }>;
 
-export function requestMusicAPI(path: string, body: any): Promise<{
-    statusCode: number,
-    statusMessage: string,
-    headers: IncomingHttpHeaders,
-    body: any
-}>;
+export function requestMusicAPI(path: string, body: any): Promise<Response>;
 
 export function download(url: URL, path: string, method?: string, headers?: OutgoingHttpHeaders): Promise<string | null>;

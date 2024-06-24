@@ -321,6 +321,10 @@ declare class PlaylistItem {
      */
     videoOwnerChannelTitle: string;
     /**
+     * The ID of the channel that uploaded this video.
+     */
+    videoOwnerChannelId: string;
+    /**
      * The ID that YouTube uses to uniquely identify the playlist that the playlist item is in.
      */
     playlistId: string;
@@ -336,6 +340,14 @@ declare class PlaylistItem {
      * The playlist item's privacy status.
      */
     privacyStatus: "private" | "public" | "unlisted";
+    /**
+     * The playlist item's duration in seconds.
+     */
+    duration: number;
+    /**
+     * Whether the playlist item is playable.
+     */
+    playable: boolean;
 
     constructor(data: RawPlaylistItemData)
 }
@@ -385,14 +397,8 @@ declare class Playlist {
     constructor(data: RawBrowseData);
 }
 
-/**
- * A search result contains information about a YouTube video, channel, or playlist that matches the search parameters specified in an API request. While a search result points to a uniquely identifiable resource, like a video, it does not have its own persistent data.
- */
-declare class SearchResult {
-    /**
-     * The `id` object contains information that can be used to uniquely identify the resource that matches the search request.
-     */
-    id: {
+type SearchResultID = {
+    [SearchResultType.VIDEO]: {
         /**
          * The type of the API resource.
          */
@@ -401,7 +407,8 @@ declare class SearchResult {
          * If the `id.type` property's value is {@link SearchResultType.VIDEO}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a video that matches the search query.
          */
         videoId: string;
-    } | {
+    };
+    [SearchResultType.CHANNEL]: {
         /**
          * The type of the API resource.
          */
@@ -410,7 +417,8 @@ declare class SearchResult {
          * If the `id.type` property's value is {@link SearchResultType.CHANNEL}, then this property will be present and its value will contain the ID that YouTube uses to uniquely identify a channel that matches the search query.
          */
         channelId: string;
-    } | {
+    };
+    [SearchResultType.PLAYLIST]: {
         /**
          * The type of the API resource.
          */
@@ -420,6 +428,16 @@ declare class SearchResult {
          */
         playlistId: string;
     };
+}
+
+/**
+ * A search result contains information about a YouTube video, channel, or playlist that matches the search parameters specified in an API request. While a search result points to a uniquely identifiable resource, like a video, it does not have its own persistent data.
+ */
+declare class SearchResult<T extends SearchResultType> {
+    /**
+     * The `id` object contains information that can be used to uniquely identify the resource that matches the search request.
+     */
+    id: SearchResultID[T];
     /**
      * The value that YouTube uses to uniquely identify the channel that published the resource that the search result identifies.
      */
@@ -453,7 +471,7 @@ declare class SearchResult {
 /**
  * A search list response contains information from the response to a search query.
  */
-declare class SearchListResponse {
+declare class SearchListResponse<T extends SearchResultType> {
     /**
      * The token that can be used as the value of the `pageToken` parameter to retrieve the next page in the result set.
      */
@@ -475,11 +493,11 @@ declare class SearchListResponse {
     /**
      * The list of search results returned from the search.
      */
-    items: SearchResult[];
+    items: SearchResult<T>[];
     /**
      * Updates `items` with the next page of search results.
      */
-    next(): Promise<SearchResult[]>;
+    next(): Promise<SearchResult<T>[]>;
 
     constructor(data: RawSearchData)
 }
@@ -505,7 +523,7 @@ declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlis
  * @param q Specifies the query term to search for.
  * @param type Restricts the search query to only retrieve a particular type of resource.
  */
-declare function listSearchResults(q: string, type?: SearchResultType): Promise<SearchListResponse | null>;
+declare function listSearchResults<T extends SearchResultType = SearchResultType>(q: string, type?: T): Promise<SearchListResponse<T>>;
 
 /**
  * Returns an object representing a device code and verification URL for a linking device. You must visit `verificationUrl` and enter `userCode` before `expires` in order for the `deviceCode` to be valid.
@@ -523,6 +541,8 @@ declare function getDeviceCode(): Promise<{
  */
 declare function setBearerToken(deviceCode: string): Promise<void>;
 
+declare function getMusicSearchSuggestions(q: string): Promise<string[]>;
+
 export {
     SearchResultType,
     Video,
@@ -534,5 +554,6 @@ export {
     getPlaylist,
     listSearchResults,
     getDeviceCode,
-    setBearerToken
+    setBearerToken,
+    getMusicSearchSuggestions
 }

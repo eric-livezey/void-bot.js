@@ -1,11 +1,12 @@
-import { AudioPlayerStatus, AudioResource, PlayerSubscription, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { ChannelType, Client, Colors, Embed, EmbedBuilder, Events, Guild, GuildMember, Message, MessageFlags, Partials, PermissionsBitField } from "discord.js";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { Duration, now } from "./innertube/utils.js";
-import { SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
+import { VoiceConnectionStatus, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
+import { ChannelType, Client, EmbedBuilder, Events, Guild, GuildMember, Message, MessageFlags, Partials, PermissionsBitField } from "discord.js";
+import { readFileSync } from "fs";
+import { now } from "./innertube/utils.js";
+import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
-import EventEmitter from "events";
+import { Player, Track, getPlayer } from "./player.js";
 import ytdl from "ytdl-core";
+import { formatDuration, formatDurationMillis } from "./utils.js";
 
 process.env.TOKEN = JSON.parse(readFileSync("./env.json")).TOKEN;
 
@@ -17,23 +18,10 @@ const CLIENT = new Client({
     partials: [Partials.Channel]
 });
 
-if (!existsSync("./audio")) {
-    mkdirSync("./audio");
-}
-
-if (!existsSync("./innertube/cache.json")) {
-    writeFileSync("./innertube/cache.json", "{}");
-}
-
-/**
- * @type {{[id:string]:Video}}
- */
-const CACHE = JSON.parse(readFileSync("./innertube/cache.json"));
-
-/**
- * @type {{[guildId:string]:Player}}
- */
-const PLAYERS = {};
+const YT_HEADERS = {
+    "Cookie": "GPS=1; YSC=Y3luw7uGfnI; VISITOR_INFO1_LIVE=EIHHCh_n-Mg; VISITOR_PRIVACY_METADATA=CgJVUxIEGgAgLQ%3D%3D; __Secure-1PSIDTS=sidts-CjIB3EgAEuWdW0K8-m8ocDVBqFzJVn3_C4kD96JG4ZBbd5UN9YUHOvE2vKHCFp8vq3SZ6RAA; __Secure-3PSIDTS=sidts-CjIB3EgAEuWdW0K8-m8ocDVBqFzJVn3_C4kD96JG4ZBbd5UN9YUHOvE2vKHCFp8vq3SZ6RAA; HSID=AJLEpxUldX71qbVjH; SSID=A0MemZy_gtUcTRpnF; APISID=Q3cCxcDtRgnSpVRr/Aqy84vpwhj8P3LWE4; SAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; __Secure-1PAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; __Secure-3PAPISID=pSNQt0Sl9i_V19Ol/Aa2Fv41svPWXmE6HD; SID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5Asvzd4bLYxSTKIBtoI7eklQACgYKAQMSARMSFQHGX2MivO84D2nurf58rTfsXoIlNRoVAUF8yKolpR30KTxoDElSliQnaTsQ0076; __Secure-1PSID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5AH1wyu22vqio3vgunUz7HvQACgYKAUQSARMSFQHGX2MiqoBXZ4nFc4JgHzCwI419-hoVAUF8yKq40ueyB4tF4AWcsPyEdd9K0076; __Secure-3PSID=g.a000lAhh8j9D68nuneCVUsr7HFG0JB9vPioCtldU5IIzovSjtq5AZaxYFGRVqUYqPP2SJociiQACgYKAakSARMSFQHGX2MiKfhH3C4_JnwNg7Mmc0P3PBoVAUF8yKq0Cj7cyQLk9_EZtGjbMgkO0076; LOGIN_INFO=AFmmF2swRQIhAPHvsI2dhvUBVVp5ptvKcMLxD3l-J2T55oF_wXnyTkGvAiBddnJp_yiI3zSkQsT9trh8b4zqaI55Xvx8sp6HNdi7Bw:QUQ3MjNmeWtDc2ZSLWJyVlNUQlNSR19mQng1OWRiWngzZHE0d2FlWnltMllTbi01bzNWcDlSV0hhcGNhaUhrMUp2Ul9HNkw4WXB5dVlFcW9GbENkekhlYVpqZTVmZUd2N2JIcTI5X3JzY1hNVHA4Q1NHal9QZWdGekFWOUgzWWRrMWpZMVk4MDlOSVZ4QXNrZHVVTEFnUDFwcWdfN2stcWdB; PREF=tz=America.New_York&f5=30000&f7=100; SIDCC=AKEyXzUFKjb1WSX6lnYzU0Iq13Ye9150PuzFtP0v9yEQ2JaXVkcZYPh0pJd_goUOsxaa1Ui_; __Secure-1PSIDCC=AKEyXzVeW5tU1-s1X7IjgU3ySn27BMbohmj7VHIG4QiKPZImRgvUtXk8NYn1G70P0ra1ZM7W6g; __Secure-3PSIDCC=AKEyXzU3olmGR3Y2K0Cl7dGy0WSsxXyoq_hh4Miuu12U5ChaPMgU63-waWWgYztJ6Q5VqxIZ",
+    "X-Youtube-Identity-Token": "QUFFLUhqbHV6QjVDVHFQSHloaHJORHZLamNFXzAxWTZxd3w\u003d"
+};
 
 // Utility Functions
 
@@ -43,7 +31,7 @@ const PLAYERS = {};
  * @param {string} s The string to parse
  * @returns The URL object for given string if it is a valid URL, otherwise `null`.
  */
-function getUrl(s) {
+function parseURL(s) {
     if (/^[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/.test(s) && !s.startsWith("http")) {
         // String is a valid URL without a protocol
         s = "https://" + s;
@@ -63,7 +51,7 @@ function getUrl(s) {
  * @param {URL} url A YouTube video URL.
  * @returns The video ID if the url is valid, otherwise `null`.
  */
-function extractVideoId(url) {
+function extractVideoID(url) {
     const str = url.host + url.pathname;
     if (/^((www|music)\.)?youtube\.com\/watch$/.test(str) && url.searchParams.has("v")) {
         // URL is a regular video link
@@ -89,7 +77,7 @@ function extractVideoId(url) {
  * @param {URL} url A YouTube playlist URL.
  * @returns The playlist ID if the url is valid, otherwise `null`.
  */
-function extractPlaylistId(url) {
+function extractPlaylistID(url) {
     if (/^((www|music)\.)?youtube\.com\/playlist$/.test(url.host + url.pathname) && url.searchParams.has("list")) {
         // URL is a YouTube playlist link
         return url.searchParams.get("list");
@@ -101,300 +89,6 @@ function extractPlaylistId(url) {
 
 function timelog(msg) {
     console.log(`[${now()}]`, msg);
-}
-
-// Player
-
-class Player extends EventEmitter {
-    /**
-     * The id of guild which the player is for
-     */
-    id;
-    /**
-     * @type {PlayerSubscription | null}
-     */
-    #subscription;
-    #player;
-    /**
-     * The `AudioPlayer` instance of this player
-     * 
-     * @readonly
-     */
-    get player() {
-        return this.#player;
-    };
-    /**
-     * @type {VoiceConnection | null}
-     */
-    #connection;
-    /**
-     * The voice connection the player is currently subscribed to.
-     */
-    get connection() {
-        if (this.#connection === null || this.#connection.state.status === VoiceConnectionStatus.Destroyed)
-            this.connection = getVoiceConnection(this.id) || null;
-        return this.#connection;
-    }
-    set connection(value) {
-        // unsubscribe from the old connection if it exists
-        if (this.#subscription)
-            this.#subscription.unsubscribe();
-        if (value === null || value.state.status === VoiceConnectionStatus.Destroyed || value.state.status === VoiceConnectionStatus.Disconnected) {
-            // stop
-            this.stop();
-        } else if (value instanceof VoiceConnection) {
-            this.connection = null;
-            // subscribe and handle state change
-            this.#subscription = value.subscribe(this.player);
-            value.on("stateChange", (oldState, newState) => {
-                if (newState.status === VoiceConnectionStatus.Destroyed || newState.status === VoiceConnectionStatus.Disconnected) this.stop();
-            });
-            value.on("error", (e) => {
-                this.emit("error", e);
-                this.stop();
-            });
-        } else {
-            throw new TypeError("connection must be an instance of VoiceConnection or null");
-        }
-        this.#connection = value;
-    }
-    /**
-     * The currently playing track
-     * 
-     * @type {Track&{readonly resource:AudioResource<null>,get elapsed():number;}}
-     */
-    nowPlaying;
-    /**
-     * A list of tracks in the queue
-     * 
-     * @type {Track[]}
-     */
-    queue;
-    /**
-     * Whether player should loop the current track
-     * 
-     * @type {boolean}
-     */
-    loop;
-    /**
-     * The volume of the player as a decimal
-     * 
-     * @type {number}
-     */
-    #volume;
-    get volume() {
-        return this.#volume;
-    }
-    set volume(value) {
-        this.#volume = value;
-        if (this.playing())
-            this.nowPlaying.resource.volume.setVolume(value);
-    }
-
-    /**
-     * @param {string} id 
-     */
-    constructor(id) {
-        super();
-        this.id = id;
-        this.#player = createAudioPlayer();
-        this.#connection = null;
-        this.connection = getVoiceConnection(id) || null;
-        this.nowPlaying = null;
-        this.queue = [];
-        this.loop = false;
-        this.volume = 1;
-        this.player.on("stateChange", (oldState, newState) => {
-            // play next track when the track finished
-            if (oldState.status === AudioPlayerStatus.Playing && newState.status === AudioPlayerStatus.Idle)
-                this.#next();
-        });
-        this.player.on("error", (e) => {
-            // skip on error
-            this.skip();
-            this.emit("error", e);
-        });
-    }
-
-    async #next() {
-        return this.loop ? await this.play(new Track(this.nowPlaying.video)) : this.queue.length > 0 ? await this.play(this.queue.shift()) : (this.stop(), false);
-    }
-
-    ready() {
-        return this.connection !== null && this.connection.state.status !== VoiceConnectionStatus.Destroyed && this.connection.state.status !== VoiceConnectionStatus.Disconnected;
-    }
-
-    playing() {
-        return this.nowPlaying !== null;
-    }
-
-    paused() {
-        return this.player.state.status === AudioPlayerStatus.Paused;
-    }
-
-    /**
-     * @param {Track} track
-     */
-    async play(track) {
-        const path = await track.path;
-        if (path === null) {
-            await this.skip();
-            this.emit("error", new Error(`could not download audio for ${track.url}`));
-            return false;
-        }
-        if (!this.ready()) {
-            this.stop();
-            this.emit("error", new Error("the audio connection was invalidated"));
-            return false;
-        }
-        const resource = createAudioResource(path, { inlineVolume: true });
-        resource.volume.setVolume(this.volume);
-        this.player.play(resource);
-        if (this.paused())
-            this.player.unpause();
-        Object.defineProperties(track, {
-            "resource": {
-                value: resource
-            },
-            "elapsed": {
-                get: () => {
-                    return resource.playbackDuration;
-                }
-            }
-        });
-        this.nowPlaying = track;
-        return true;
-    }
-
-    pause() {
-        return this.playing() && !this.paused() && this.player.pause();
-    }
-
-    unpause() {
-        return this.playing() && this.paused() && this.player.unpause();
-    }
-
-    async skip() {
-        this.loop = false;
-        return await this.#next();
-    }
-
-    stop() {
-        this.queue = [];
-        this.nowPlaying = null;
-        this.loop = false;
-        this.player.stop(true);
-    }
-
-    /**
-     * @param {Track} track 
-     */
-    async enqueue(track) {
-        if (!this.playing())
-            return await this.play(track);
-        this.queue.push(track);
-        return false;
-    }
-}
-
-class Track {
-    title;
-    url;
-    author;
-    thumbnail;
-    video;
-    duration;
-    /**
-     * @type {Promise<string | null>}
-     */
-    path;
-
-    /**
-     * @param {Video} video 
-     */
-    constructor(video) {
-        this.video = video;
-        this.title = video.title || null;
-        this.url = video.id ? `https://www.youtube.com/watch?v=${video.id}` : null;
-        this.author = video.channelTitle ? { title: video.channelTitle, url: video.channelId ? `https://www.youtube.com/channel/${video.channelId}` : undefined } : null;
-        this.thumbnail = video.thumbnails && video.thumbnails.maxres ? video.thumbnails.maxres.url : null
-        this.duration = new Duration(video.duration.total);
-        this.path = new Promise((resolve) => {
-            const path = `./audio/${video.id}.webm`;
-            // check if file is already downloaded
-            if (!existsSync(path)) {
-                // if (!(video instanceof Video))
-                //     video = await getVideo(video.id);
-                // if (video === null)
-                //     // couldn't fetch the video
-                //     resolve(null);
-                // let best = null;
-                // for (let stream of video.fileDetails.audioStreams) {
-                //     if (best === null)
-                //         best = stream;
-                //     else if (stream.codec != "opus")
-                //         continue;
-                //     else if (stream.bitrateBps > best.bitrateBps)
-                //         best = stream;
-                // }
-                // if (best === null)
-                //     // no valid streams
-                //     resolve(null);
-                // // try up to five times to download from the url
-                // let success = false;
-                // for (let tries = 0; !success && tries < 5; tries++)
-                //     if (await download(new URL(best.url), path) !== null)
-                //         success = true;
-                // if (!success)
-                //     // audio failed to download
-                //     resolve(null);
-                ytdl(`https://www.youtube.com/watch?v=${video.id}`, { "quality": "highestaudio" }).pipe(createWriteStream(path)).once("finish", () => { resolve(path) });
-            } else {
-                resolve(path);
-            }
-        });
-    }
-
-    /**
-     * 
-     * @param {Duration | undefined} elapsed
-     */
-    embed(elapsed) {
-        const eb = new EmbedBuilder();
-        eb.setTitle(this.title || "Unknown Title");
-        eb.setURL(this.url);
-        eb.setAuthor(this.author)
-        eb.setThumbnail(this.thumbnail);
-        let duration = this.duration.format();
-        if (elapsed)
-            duration = `${elapsed.format()}/${duration}`;
-        eb.setFooter({
-            name: "Duration",
-            value: duration
-        });
-        return new Embed(eb.toJSON());
-    }
-
-    /**
-     * Creates a track from a YouTube video.
-     * 
-     * @param {Video} video 
-     */
-    static fromVideo(video) {
-    }
-}
-
-/**
- * @param {string} id 
- */
-function getPlayer(id) {
-    if (!(id in PLAYERS)) {
-        PLAYERS[id] = new Player(id);
-        PLAYERS[id].on("error", (error) => {
-            console.error(error);
-        });
-    }
-    return PLAYERS[id];
 }
 
 /**
@@ -423,56 +117,6 @@ function createVoiceConnection(channel) {
     return connection;
 }
 
-/**
- * @param {string} id 
- */
-async function retrieveVideo(id) {
-    if (!(id in CACHE) || CACHE[id] === null || !("duration" in CACHE[id])) {
-        CACHE[id] = await getVideo(id);
-        writeFileSync("./innertube/cache.json", JSON.stringify(CACHE));
-    }
-    return CACHE[id]
-}
-
-/**
- * Creates an embed for the specified video object
- * 
- * @param {Video} video A YouTube video object for which to create an embed
- * @param {number | undefined} elapsed The time at which the video started playing
- * @returns An embed representing the video object
- */
-function createVideoEmbed(video, elapsed) {
-    const eb = new EmbedBuilder();
-    if (!video.id) {
-        // Video is unavailable error
-        eb
-            .setColor(Colors.Red)
-            .setTitle("Unavailable Video")
-            .setDescription("The video is unavailable.");
-    } else if (video.privacyStatus === "private") {
-        // Video is private error
-        eb
-            .setColor(Colors.Red)
-            .setTitle("Private Video")
-            .setDescription("The video is private.");
-    } else {
-        if (video.ageRestricted) {
-            // Video is age restricted error, but we can still display the video info
-            eb
-                .setColor(Colors.Red)
-                .setDescription("The video is age restricted.");
-        }
-        // Video is playable
-        eb
-            .setTitle(video.title || "Unknown Title")
-            .setURL(video.id ? "https://www.youtube.com/watch?v=" + video.id : null)
-            .setAuthor({ name: video.channelTitle || "Unknown Channel", url: video.channelId ? "https://www.youtube.com/channel/" + video.channelId : undefined })
-            .setThumbnail(video.thumbnails?.maxres?.url || null)
-            .addFields({ name: "Duration", value: video.duration ? (elapsed ? new Duration(Math.floor(elapsed / 1000)).format() + "/" : "") + new Duration(video.duration.total).format() : "Unknown Duration" });
-    }
-    return eb.data;
-}
-
 // Commands
 
 /**
@@ -498,13 +142,13 @@ async function play(member, query) {
     const player = getPlayer(member.guild.id);
     let id = null;
     // Check if the query is a URL
-    const url = getUrl(query);
+    let url = parseURL(query);
     if (url !== null) {
         // Attempt to extract the video ID
-        id = extractVideoId(url);
+        id = extractVideoID(url);
         if (id === null) {
             // Attempt to extract a playlist ID
-            const listId = extractPlaylistId(url);
+            const listId = extractPlaylistID(url);
             if (listId !== null)
                 return await playPlaylist(player, listId);
             // Invalid URL
@@ -520,29 +164,20 @@ async function play(member, query) {
         for (let attempts = 0; search.items.length === 0 && attempts < 10; attempts++)
             search = await listSearchResults(query, SearchResultType.VIDEO);
         if (search.items.length === 0)
-            // Innertube returned an empty response 10 times
+            // Innertube returned an invalid response 10 times
             return "Something went wrong whilst trying to search for your query.";
         // Retrieve the id of the first search result
         id = search.items[0].id.videoId;
     }
-    // Get the video
-    const video = await retrieveVideo(id);
-    if (video === null)
-        // The video could not retrieved
-        return "An error occurred whilst trying to retrieve the requested video.";
-    let content = "";
-    let embed = createVideoEmbed(video);
-    if (!video.id || !video.fileDetails || video.privacyStatus === "private" || video.ageRestricted)
-        // An error occurred
-        content = "**Issue Playing Track:**";
-    else
-        if (await player.enqueue(new Track(video)))
-            // Track played immediately
-            content = "**Now Playing:**", embed = createVideoEmbed(video, player.nowPlaying.elapsed);
-        else
-            // Track was queued
-            content = "**Added to the Queue**";
-    return { content: content, embeds: [embed] }
+    // Get the video info
+    let info;
+    try {
+        info = await ytdl.getInfo(id, { requestOptions: { headers: YT_HEADERS } });
+    } catch (e) {
+        return "An error occurred whilst trying to retrieve the requested video.\n" + e.message;
+    }
+    const track = Track.fromVideoInfo(info);
+    return { content: player.enqueue(track) ? "**Now Playing:**" : "**Added to the Queue:**", embeds: [track.toEmbed()] };
 }
 
 /**
@@ -554,11 +189,11 @@ async function skip(member) {
     if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return "You must be in the same voice channel as the bot to use the command."
     const player = getPlayer(member.guild.id);
-    if (!player.playing())
+    if (!player.isPlaying)
         return "Nothing is playing."
     const track = player.nowPlaying;
-    await player.skip();
-    return { content: "**Skipped:**", embeds: [createVideoEmbed(track.video, track.elapsed)] };
+    player.skip();
+    return { content: "**Skipped:**", embeds: [track.toEmbed()] };
 }
 
 /**
@@ -571,7 +206,7 @@ async function stop(member) {
     if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return "You must be in the same voice channel as the bot to use the command."
     const player = getPlayer(member.guild.id);
-    if (!player.playing())
+    if (!player.isPlaying)
         return "Nothing is playing."
     player.stop();
     return "Playback stopped.";
@@ -587,9 +222,9 @@ async function pause(member) {
     if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return "You must be in the same voice channel as the bot to use the command."
     const player = getPlayer(member.guild.id);
-    if (!player.playing())
+    if (!player.isPlaying)
         return "Nothing is playing."
-    if (player.paused()) {
+    if (player.isPaused) {
         unpause(member);
         return "Playback resumed."
     }
@@ -605,11 +240,11 @@ async function unpause(member) {
     if (member === null)
         return "This command must be used in a server.";
     const player = getPlayer(member.guild.id);
-    if (!player.playing())
+    if (!player.isPlaying)
         return "Nothing is playing."
     if (member.voice.channel === null || (await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return "You must be in the same voice channel as the bot to use the command."
-    if (!player.paused())
+    if (!player.isPaused)
         return "Playback is not paused.";
     player.unpause();
     return "Playback paused."
@@ -630,15 +265,19 @@ async function playPlaylist(player, listId) {
     };
     let totalAdded = 0;
     for (const listItem of await playlist.listItems()) {
-        if (!player.ready()) {
+        if (!player.isReady) {
             player.stop();
-            return "An voice connection error occurred whilst adding the playlist.";
+            return "A voice connection error occurred whilst adding the playlist.";
         }
-        const video = await retrieveVideo(listItem.id)
-        if (video === null || !video.id || !video.fileDetails || video.ageRestricted || video.privacyStatus === "private")
-            continue;
-        await player.enqueue(new Track(video));
-        totalAdded++;
+        if (listItem.playable) {
+            try {
+                // const info = await ytdl.getInfo(listItem.id, { requestOptions: { headers: YT_HEADERS } })
+                player.enqueue(Track.fromPlaylistItem(listItem));
+            } catch {
+                continue;
+            }
+            totalAdded++;
+        }
     }
     return {
         content: "**Added " + totalAdded + " tracks to the queue:**",
@@ -674,12 +313,12 @@ async function connect(member, channelId) {
         return "I am already connected to <#" + channelId + ">.";
     }
     const channel = await new Promise((resolve) => {
-        resolve(member.guild.channels.fetch(channelId).catch(() => { resolve(null) }));
+        resolve(member.guild.channels.fetch(channelId).catch(() => { return null }));
     })
     if (channel === null)
         return "*" + channelId + "* is not a valid channel ID.";
     if (channel.type != ChannelType.GuildVoice)
-        resolve("<#" + channelId + "> is not a voice channel.")
+        return "<#" + channelId + "> is not a voice channel.";
     // Join specified channel
     const vc = createVoiceConnection(channel);
     return new Promise(async (resolve) => {
@@ -711,9 +350,9 @@ async function disconnect(guild) {
  */
 function nowPlaying(guild) {
     const player = getPlayer(guild.id);
-    if (!player.playing())
+    if (!player.isPlaying)
         return "Nothing is playing.";
-    return { content: "**Now playing:**", embeds: [createVideoEmbed(player.nowPlaying.video, player.nowPlaying.elapsed)] };
+    return { content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] };
 }
 
 /**
@@ -723,18 +362,18 @@ function queue(message) {
     const player = getPlayer(message.guild.id);
     if (player.queue.length === 0)
         return nowPlaying(message.guild);
-    let total = player.nowPlaying.duration.total;
+    let total = player.nowPlaying.duration / 1000;
     for (let i = 0; i < player.queue.length; i++)
-        total += player.queue[i].duration.total;
+        total += player.queue[i].duration / 1000;
     const eb = new EmbedBuilder()
         .setAuthor({ name: "Now Playing:" })
-        .setTitle(player.nowPlaying.video.title)
-        .setURL(`https://www.youtube.com/watch?v=${player.nowPlaying.video.id}`)
-        .setDescription(new Duration(Math.floor(player.nowPlaying.elapsed / 1000)).format() + "/" + player.nowPlaying.duration.format())
-        .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(total).format() + ")" });
-    for (var i = 0; i < player.queue.length && i < 25; i++)
-        eb.addFields({ name: i + 1 + ": " + player.queue[i].video.title, value: player.queue[i].duration.format() });
-    var response = { embeds: [eb.data] }
+        .setTitle(player.nowPlaying.title)
+        .setURL(player.nowPlaying.url)
+        .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
+        .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total))})` });
+    for (let i = 0; i < player.queue.length && i < 25; i++)
+        eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
+    let response = { embeds: [eb.toJSON()] }
     if (player.queue.length > 25)
         response.components = [{ type: 1, components: [{ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: message.id + ".2" }] }];
     return response;
@@ -751,7 +390,7 @@ function remove(guild, index) {
     if (index < 1 | index > player.queue.length)
         return `${index} is not a valid index in the queue.`;
     const track = player.queue.splice(index - 1, 1)[0];
-    return { content: "**Removed:**", embeds: [createVideoEmbed(track.video)] };
+    return { content: "**Removed:**", embeds: [track.toEmbed()] };
 }
 
 
@@ -772,7 +411,7 @@ function move(guild, source, destination) {
         return "Indices must not be equal.";
     const track = player.queue.splice(source - 1, 1)[0];
     player.queue.splice(destination - 1, 0, track);
-    return `Moved \`${track.video.title}\` to index ${destination} in the queue.`;
+    return `Moved \`${track.title}\` to index ${destination} in the queue.`;
 }
 
 /**
@@ -794,7 +433,7 @@ function info(guild, index) {
         return "The queue is empty.";
     if (index < 1 || index > player.queue.length)
         return `${index} is not a valid index in the queue.`;
-    return { embeds: [createVideoEmbed(player.queue[index - 1].video)] };
+    return { embeds: [player.queue[index - 1].toEmbed()] };
 }
 
 /**
@@ -862,21 +501,21 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
             interaction.update(response);
             return;
         }
-        var totalSeconds = player.nowPlaying.duration.total;
+        var total = player.nowPlaying.duration / 1000;
         for (var i = 0; i < player.queue.length; i++)
-            totalSeconds += player.queue[i].duration.total;
+            total += player.queue[i].duration / 1000;
         var eb = new EmbedBuilder()
-            .setFooter({ text: player.queue.length + 1 + " items (" + new Duration(totalSeconds).format() + ")" });
+            .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total / 1000))})` });
         if (page == 1) {
             // Include now playing if on first page
             eb.setAuthor({ name: "Now Playing:" })
-                .setTitle(player.nowPlaying.video.title)
+                .setTitle(player.nowPlaying.title)
                 .setURL(player.nowPlaying.url)
-                .setDescription(new Duration(Math.floor(player.nowPlaying.elapsed / 1000)).format() + "/" + player.nowPlaying.duration.format())
+                .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
         }
         // Append up to 25 tracks to the queue message
         for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
-            eb.addFields({ name: i + 1 + ": " + player.queue[i].video.title, value: player.queue[i].duration.format() });
+            eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
         }
         var response = { embeds: [eb.data], components: [{ type: 1, components: [] }] }
         if (page > 1) {
@@ -921,6 +560,34 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             var response;
             // Handle Command
             switch (cmd) {
+                case "cookie":
+                    if (message.author.id === "420741651804323843") {
+                        if (args.length < 1) {
+                            if ("cookie" in YT_HEADERS)
+                                delete YT_HEADERS["cookie"];
+                            response = "Cookie unset.";
+                        } else {
+                            YT_HEADERS["cookie"] = args[0];
+                            response = "Cookie set.";
+                        }
+                    } else {
+                        response = "You can't use this command."
+                    }
+                    break;
+                case "id":
+                    if (message.author.id === "420741651804323843") {
+                        if (args.length < 1) {
+                            if ("X-Youtube-Identity-Token" in YT_HEADERS)
+                                delete YT_HEADERS["X-Youtube-Identity-Token"];
+                            response = "ID unset.";
+                        } else {
+                            YT_HEADERS["X-Youtube-Identity-Token"] = args[0];
+                            response = "ID set.";
+                        }
+                    } else {
+                        response = "You can't use this command."
+                    }
+                    break;
                 case "join":
                 case "connect":
                     // Connect
@@ -1067,6 +734,12 @@ CLIENT.on(Events.MessageCreate, async (message) => {
         } catch (e) {
             console.error(`[${now()}] Uncaught Error on "${cmd}":`);
             console.error(e);
+            try {
+                await message.channel.send("An error occurred whist processing your command.");
+            } catch (e) {
+                console.error(`[${now()}] Failed to send response message:\n`);
+                console.error(e);
+            }
         }
     }
 });

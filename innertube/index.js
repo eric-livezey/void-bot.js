@@ -1,4 +1,8 @@
-const CLIENTS = {
+import { MimeType } from "./utils.js";
+
+const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+const cli = {
     WEB: { id: 1, name: "WEB", version: "2.20230914.04.00" },
     ANDROID_EMBED: { name: "ANDROID", version: "16.20", screen: "EMBED" }
 }
@@ -18,46 +22,111 @@ const JS_CACHE = {};
  */
 const BEARER_TOKEN = {};
 
-/**
- * @param {string} path 
- * @param {*} body 
- */
-async function request(path, body) {
-    var useOAuth = false;
-    var client = CLIENTS.WEB;
-    // Check if bearer token is set
-    if ("access_token" in BEARER_TOKEN) {
-        // Check if bearer token is still valid
-        if (new Date().getTime() >= BEARER_TOKEN.expires) {
-            await refreshBearerToken();
-        }
-        useOAuth = true;
-        client = CLIENTS.ANDROID_EMBED;
+function createReadOnlyObject(properties) {
+    const obj = Object.create(null);
+
+    for (const entry of Object.entries(properties)) {
+        Object.defineProperty(obj, entry[0], { value: entry[1] });
     }
-    // Append base context to body
-    body = {
-        ...body,
-        context: {
-            client: {
-                clientName: client.name,
-                clientVersion: client.version,
-                clientScreen: client.screen
-            }
-        }
-    }
-    // Set authorization header if using OAuth
-    const authHeader = useOAuth ? { authorization: "Bearer " + BEARER_TOKEN.access_token } : {};
-    return await fetch(`https://www.youtube.com/youtubei/v1${path}` + (useOAuth ? "" : "?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"), {
-        method: "POST",
-        headers: {
-            "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-            "x-youtube-client-version": client.version,
-            ...authHeader
-        },
-        body: JSON.stringify(body)
-    });
+
+    return obj;
 }
+
+/**
+ * @type {{readonly 1:{name:"WEB";version:"2.20240620.05.00";platform:"DESKTOP"};readonly 2:{name:"MWEB";version:"2.20240620.05.00";platform:"MOBILE"};readonly 67:{name:"WEB_REMIX";version:"1.20240617.01.00";platform:"DESKTOP";};}}
+ */
+const ClientInfo = createReadOnlyObject({
+    1: createReadOnlyObject({
+        name: "WEB",
+        version: "2.20240620.05.00",
+        platform: "DESKTOP"
+    }),
+    2: createReadOnlyObject({
+        name: "MWEB",
+        version: "2.20240620.05.00",
+        platform: "MOBILE"
+    }),
+    67: createReadOnlyObject({
+        name: "WEB_REMIX",
+        version: "1.20240617.01.00",
+        platform: "DESKTOP"
+    })
+})
+
+/**
+ * @type {{readonly WEB:1;readonly MWEB:2;readonly WEB_REMIX:67;}}
+ */
+const ClientType = createReadOnlyObject({
+    "WEB": 1,
+    "MWEB": 2,
+    "WEB_REMIX": 67
+});
+
+class Client {
+    id;
+    name;
+    version;
+    platform;
+    get userAgent() {
+        return this.platform === "DESKTOP" ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36" : "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36";
+    }
+    get context() {
+        return { client: { clientName: this.name, clientVersion: this.version, platform: this.platform } };
+    }
+    get headers() {
+        return {
+            "User-Agent": this.userAgent,
+            "Content-Type": "application/json",
+            "X-Youtube-Bootstrap-Logged-In": false,
+            "X-Youtube-Client-Name": this.id,
+            "X-Youtube-Client-Version": this.version
+        }
+    }
+
+
+    /**
+     * @param {keyof ClientType} type 
+     */
+    constructor(type) {
+        if (!(type in ClientType))
+            throw new TypeError("invalid client type");
+
+        this.id = ClientType[type];
+        const info = ClientInfo[this.id];
+        this.name = info.name;
+        this.version = info.version;
+        this.platform = info.platform;
+    }
+
+    /**
+     * @param {string} endpoint 
+     * @param {{[key: string]: any}}
+     */
+    async request(endpoint, body) {
+        if (typeof endpoint !== "string")
+            throw new TypeError("endpoint must of type string");
+        if (typeof body !== "undefined" && typeof body !== "object")
+            throw new TypeError("body must of type object or undefined");
+
+        const response = await fetch(`https://www.youtube.com/youtubei/v1${endpoint}?key=${API_KEY}`, {
+            method: "POST",
+            headers: this.headers,
+            body: JSON.stringify({ context: this.context, ...(body || {}) })
+        });
+        if (!response.ok)
+            throw new Error(`${response.status} ${response.statusText}`);
+        return response;
+    }
+}
+
+/**
+ * @type {{readonly WEB:Client;readonly MWEB:Client;readonly WEB_REMIX:Client;}}
+ */
+const CLIENTS = createReadOnlyObject({
+    "WEB": new Client("WEB"),
+    "MWEB": new Client("MWEB"),
+    "WEB_REMIX": new Client("WEB_REMIX")
+});
 
 /**
  * @param {string} videoId 
@@ -222,35 +291,67 @@ class Video {
                     this.liveStreamingDetails.actualEndTime = new Date(liveBroadcastDetails.endTimestamp);
             }
         }
-        if ("streamingData" in data) {
-            const streamingData = data.streamingData;
+        let streamingData;
+        if (streamingData = data.streamingData) {
             this.projection = streamingData.adaptiveFormats[0].projectionType.toLowerCase();
-            this.fileDetails = {
-                videoStreams: streamingData.adaptiveFormats.filter(value => value.mimeType.startsWith("video")).map(value => {
-                    return {
-                        widthPixels: value.width,
-                        heightPixels: value.height,
-                        frameRateFps: value.fps,
-                        aspectRatio: value.width / value.width,
-                        codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                        bitrateBps: value.bitrate,
-                        url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                        contentLength: value.contentLength
+            let adaptiveFormats;
+            if (adaptiveFormats = streamingData.adaptiveFormats) {
+                const fileDetails = {};
+                const audioStreams = [];
+                const videoStreams = [];
+                for (const format of adaptiveFormats) {
+                    if (format.mimeType && /(vp9|vp09|vp8|avc1|av01)/.test(format.mimeType || "")) {
+                        videoStreams.push({
+                            widthPixels: format.width,
+                            heightPixels: format.height,
+                            frameRateFps: format.fps,
+                            aspectRatio: format.width / format.width,
+                            codec: MimeType.parse(format.mimeType).parameters.get("codecs"),
+                            bitrateBps: format.bitrate,
+                            url: format.url || decipher(js, new URLSearchParams(format.cipher || format.signatureCipher)),
+                            contentLength: format.contentLength
+                        })
+                    } else if (format.mimeType && /(opus|mp4a|dtse|ac-3|ec-3|iamf)/.test(format.mimeType || "")) {
+                        audioStreams.push({
+                            channelCount: format.audioChannels,
+                            codec: MimeType.parse(format.mimeType).parameters.get("codecs"),
+                            bitrateBps: format.bitrate,
+                            url: format.url ? format.url : decipher(js, new URLSearchParams(format.signatureCipher)),
+                            contentLength: format.contentLength
+                        })
                     }
-                }),
-                audioStreams: streamingData.adaptiveFormats.filter(value => value.mimeType.startsWith("audio")).map(value => {
-                    return {
-                        channelCount: value.audioChannels,
-                        codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                        bitrateBps: value.bitrate,
-                        url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                        contentLength: value.contentLength
-                    }
-                }),
-                durationMs: streamingData.adaptiveFormats[0].approxDurationMs,
-                dashManifestUrl: streamingData.dashManifestUrl,
-                hlsManifestUrl: streamingData.hlsManifestUrl
-            };
+
+                }
+                fileDetails.videoStreams = videoStreams;
+                fileDetails.audioStreams = audioStreams;
+                this.fileDetails = fileDetails;
+                // this.fileDetails = {
+                //     videoStreams: adaptiveFormats.filter(value => value.mimeType.startsWith("video")).map(value => {
+                //         return {
+                //             widthPixels: value.width,
+                //             heightPixels: value.height,
+                //             frameRateFps: value.fps,
+                //             aspectRatio: value.width / value.width,
+                //             codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
+                //             bitrateBps: value.bitrate,
+                //             url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                //             contentLength: value.contentLength
+                //         }
+                //     }),
+                //     audioStreams: adaptiveFormats.filter(value => value.mimeType.startsWith("audio")).map(value => {
+                //         return {
+                //             channelCount: value.audioChannels,
+                //             codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
+                //             bitrateBps: value.bitrate,
+                //             url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
+                //             contentLength: value.contentLength
+                //         }
+                //     }),
+                //     durationMs: streamingData.adaptiveFormats[0].approxDurationMs,
+                //     dashManifestUrl: streamingData.dashManifestUrl,
+                //     hlsManifestUrl: streamingData.hlsManifestUrl
+                // };
+            }
         }
         this.dimension = null;
         this.definition = null;
@@ -269,6 +370,8 @@ class PlaylistItem {
     position;
     videoId;
     privacyStatus;
+    duration;
+    playable;
 
     /**
      * @param {import("./rawTypes").RawPlaylistItemData} data 
@@ -304,10 +407,13 @@ class PlaylistItem {
             }
         };
         this.videoOwnerChannelTitle = data.shortBylineText.runs.map(value => value.text).join(" ");
+        this.videoOwnerChannelId = data.shortBylineText.runs.find(value => value.navigationEndpoint && value.navigationEndpoint.browseEndpoint && value.navigationEndpoint.browseEndpoint.browseId).navigationEndpoint.browseEndpoint.browseId;
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
         this.position = Number(data.index.simpleText);
         this.videoId = this.id;
         this.privacyStatus = "public";
+        this.duration = Number(data.lengthSeconds);
+        this.playable = data.isPlayable;
     };
 }
 
@@ -394,7 +500,7 @@ class Playlist {
             /**
              * @type {import("./rawTypes").RawBrowseContinuationData}
              */
-            const data = await (await request("/browse", { continuation: continuation })).json();
+            const data = await (await CLIENTS.WEB.request("/browse", { continuation: continuation })).json();
             contents = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems;
             items.push(...contents.filter(value => "playlistVideoRenderer" in value).map(value => new PlaylistItem(value.playlistVideoRenderer)));
             continuationContainer = contents.find(value => "continuationItemRenderer" in value);
@@ -573,7 +679,7 @@ class SearchListResponse {
         /**
          * @type {import("./rawTypes").RawSearchData}
          */
-        const data = await (await request("/search", { continuation: this.nextPageToken })).json();
+        const data = await (await CLIENTS.WEB.request("/search", { continuation: this.nextPageToken })).json();
         var continuation = null;
         if ("onResponseReceivedCommands" in data)
             continuation = data.onResponseReceivedCommands.find(value => "appendContinuationItemsAction" in value);
@@ -597,10 +703,11 @@ class SearchListResponse {
 
 /**
  * @param {string} id 
+ * @deprecated in favor of `ytdl.getVideoInfo()`
  */
 async function getVideo(id) {
     // const js = await getJs(await getPlayerId(id));
-    // const response = await request("/player", {
+    // const response = await CLIENTS.WEB.request("/player", {
     //     videoId: id,
     //     playbackContext: {
     //         contentPlaybackContext: {
@@ -610,7 +717,7 @@ async function getVideo(id) {
     //     racyCheckOk: false,
     //     contentCheckOk: false
     // })
-    const response = await fetch(`https://www.youtube.com/watch?v=${id}`);
+    const response = await fetch(`https://www.youtube.com/watch?v=${id}`, { headers: CLIENTS.WEB.headers });
     if (response.ok) {
         // return new Video(await response.json(), js);
         const text = await response.text();
@@ -636,7 +743,7 @@ async function getVideo(id) {
  * @param {boolean} unavailable
  */
 async function getPlaylist(id, unavailable = false) {
-    const response = await request("/browse", {
+    const response = await CLIENTS.WEB.request("/browse", {
         browseId: "VL" + id,
         params: unavailable ? "wgYCCAA%3D" : undefined
     });
@@ -652,12 +759,33 @@ async function getPlaylist(id, unavailable = false) {
  * @param {import("./index.d.ts").SearchResultType} type 
  */
 async function listSearchResults(q, type = null) {
-    const response = await request("/search", {
+    const response = await CLIENTS.WEB.request("/search", {
         query: q,
         params: type === SearchResultType.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultType.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultType.PLAYLIST ? "EgIQAw%3D%3D" : undefined
     })
     if (response.ok) {
         return new SearchListResponse(await response.json());
+    } else {
+        return null;
+    }
+}
+
+async function getMusicSearchSuggestions(q) {
+    const response = await CLIENTS.WEB_REMIX.request("music/get_search_suggestions", { input: q });
+    if (response.ok) {
+        const body = await response.json();
+        if (!("contents" in response)) {
+            return [];
+        }
+        const suggestions = [];
+        for (const content of response.contents[0].searchSuggestionsSectionRenderer.contents) {
+            var text = "";
+            for (const run of content.searchSuggestionRenderer.suggestion.runs) {
+                text += run.text;
+            }
+            suggestions.push(text);
+        }
+        return suggestions;
     } else {
         return null;
     }
@@ -731,6 +859,8 @@ async function refreshBearerToken() {
     BEARER_TOKEN.expires = start + response.expires_in * 1000;
 }
 
+await getVideo("RuPr33Jk2A4");
+
 export {
     SearchResultType,
     Video,
@@ -743,6 +873,7 @@ export {
     listSearchResults,
     getDeviceCode,
     setBearerToken,
+    getMusicSearchSuggestions,
 
     extractPlayerId,
     getPlayerId,

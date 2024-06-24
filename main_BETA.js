@@ -1,13 +1,12 @@
 import { AudioPlayer, AudioPlayerStatus, AudioResource, StreamType, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
 import { AttachmentBuilder, ChannelType, ChatInputCommandInteraction, Client, Colors, EmbedBuilder, Events, Partials, PermissionFlagsBits, Routes, formatEmoji, parseEmoji } from "discord.js";
-import { readFileSync, rmSync, writeFileSync } from "fs";
-import { Readable } from "stream";
-import { Playlist, SearchResultType, Video, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
-import { Duration, download } from "./innertube/utils.js";
-import { getMusicSearchSuggestions } from "./innertube/videos.js";
+import { createWriteStream, readFileSync, rmSync, writeFileSync } from "fs";
+import { Playlist, SearchResultType, Video, getPlaylist, getVideo, listSearchResults, getMusicSearchSuggestions } from "./innertube/index.js";
+import { Duration } from "./innertube/utils.js";
 import { spawn } from "child_process";
 import * as Tracks from "./innertube/music/tracks.js";
 import * as Albums from "./innertube/music/albums.js";
+import ytdl from "ytdl-core";
 
 // Global Constants
 
@@ -117,14 +116,9 @@ class Player {
      * 
      * @param {Track} track The track to play
      */
-    async play(track) {
+    play(track) {
         this.nowPlaying = track;
-        // Since the audio url can theoretically expire if it's been queued for a few hours, refresh it if so
-        if (Date.now() / 1000 > new URL(track.url).searchParams.get("expire")) {
-            this.nowPlaying = new Track(await getVideo(track.video.id));
-        }
-        const stream = Readable.fromWeb((await fetch(await track.url)).body);
-        // Bot needs to retry network requests that fail, not yet implemented
+        const stream = track.stream;
         this.audioResource = createAudioResource(stream, { inlineVolume: true, inputType: StreamType.WebmOpus });
         this.audioResource.volume.setVolume(this.volume);
         this.audioPlayer.play(this.audioResource);
@@ -137,10 +131,10 @@ class Player {
      * @param {Track} track The track
      * @returns `true` if the track is played immediately, otherwise `false`
      */
-    async playOrQueue(track) {
+    playOrQueue(track) {
         if (this.nowPlaying === null) {
             // Nothing is playing
-            await this.play(track);
+            this.play(track);
             return true;
         } else {
             // Add the track to the queue
@@ -201,10 +195,14 @@ class Track {
      * @type {?number}
      */
     startTime;
+    // /**
+    //  * The url of this track's file
+    //  */
+    // url;
     /**
-     * The url of this track's file
+     * The stream to read this track's audio from
      */
-    url;
+    stream;
 
     /**
      * Creates a new track representing the given video.
@@ -215,20 +213,21 @@ class Track {
         this.video = video;
         this.startTime = null;
         this.skipped = false;
-        this.url = ((streams) => {
-            // Find the highest bitrate audio stream
-            var best;
-            for (var stream of streams) {
-                if (!best) {
-                    best = stream;
-                } else if (stream.codec != "opus") {
-                    continue;
-                } else if (stream.bitrateBps > best.bitrateBps) {
-                    best = stream;
-                }
-            }
-            return new URL(best.url);
-        })(video.fileDetails.audioStreams);
+        // this.url = ((streams) => {
+        //     // Find the highest bitrate audio stream
+        //     var best;
+        //     for (var stream of streams) {
+        //         if (!best) {
+        //             best = stream;
+        //         } else if (stream.codec != "opus") {
+        //             continue;
+        //         } else if (stream.bitrateBps > best.bitrateBps) {
+        //             best = stream;
+        //         }
+        //     }
+        //     return new URL(best.url);
+        // })(video.fileDetails.audioStreams);
+        this.stream = ytdl(`https://www.youtube.com/watch?v=${video.id}`, { "quality": "highestaudio" });
     }
 }
 
@@ -562,7 +561,7 @@ async function playCommand(interaction) {
         // Track cannot be played
         content = "**Issue Playing Track:**";
     } else {
-        content = await player.playOrQueue(new Track(video)) ? "**Now playing:**" : "**Added to the queue:**";
+        content = player.playOrQueue(new Track(video)) ? "**Now playing:**" : "**Added to the queue:**";
     }
     return { content: content, embeds: [createVideoEmbed(video)] };
 }
@@ -652,30 +651,35 @@ async function streamsCommand(interaction) {
         // URL does not correspond to a YouTube video
         return { content: "That URL does not correspond to a YouTube video.", ephemeral: true };
     }
-    interaction.deferReply();
+    await interaction.deferReply();
     const video = await getVideo(videoId);
     const embeds = [createVideoEmbed(video)];
     if (video === null || video.privacyStatus === "private" || video.ageRestricted) {
-        interaction.editReply({ content: "**Error getting audio streams:**", embeds: embeds });
+        await interaction.editReply({ content: "**Error getting audio streams:**", embeds: embeds });
         return null;
     }
-    for (const audioStream of video.fileDetails.audioStreams) {
+
+    let i = 0;
+    for (const audioStream of (await ytdl.getInfo(video.id)).formats.filter((format) => format.hasAudio && !format.hasVideo)) {
+        if (i == 25)
+            break;
         embeds.push(new EmbedBuilder()
             .setTitle("Audio Stream")
             .setURL(audioStream.url)
             .addFields(
-                { name: "Codec", value: audioStream.codec, inline: true },
-                { name: "Bitrate", value: audioStream.bitrateBps.toString(), inline: true },
-                { name: "Audio Channels", value: audioStream.channelCount.toString(), inline: true },
+                { name: "Codec", value: audioStream.audioCodec, inline: true },
+                { name: "Bitrate", value: audioStream.audioBitrate.toString(), inline: true },
+                { name: "Audio Channels", value: audioStream.audioChannels.toString(), inline: true },
                 {
                     name: "Size", value: audioStream.contentLength < 1024 ? audioStream.contentLength.toFixed(2) + "B" :
                         audioStream.contentLength < 1024 * 1024 ? (audioStream.contentLength / 1024).toFixed(2) + "kB" :
                             (audioStream.contentLength / 1024 / 1024).toFixed(2) + "MB"
                 })
             .setFooter({ text: "Expires " + new Date(Number(new URL(audioStream.url).searchParams.get("expire") * 1000)).toLocaleString() })
-            .data);
+            .toJSON());
+        i++;
     }
-    interaction.editReply({ content: "**Audio streams:**", embeds: embeds });
+    await interaction.editReply({ content: "**Audio streams:**", embeds: embeds });
     return null;
 }
 
@@ -704,8 +708,16 @@ async function downloadCommand(interaction) {
         interaction.editReply({ content: "**Issue Getting Track:**", embeds: [createVideoEmbed(video)] });
         return null;
     }
-    const vidPath = await download(new Track(video).url, `${videoId}.webm`);
-    if (vidPath === null) {
+    // const vidPath = await download(new Track(video).url, `${videoId}.webm`);
+    const vidPath = `${videoId}.webm`;
+    try {
+        await new Promise((resolve, reject) => {
+            const writeStream = createWriteStream(vidPath);
+            writeStream.once("error", (e) => { reject(e) });
+            writeStream.once("finish", () => { resolve() });
+            ytdl(`https://www.youtube.com/watch?v=${video.id}`, { quality: "highestaudio" }).pipe(writeStream);
+        })
+    } catch (e) {
         interaction.editReply("Something went wrong.");
         return null;
     }

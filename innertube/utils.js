@@ -1,6 +1,53 @@
 import { writeFileSync } from "fs";
 import { request } from "https";
 
+class MimeType {
+    constructor(type, subtype, parameters) {
+        if (typeof type !== "string")
+            throw new TypeError("type must be an instance of string");
+        if (typeof subtype !== "string")
+            throw new TypeError("subtype must be an instance of string");
+        if (parameters === undefined)
+            parameters = {};
+        if (typeof parameters !== "object" || parameters === null)
+            throw new TypeError("parameters must be an instance of a non-null object");
+        for (const value of Object.values(parameters))
+            if (typeof value !== "string")
+                throw new TypeError("parameters must be a dict of strings");
+        Object.defineProperties(this, {
+            "type": {
+                value: type
+            },
+            "subtype": {
+                value: subtype
+            },
+            "parameters": {
+                value: new Map(Object.entries(parameters))
+            }
+        });
+    }
+
+    static parse(str) {
+        if (typeof str !== "string")
+            throw new TypeError("str must be an instance of string");
+        if (!/^[A-Za-z0-9][A-Za-z0-9!#$&-^_]{0,126}\/[A-Za-z0-9][A-Za-z0-9!#$&-^_]{0,126}(; *[A-Za-z0-9][A-Za-z0-9!#$&-^_]{0,126}=[^;]+)+$/.test(str))
+            throw new Error(`could not parse "${str.replaceAll('"', '\\"')}"`);
+        let i = str.indexOf('/');
+        const type = str.substring(0, i);
+        const subtype = str.substring(i + 1, (i = str.indexOf(';')) !== -1 ? i : undefined).trimEnd();
+        const parameters = {};
+        let k, v;
+        while (i !== -1) {
+            k = str.substring(i + 1, i = str.indexOf('=', i + 1)).trim();
+            v = str.substring(i + 1, (i = str.indexOf(';', i + 1)) !== -1 ? i : undefined).trim();
+            if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"')
+                v = v.substring(1, v.length - 1);
+            parameters[k] = v;
+        }
+        return new MimeType(type, subtype, parameters);
+    }
+}
+
 export class Duration {
     total;
     seconds;
@@ -120,26 +167,25 @@ export async function requestAPI(path, body) {
 }
 
 export async function requestMusicAPI(path, body) {
-    const response = await httpsRequest(
+    const response = await fetch(
+        `https://music.youtube.com/youtubei/v1/${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`,
         {
-            hostname: "music.youtube.com",
-            path: `/youtubei/v1/${path}?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`,
             method: "POST",
             headers: {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
                 "Content-Type": "application/json"
-            }
-        },
-        JSON.stringify({
-            context: {
-                client: {
-                    clientName: "WEB_REMIX",
-                    clientVersion: "1.20230829.05.00",
-                }
             },
-            ...body
-        }));
-    response.body = JSON.parse(response.body);
+            body: JSON.stringify({
+                context: {
+                    client: {
+                        clientName: "WEB_REMIX",
+                        clientVersion: "1.20230829.05.00",
+                    }
+                },
+                ...body
+            })
+        }
+    );
     return response;
 }
 
@@ -174,4 +220,8 @@ export async function download(url, path) {
     }
     writeFileSync(path, Buffer.concat(data));
     return path;
+}
+
+export {
+    MimeType
 }
