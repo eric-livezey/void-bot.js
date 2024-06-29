@@ -1,4 +1,4 @@
-import { MimeType } from "./utils.js";
+import { MimeType, getRenderedText } from "./utils.js";
 
 const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
@@ -215,6 +215,7 @@ class Video {
     embedHtml;
     fileDetails;
     liveStreamingDetails;
+    playable;
 
     /**
      * @param {import("./rawTypes").RawPlayerData} data 
@@ -274,7 +275,7 @@ class Video {
             this.publishedAt = new Date(microformat.playerMicroformatRenderer.publishDate);
             this.category = microformat.playerMicroformatRenderer.category;
             this.regionRestriction = {
-                allowed: microformat.playerMicroformatRenderer.availableCountries
+                allowed: microformat.playerMicroformatRenderer.availableCountries || []
             };
             this.embedHtml = `\u003ciframe width=\"${microformat.playerMicroformatRenderer.embed.width}\" height=\"${microformat.playerMicroformatRenderer.embed.height}\" src=\"${microformat.playerMicroformatRenderer.embed.iframeUrl}\" frameborder=\"0\" allow=\"accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" allowfullscreen\u003e\u003c/iframe\u003e`;
             if ("liveBroadcastDetails" in microformat.playerMicroformatRenderer) {
@@ -353,6 +354,8 @@ class Video {
         this.ageRestricted = data.playabilityStatus.reason === "Sign in to confirm your age";
         this.uploadStatus = data.playabilityStatus.reason === "We're processing this video. Check back later." ? "uploaded" : "processed";
         this.embeddable = data.playabilityStatus.playableInEmbed;
+        const errorScreen = data.playabilityStatus.errorScreen;
+        this.playable = errorScreen && (errorScreen.playerLegacyDesktopYpcOfferRenderer || errorScreen.playerLegacyDesktopYpcTrailerRenderer || errorScreen.ypcTrailerRenderer) ? true : data.videoDetails && data.videoDetails.isUpcoming ? true : ["OK", "LIVE_STREAM_OFFLINE", "FULLSCREEN_ONLY"].includes(data.playabilityStatus.status);
     };
 }
 
@@ -373,7 +376,7 @@ class PlaylistItem {
      */
     constructor(data) {
         this.id = data.videoId;
-        this.title = data.title.runs.map(value => value.text).join(" ");
+        this.title = getRenderedText(data.title);
         this.thumbnails = {
             default: {
                 url: `https://i.ytimg.com/vi/${this.id}/default.jpg`,
@@ -401,10 +404,10 @@ class PlaylistItem {
                 height: 720
             }
         };
-        this.videoOwnerChannelTitle = data.shortBylineText.runs.map(value => value.text).join(" ");
+        this.videoOwnerChannelTitle = getRenderedText(data.shortBylineText);
         this.videoOwnerChannelId = data.shortBylineText.runs.find(value => value.navigationEndpoint && value.navigationEndpoint.browseEndpoint && value.navigationEndpoint.browseEndpoint.browseId).navigationEndpoint.browseEndpoint.browseId;
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
-        this.position = Number(data.index.simpleText);
+        this.position = Number(getRenderedText(data.index));
         this.videoId = this.id;
         this.privacyStatus = "public";
         this.duration = Number(data.lengthSeconds);
@@ -432,9 +435,9 @@ class Playlist {
             this.id = header.playlistHeaderRenderer.playlistId;
             if ("ownerEndpoint" in header.playlistHeaderRenderer)
                 this.channelId = header.playlistHeaderRenderer.ownerEndpoint.browseEndpoint.browseId;
-            this.title = header.playlistHeaderRenderer.title.simpleText;
+            this.title = getRenderedText(header.playlistHeaderRenderer.title);
             if ("descriptionText" in header.playlistHeaderRenderer)
-                this.description = header.playlistHeaderRenderer.descriptionText.simpleText;
+                this.description = getRenderedText(header.playlistHeaderRenderer.descriptionText);
             this.thumbnails = (thumbnailData => {
                 const thumbnails = {};
                 if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
@@ -472,9 +475,9 @@ class Playlist {
                 return thumbnails;
             })(header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails);
             if ("ownerText" in header.playlistHeaderRenderer)
-                this.channelTitle = header.playlistHeaderRenderer.ownerText.runs.map(value => value.text).join(" ");
+                this.channelTitle = getRenderedText(header.playlistHeaderRenderer.ownerText)
             else if ("subtitle" in header.playlistHeaderRenderer)
-                this.channelTitle = header.playlistHeaderRenderer.subtitle.simpleText;
+                this.channelTitle = getRenderedText(header.playlistHeaderRenderer.subtitle);
             this.privacyStatus = header.playlistHeaderRenderer.privacy.toLowerCase();
             this.itemCount = Number(header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]);
         } else {
@@ -526,9 +529,9 @@ class SearchResult {
             };
             if ("browseEndpoint" in videoRenderer.ownerText.runs[0].navigationEndpoint)
                 this.channelId = videoRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-            this.title = videoRenderer.title.runs.map(value => value.text).join(" ");
+            this.title = getRenderedText(videoRenderer.title)
             if ("detailedMetadataSnippets" in videoRenderer && "runs" in videoRenderer.detailedMetadataSnippets[0].snippetText)
-                this.description = videoRenderer.detailedMetadataSnippets[0].snippetText.runs.map(value => value.text).join(" ");
+                this.description = getRenderedText(videoRenderer.detailedMetadataSnippets[0].snippetText)
             this.thumbnails = {
                 default: {
                     url: `https://i.ytimg.com/vi/${this.id.videoId}/default.jpg`,
@@ -556,7 +559,7 @@ class SearchResult {
                     height: 720
                 }
             };
-            this.channelTitle = videoRenderer.ownerText.runs.map(value => value.text).join(" ");
+            this.channelTitle = getRenderedText(videoRenderer.ownerText)
             if ("badges" in videoRenderer)
                 this.liveBroadcastContent = videoRenderer.badges.find(value => value.metadataBadgeRenderer.label === "LIVE") ? "live" : "none";
         } else if ("channelRenderer" in data) {
@@ -566,9 +569,9 @@ class SearchResult {
                 channelId: channelRenderer.channelId
             };
             this.channelId = this.id.channelId;
-            this.title = channelRenderer.title.simpleText;
+            this.title = getRenderedText(channelRenderer.title);
             if ("descriptionSnippet" in channelRenderer)
-                this.description = channelRenderer.descriptionSnippet.runs.map(value => value.text).join(" ");
+                this.description = getRenderedText(channelRenderer.descriptionSnippet)
             this.thumbnails = {
                 default: {
                     url: "https:" + channelRenderer.thumbnail.thumbnails[0].url,
@@ -595,7 +598,7 @@ class SearchResult {
             };
             if ("browseEndpoint" in playlistRenderer.longBylineText.runs[0].navigationEndpoint)
                 this.channelId = playlistRenderer.longBylineText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-            this.title = playlistRenderer.title.simpleText;
+            this.title = getRenderedText(playlistRenderer.title);
             this.thumbnails = {
                 default: {
                     url: `https://i.ytimg.com/vi/${playlistRenderer.videos[0].childVideoRenderer.navigationEndpoint.watchEndpoint.videoId}/default.jpg`,
@@ -626,7 +629,7 @@ class SearchResult {
                     type: SearchResultType.PLAYLIST,
                     playlistId: universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.navigationEndpoint.watchPlaylistEndpoint.playlistId
                 };
-            this.title = universalWatchCardRenderer.header.watchCardRichHeaderRenderer.title.simpleText;
+            this.title = getRenderedText(universalWatchCardRenderer.header.watchCardRichHeaderRenderer.title);
             if ("singleHeroImageRenderer" in universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.heroImage && universalWatchCardRenderer.callToAction.watchCardHeroVideoRenderer.heroImage.singleHeroImageRenderer.style == "SINGLE_HERO_IMAGE_STYLE_SQUARE")
                 this.thumbnails = {
                     standard: {
@@ -635,7 +638,7 @@ class SearchResult {
                         height: 640
                     }
                 };
-            this.channelTitle = universalWatchCardRenderer.header.watchCardRichHeaderRenderer.subtitle.simpleText;
+            this.channelTitle = getRenderedText(universalWatchCardRenderer.header.watchCardRichHeaderRenderer.subtitle);
         }
     }
 }
@@ -853,8 +856,6 @@ async function refreshBearerToken() {
     BEARER_TOKEN.access_token = response.access_token;
     BEARER_TOKEN.expires = start + response.expires_in * 1000;
 }
-
-await getVideo("RuPr33Jk2A4");
 
 export {
     SearchResultType,

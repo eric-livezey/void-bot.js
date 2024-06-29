@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders, OutgoingHttpHeaders } from "http";
 import { RequestOptions } from "https";
+import { TextRenderer } from "./rawTypes";
 
 declare class MimeType {
     readonly type: string;
@@ -10,6 +11,8 @@ declare class MimeType {
 
     static parse(str: string): MimeType;
 }
+
+declare function getRenderedText(text: TextRenderer): string;
 
 export class Duration {
     total: number;
@@ -50,3 +53,8 @@ export function requestAPI(path: string, body: any): Promise<{
 export function requestMusicAPI(path: string, body: any): Promise<Response>;
 
 export function download(url: URL, path: string, method?: string, headers?: OutgoingHttpHeaders): Promise<string | null>;
+
+export {
+    MimeType,
+    getRenderedText
+}

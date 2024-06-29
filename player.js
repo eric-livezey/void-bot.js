@@ -1,10 +1,10 @@
-import { AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
+import { AudioPlayerStatus, AudioResource, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
 import { EmbedBuilder } from "discord.js";
 import EventEmitter from "ws";
 import ytdl from "ytdl-core";
 import { formatDurationMillis } from "./utils.js";
 import { PlaylistItem } from "./innertube/index.js";
-import fs, { existsSync } from "fs";
+import fs, { existsSync, write } from "fs";
 
 /**
  * @type {{[key: string]: Player}}
@@ -74,10 +74,10 @@ class Player extends EventEmitter.EventEmitter {
         this.queue = [];
         this.loop = false;
         this.volume = 1;
-        this.player.on("stateChange", (oldState, newState) => {
+        this.player.on("stateChange", async (oldState, newState) => {
             // play next track when the track finished
             if (oldState.status === AudioPlayerStatus.Playing && newState.status === AudioPlayerStatus.Idle)
-                this.#next();
+                await this.#next();
         });
         this.player.on("error", (e) => {
             // skip on error
@@ -86,25 +86,24 @@ class Player extends EventEmitter.EventEmitter {
         });
     }
 
-    #next() {
+    async #next() {
         if (this.loop && this.isPlaying) {
-            this.nowPlaying.resource = null;
-            this.play(this.nowPlaying);
+            await this.play(this.nowPlaying);
         } else if (this.queue.length > 0) {
-            this.play(this.queue.shift())
+            await this.play(this.queue.shift())
         } else {
             this.stop();
         }
         this.emit("next");
     }
 
-    play(track) {
+    async play(track) {
         if (!this.isReady) {
             this.stop();
             throw new Error("the audio connection was invalidated");
         }
-        if (track.resource === null)
-            track.resource = track.getResource();
+        if (track.resource === null || track.resource.started)
+            track.resource = await track.getResource();
         track.resource.volume.setVolume(this.volume);
         this.player.play(track.resource);
         if (this.isPaused)
@@ -112,7 +111,7 @@ class Player extends EventEmitter.EventEmitter {
         this.nowPlaying = track;
         // prepare the next track's resource
         if (this.queue.length > 0 && this.queue[0].resource === null)
-            this.queue[0].resource = this.queue[0].getResource();
+            this.queue[0].resource = await this.queue[0].getResource();
     }
 
     pause() {
@@ -133,9 +132,9 @@ class Player extends EventEmitter.EventEmitter {
         return false;
     }
 
-    skip() {
+    async skip() {
         this.loop = false;
-        this.#next();
+        await this.#next();
     }
 
     stop() {
@@ -145,14 +144,14 @@ class Player extends EventEmitter.EventEmitter {
         this.player.stop(true);
     }
 
-    enqueue(track) {
+    async enqueue(track) {
         if (!this.isPlaying) {
-            this.play(track);
+            await this.play(track);
             return true;
         }
         this.queue.push(track);
         if (this.queue.length === 1)
-            track.resource = track.getResource();
+            track.resource = await track.getResource();
         return false;
     }
 }
@@ -170,6 +169,7 @@ class Track {
         this.getResource = getResource;
         this.resource = null;
         this.title = title;
+        options = options || {};
         this.url = options.url || null;
         this.author = options.author || null;
         this.thumbnail = options.thumbnail || null;
@@ -197,11 +197,20 @@ class Track {
     /**
      * 
      * @param {ytdl.videoInfo} info 
+     * @param {*} download 
      * @returns 
      */
-    static fromVideoInfo(info) {
-        const getResource = () => createAudioResource(ytdl.downloadFromInfo(info, { quality: "highestaudio" }), { inlineVolume: true });
+    static fromVideoInfo(info, download) {
         const details = info.videoDetails;
+        const getResource = download ? async () => {
+            const path = `./audio/${details.videoId}.webm`;
+            return createAudioResource(fs.existsSync(path) ? path : await new Promise((resolve, reject) => {
+                const writeStream = fs.createWriteStream(path);
+                writeStream.once("finish", () => resolve(path));
+                writeStream.once("error", (e) => reject(e));
+                ytdl.downloadFromInfo(info, { quality: "highestaudio" }).pipe(writeStream);
+            }), { inlineVolume: true });
+        } : () => createAudioResource(ytdl.downloadFromInfo(info, { quality: "highestaudio" }), { inlineVolume: true });
         const title = details.title;
         const options = {};
         options.url = details.video_url;
@@ -211,12 +220,18 @@ class Track {
         return new Track(getResource, title, options);
     }
 
-    /**
-     * 
-     * @param {PlaylistItem} item 
-     */
-    static fromPlaylistItem(item) {
-        const getResource = () => createAudioResource(ytdl(item.id, { quality: "highestaudio" }), { inlineVolume: true });
+    static fromPlaylistItem(item, download) {
+        const getResource = download ?
+            async () => {
+                const path = `./audio/${item.id}.webm`;
+                return createAudioResource(fs.existsSync(path) ? path : await new Promise((resolve, reject) => {
+                    const writeStream = fs.createWriteStream(path);
+                    writeStream.once("finish", () => resolve(path));
+                    writeStream.once("error", (e) => reject(e));
+                    ytdl(item.id, { quality: "highestaudio" }).pipe(writeStream);
+                }), { inlineVolume: true })
+            } :
+            () => createAudioResource(ytdl(item.id, { quality: "highestaudio" }), { inlineVolume: true });
         const title = item.title;
         const options = {};
         options.url = `https://www.youtube.com/watch?v=${item.id}`;

@@ -53,21 +53,21 @@ declare class Player extends EventEmitter.EventEmitter {
      */
     constructor(id: Snowflake);
 
-    play(track: Track): void;
+    play(track: Track): Promise<void>;
 
     pause(): boolean;
 
     unpause(): boolean;
 
-    skip(): void;
+    skip(): Promise<void>;
 
     stop(): void;
 
-    enqueue(track: Track): boolean;
+    enqueue(track: Track): Promise<boolean>;
 }
 
-declare class Track<T = null> {
-    getResource: () => AudioResource<T>;
+declare class Track<T = unknown> {
+    getResource: () => Promise<AudioResource<T>> | AudioResource<T>;
     resource: AudioResource<T> | null;
     title: string;
     url: string | null;
@@ -83,7 +83,7 @@ declare class Track<T = null> {
      * @param title the title of the track
      * @param options additional info about the track
      */
-    constructor(getResource: () => AudioResource<T>, title: string, options?: { url?: string, author?: { title: string, url?: string, iconURL?: string }, thumbnail?: string, duration?: number });
+    constructor(getResource: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, options?: { url?: string, author?: { title: string, url?: string, iconURL?: string }, thumbnail?: string, duration?: number });
 
     /**
      * Returns an Embed reprentation of this track
@@ -95,10 +95,10 @@ declare class Track<T = null> {
      * 
      * @param info a videoInfo object to construct the track from
      */
-    static fromVideoInfo(info: ytdl.videoInfo): Track;
+    static fromVideoInfo(info: ytdl.videoInfo, download?: boolean): Track<null>;
 
 
-    static fromPlaylistItem(item: PlaylistItem): Track;
+    static fromPlaylistItem(item: PlaylistItem, download?: boolean): Track<null>;
 }
 
 /**

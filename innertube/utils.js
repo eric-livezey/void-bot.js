@@ -48,6 +48,14 @@ class MimeType {
     }
 }
 
+function getRenderedText(textRenderer) {
+    if (textRenderer.simpleText)
+        return textRenderer.simpleText;
+    if (textRenderer.runs)
+        return textRenderer.runs.map(run => run.text).join();
+    return "";
+}
+
 export class Duration {
     total;
     seconds;
@@ -223,5 +231,6 @@ export async function download(url, path) {
 }
 
 export {
-    MimeType
+    MimeType,
+    getRenderedText
 }
