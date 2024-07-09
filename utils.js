@@ -1,6 +1,3 @@
-import { Colors, EmbedBuilder } from "discord.js";
-import ytdl from "ytdl-core";
-
 class Duration {
     total;
     seconds;
@@ -43,4 +40,4 @@ export {
     Duration,
     formatDuration,
     formatDurationMillis
-}
+};
