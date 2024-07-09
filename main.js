@@ -1,13 +1,12 @@
-import { VoiceConnectionStatus, createAudioResource, getVoiceConnection, joinVoiceChannel } from "@discordjs/voice";
-import { Attachment, ChannelType, Client, EmbedBuilder, Events, Guild, GuildMember, Message, MessageFlags, Partials, PermissionsBitField, VoiceChannel } from "discord.js";
+import { joinVoiceChannel } from "@discordjs/voice";
+import { Attachment, Client, EmbedBuilder, Events, MessageFlags, Partials, VoiceChannel } from "discord.js";
 import { readFileSync } from "fs";
-import internal from "stream";
 import ytdl from "ytdl-core";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
 import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
 import { now } from "./innertube/utils.js";
 import { evaluate } from "./math.js";
-import { Player, Track, getPlayer } from "./player.js";
+import { Track, getPlayer } from "./player.js";
 import { formatDuration, formatDurationMillis } from "./utils.js";
 
 Object.assign(process.env, JSON.parse(readFileSync("./env.json")));
@@ -125,12 +124,12 @@ function createVoiceConnection(channel) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string} id 
  */
-async function playPlaylist_r(ctx, id) {
+async function playPlaylist_c(ctx, id) {
     // Get the playlist by id
     const playlist = await getPlaylist(id);
     if (playlist === null)
         return await ctx.reply("That is not a valid YouTube playlist link.");
-    const player = getPlayer(ctx.member.guild.id)
+    const player = getPlayer(ctx.guild.id)
     let totalAdded = 0;
     for (const listItem of await playlist.listItems()) {
         if (!player.isReady) {
@@ -162,11 +161,11 @@ async function playPlaylist_r(ctx, id) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {VoiceChannel | undefined} channel
  */
-async function connect_r(ctx, channel) {
+async function connect_c(ctx, channel) {
     channel = channel || ctx.member.voice.channel;
     if (!channel)
         return await ctx.reply("You are not in a voice channel.");
-    if ((await ctx.member.guild.members.fetchMe()).voice.channelId === channel.id)
+    if ((await ctx.guild.members.fetchMe()).voice.channelId === channel.id)
         return await ctx.reply("I am already in that channel");
     createVoiceConnection(channel);
     return await ctx.reply(`Connected to <#${channel.id}>.`);
@@ -175,8 +174,8 @@ async function connect_r(ctx, channel) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function disconnect_r(ctx) {
-    const me = await ctx.member.guild.members.fetchMe();
+async function disconnect_c(ctx) {
+    const me = await ctx.guild.members.fetchMe();
     const voice = me.voice;
     const channel = voice.channel;
     if (!channel)
@@ -192,20 +191,21 @@ async function disconnect_r(ctx) {
  * @param {string | undefined} query 
  * @param {Attachment | undefined} attachment
  */
-async function play_r(ctx, query, attachment) {
+async function play_c(ctx, query, attachment) {
+    // handle voice channel
     const channel = ctx.member.voice.channel;
     if (!channel)
         return await ctx.reply("You are not in a voice channel.");
-    if ((await ctx.member.guild.members.fetchMe()).voice.channelId !== channel.id)
+    if ((await ctx.guild.members.fetchMe()).voice.channelId !== channel.id)
         createVoiceConnection(channel);
 
-    const player = getPlayer(ctx.member.guild.id);
-    let track;
+    const player = getPlayer(ctx.guild.id);
+    let track = null;
     if (ctx.isInteraction())
         await ctx.interaction.deferReply();
     if (attachment) {
         // Create a track from the attachment
-        track = new Track(async () => createAudioResource(internal.Readable.fromWeb((await fetch(attachment.url)).body), { inlineVolume: true }), attachment.name, { url: attachment.url, duration: attachment.duration || undefined });
+        track = Track.fromURL(attachment.url, attachment.name, { url: attachment.url, duration: attachment.duration || undefined });
     } else if (query) {
         let id;
         // Check if the query is a URL
@@ -217,9 +217,12 @@ async function play_r(ctx, query, attachment) {
                 // Attempt to extract a playlist ID
                 const listId = extractPlaylistID(url);
                 if (listId !== null)
-                    return await playPlaylist_r(ctx, listId);
-                // Non youtube URL
-                track = new Track(async () => createAudioResource(internal.Readable.fromWeb((await fetch(url)).body), { inlineVolume: true }), url.pathname.substring(url.pathname.lastIndexOf('/') !== -1 ? url.pathname.lastIndexOf('/') + 1 : "Unknown Title"), { url: url.toString() });
+                    return await playPlaylist_c(ctx, listId);
+                // Non YouTube URL
+                if (ctx.user.id === process.env.OWNER) // owner only
+                    track = Track.fromURL(url);
+                else
+                    return await ctx.channel.send("That URL does not correspond to a YouTube video or playlist.");
             }
         } else {
             // Search
@@ -236,7 +239,7 @@ async function play_r(ctx, query, attachment) {
             // Retrieve the id of the first search result
             id = search.items[0].id.videoId;
         }
-        if (!track) {
+        if (track === null) {
             // Get the video info
             let info;
             try {
@@ -248,7 +251,7 @@ async function play_r(ctx, query, attachment) {
         }
     } else {
         // resume
-        return await resume_r(ctx);
+        return await resume_c(ctx);
     }
     return await ctx.reply({ content: await player.enqueue(track) ? "**Now Playing:**" : "**Added to the Queue:**", embeds: [track.toEmbed()] });
 }
@@ -256,7 +259,7 @@ async function play_r(ctx, query, attachment) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function skip_r(ctx) {
+async function skip_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
     if (!player.isPlaying)
@@ -273,7 +276,7 @@ async function skip_r(ctx) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function stop_r(ctx) {
+async function stop_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
     if (!player.isPlaying)
@@ -289,7 +292,7 @@ async function stop_r(ctx) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function pause_r(ctx) {
+async function pause_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
     if (!player.isPlaying)
@@ -299,7 +302,7 @@ async function pause_r(ctx) {
     if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return await ctx.reply("You must be in the same voice channel as the bot to use the command.");
     if (player.isPaused)
-        return await resume_r(ctx);
+        return await resume_c(ctx);
     player.pause();
     return await ctx.reply("Playback paused.")
 }
@@ -307,7 +310,7 @@ async function pause_r(ctx) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function resume_r(ctx) {
+async function resume_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
     if (!player.isPlaying)
@@ -326,8 +329,8 @@ async function resume_r(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {number} percentage
  */
-async function volume_r(ctx, percentage) {
-    const player = getPlayer(ctx.member.guild.id);
+async function volume_c(ctx, percentage) {
+    const player = getPlayer(ctx.guild.id);
     player.volume = percentage / 100;
     return await ctx.reply(`Volume set to ${percentage}%.`);
 }
@@ -335,8 +338,8 @@ async function volume_r(ctx, percentage) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function loop_r(ctx) {
-    const player = getPlayer(ctx.member.guild.id);
+async function loop_c(ctx) {
+    const player = getPlayer(ctx.guild.id);
     player.loop = !player.loop;
     return await ctx.reply("Loop " + (player.loop ? "enabled." : "disabled."));
 }
@@ -346,8 +349,8 @@ async function loop_r(ctx) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function nowPlaying_r(ctx) {
-    const player = getPlayer(ctx.member.guild.id);
+async function nowPlaying_c(ctx) {
+    const player = getPlayer(ctx.guild.id);
     if (!player.isPlaying)
         return await ctx.reply("Nothing is playing.");
     return await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] });
@@ -356,10 +359,10 @@ async function nowPlaying_r(ctx) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function queue_r(ctx) {
-    const player = getPlayer(ctx.member.guild.id);
+async function queue_c(ctx) {
+    const player = getPlayer(ctx.guild.id);
     if (player.queue.length === 0)
-        return await nowPlaying_r(ctx);
+        return await nowPlaying_c(ctx);
     let total = player.nowPlaying.duration / 1000;
     for (let i = 0; i < player.queue.length; i++)
         total += player.queue[i].duration / 1000;
@@ -381,8 +384,8 @@ async function queue_r(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {number} index
  */
-async function remove_r(ctx, index) {
-    const player = getPlayer(guild.id);
+async function remove_c(ctx, index) {
+    const player = getPlayer(ctx.guild.id);
     if (!player.isPlaying)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length === 0)
@@ -391,7 +394,7 @@ async function remove_r(ctx, index) {
         return await ctx.reply(`${index} is not a valid index in the queue.`);
     const track = player.queue.splice(index - 1, 1)[0];
     if (index === 1 && player.queue.length > 0 && player.queue[0].resource === null)
-        player.queue[0].resource = await player.queue[0].getResource();
+        player.queue[0].resource = player.queue[0].getResource();
     return await ctx.reply({ content: "**Removed:**", embeds: [track.toEmbed()] });
 }
 
@@ -400,8 +403,8 @@ async function remove_r(ctx, index) {
  * @param {number} source
  * @param {number} destination
  */
-async function move_r(ctx, source, destination) {
-    const player = getPlayer(ctx.member.guild.id);
+async function move_c(ctx, source, destination) {
+    const player = getPlayer(ctx.guild.id);
     if (!player.isPlaying)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
@@ -415,15 +418,15 @@ async function move_r(ctx, source, destination) {
     const track = player.queue.splice(source - 1, 1)[0];
     player.queue.splice(destination - 1, 0, track);
     if (destination === 1 && player.queue[0].resource === null)
-        player.queue[0].resource = await player.queue[0].getResource();
+        player.queue[0].resource = player.queue[0].getResource();
     return await ctx.reply(`Moved \`${track.title}\` to index ${destination} in the queue.`);
 }
 
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function shuffle_r(ctx) {
-    const player = getPlayer(ctx.member.guild.id);
+async function shuffle_c(ctx) {
+    const player = getPlayer(ctx.guild.id);
     if (!player.isPlaying)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
@@ -437,7 +440,7 @@ async function shuffle_r(ctx) {
             player.queue[randomIndex], player.queue[currentIndex]];
     }
     if (player.queue[0].resource === null)
-        player.queue[0].resource = await player.queue[0].getResource();
+        player.queue[0].resource = player.queue[0].getResource();
     return await ctx.reply("Queue shuffled.");
 }
 
@@ -445,8 +448,8 @@ async function shuffle_r(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {number} index
  */
-async function info_r(ctx, index) {
-    const player = getPlayer(ctx.member.guild.id);
+async function info_c(ctx, index) {
+    const player = getPlayer(ctx.guild.id);
     if (!player.isPlaying)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
@@ -462,7 +465,7 @@ async function info_r(ctx, index) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string} expression
  */
-async function evaluate_r(ctx, expression) {
+async function evaluate_c(ctx, expression) {
     try {
         return await ctx.reply(String(evaluate(expression)));
     } catch (e) {
@@ -473,7 +476,7 @@ async function evaluate_r(ctx, expression) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
-async function help_r(ctx) {
+async function help_c(ctx) {
     ctx.reply({
         embeds: [new EmbedBuilder().addFields(
             { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If any atachments are added, the bot will attempt to play them as audio, otherwise if no query is provided, attempts resume." },
@@ -521,7 +524,7 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
         }
         if (player.queue.length == 0) {
             // The queue is empty
-            var response = nowPlaying(interaction.guild)
+            var response = nowPlaying_c(interaction.guild)
             if (typeof response == "string") {
                 // Clear embeds
                 response = { content: response, embeds: [] };
@@ -567,21 +570,22 @@ CLIENT.on(Events.InteractionCreate, (interaction) => {
 CLIENT.on(Events.MessageCreate, async (message) => {
     if (message.channel.isDMBased()) {
         const channel = await CLIENT.channels.fetch("1008484508200357929");
-        if (channel !== null && channel.isTextBased())
-            channel.send(`From DM of <@${message.author.id}>:`);
-        channel.send({
-            content: message.content,
-            embeds: message.embeds.map(value => value.toJSON()),
-            files: message.attachments.map(value => value),
-            components: message.components.map(value => value.toJSON()),
-            poll: message.poll || undefined,
-            tts: false,
-            nonce: undefined,
-            enforceNonce: false,
-            reply: undefined,
-            stickers: message.stickers.map((value) => value),
-            flags: message.flags.remove(MessageFlags.Crossposted, MessageFlags.IsCrosspost, MessageFlags.SourceMessageDeleted, MessageFlags.Urgent, MessageFlags.HasThread, MessageFlags.Ephemeral, MessageFlags.Loading, MessageFlags.FailedToMentionSomeRolesInThread, MessageFlags.ShouldShowLinkNotDiscordWarning, MessageFlags.IsVoiceMessage)
-        });
+        if (channel !== null && channel.isTextBased()) {
+            await channel.send(`From DM of <@${message.author.id}>:`);
+            await channel.send({
+                content: message.content,
+                embeds: message.embeds.map(value => value.toJSON()),
+                files: message.attachments.map(value => value),
+                components: message.components.map(value => value.toJSON()),
+                poll: message.poll || undefined,
+                tts: false,
+                nonce: undefined,
+                enforceNonce: false,
+                reply: undefined,
+                stickers: message.stickers.map((value) => value),
+                flags: message.flags.remove(MessageFlags.Crossposted, MessageFlags.IsCrosspost, MessageFlags.SourceMessageDeleted, MessageFlags.Urgent, MessageFlags.HasThread, MessageFlags.Ephemeral, MessageFlags.Loading, MessageFlags.FailedToMentionSomeRolesInThread, MessageFlags.ShouldShowLinkNotDiscordWarning, MessageFlags.IsVoiceMessage)
+            });
+        }
     } else if (message.content.startsWith(PREFIX)) {
         // Parse command name and arguments
         const args = message.content.split(" ");
@@ -590,73 +594,53 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             const ctx = new MessageCommandContext(message);
             // Handle Command
             switch (cmd) {
-                // case "cookie":
-                //     if (message.author.id === "420741651804323843") {
-                //         if (args.length < 1) {
-                //             if ("cookie" in YT_HEADERS)
-                //                 delete YT_HEADERS["cookie"];
-                //             await ctx.reply("Cookie unset.";
-                //         } else {
-                //             YT_HEADERS["cookie"] = args[0];
-                //             await ctx.reply("Cookie set.";
-                //         }
-                //     } else {
-                //         await ctx.reply("You can't use this command."
-                //     }
-                //     break;
-                // case "id":
-                //     if (message.author.id === "420741651804323843") {
-                //         if (args.length < 1) {
-                //             if ("X-Youtube-Identity-Token" in YT_HEADERS)
-                //                 delete YT_HEADERS["X-Youtube-Identity-Token"];
-                //             await ctx.reply("ID unset.";
-                //         } else {
-                //             YT_HEADERS["X-Youtube-Identity-Token"] = args[0];
-                //             await ctx.reply("ID set.";
-                //         }
-                //     } else {
-                //         await ctx.reply("You can't use this command."
-                //     }
-                //     break;
                 case "join":
                 case "connect":
                     // Connect
-                    await connect_r(ctx/*, args.length <= 1 ? args[0] : undefined*/);
+                    let channel;
+                    if (args.length > 0) {
+                        channel = args[0];
+                        if (/<#[0-9]+>/.test(channel))
+                            channel = channel.substring(2, channel.length - 1);
+                        channel = await CLIENT.channels.fetch(channel).catch(() => null);
+                        channel = channel || undefined;
+                    }
+                    await connect_c(ctx, channel);
                     break;
                 case "leave":
                 case "disconnect":
                     // Disconnect
-                    await disconnect_r(ctx);
+                    await disconnect_c(ctx);
                     break;
                 case "play":
-                    await play_r(ctx, message.content.substring(cmd.length + 1).trim(), message.attachments.at(0));
+                    await play_c(ctx, message.content.substring(cmd.length + 1).trim(), message.attachments.at(0));
                     break;
                 case "pause":
                     // Pause
-                    await pause_r(ctx);
+                    await pause_c(ctx);
                     break;
                 case "unpause":
                 case "resume":
                     // Resume
-                    await resume_r(ctx);
+                    await resume_c(ctx);
                     break;
                 case "stop":
                     // Stop
-                    await stop_r(ctx);
+                    await stop_c(ctx);
                     break;
                 case "skip":
                     // Skip
-                    await skip_r(ctx);
+                    await skip_c(ctx);
                     break;
                 case "now-playing":
                 case "np":
                     // Now Playing
-                    await nowPlaying_r(ctx);
+                    await nowPlaying_c(ctx);
                     break;
                 case "queue":
                 case "q":
                     // Queue
-                    await queue_r(ctx);
+                    await queue_c(ctx);
                     break;
                 case "remove":
                     // Remove
@@ -665,7 +649,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+$/.test(args[0]))
                         await ctx.reply("Index must be a integer.");
                     else
-                        await remove_r(ctx, Number(args[0]));
+                        await remove_c(ctx, Number(args[0]));
                     break;
                 case "move":
                     // Move
@@ -676,14 +660,14 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+$/.test(args[0]) || !/^[0-9]+$/.test(args[1]))
                         await ctx.reply("Both indexes must be integers.");
                     else
-                        await move_r(ctx, Number(args[0]), Number(args[1]))
+                        await move_c(ctx, Number(args[0]), Number(args[1]))
                     break;
                 case "shuffle":
-                    await shuffle_r(ctx);
+                    await shuffle_c(ctx);
                     break;
                 case "loop":
                     // Loop
-                    await loop_r(ctx);
+                    await loop_c(ctx);
                     break;
                 case "info":
                 case "i":
@@ -693,7 +677,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+$/.test(args[0]))
                         await ctx.reply("Index must be an integer.");
                     else
-                        await ctx.reply(info_r(ctx, Number(args[0])));
+                        await ctx.reply(info_c(ctx, Number(args[0])));
                     break;
                 case "volume":
                     if (args.length < 1)
@@ -701,18 +685,18 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else if (!/^[0-9]+(\.[0-9]+)?$/.test(args[0]))
                         await ctx.reply("percentage must be a number.");
                     else
-                        await volume_r(ctx, Number(args[0]));
+                        await volume_c(ctx, Number(args[0]));
                     break;
                 case "evaluate":
                 case "eval":
                     // Evaluate
-                    await evaluate_r(ctx, args.join(""));
+                    await evaluate_c(ctx, args.join(""));
                     break;
                 case "help":
-                    await help_r(ctx);
+                    await help_c(ctx);
                     break;
                 case "exec":
-                    if (message.author.id === '420741651804323843') {
+                    if (message.author.id === process.env.OWNER) {
                         try {
                             eval(args.join(" "));
                             await ctx.reply("Code executed");

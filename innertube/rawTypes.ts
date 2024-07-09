@@ -58,6 +58,11 @@ interface LatencyClass {
 	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_ULTRA_LOW: "ULTRALOW"
 }
 
+type Parameter = {
+	key: string;
+	value: string;
+}
+
 type Range = {
 	start: string;
 	end: string;
@@ -123,8 +128,18 @@ type Thumbnail = {
 
 type NavigationEndpoint = {
 	clickTrackingParams: string;
+	loggingUrls?: LoggingURL[];
 	commandMetadata?: {
-		webCommandMetadata: {
+		interactionLoggingCommandMetadata?: {
+			loggingExpectations?: {
+				screenCreatedLoggingExpectations: {
+					expectedParentScreens: {
+						screenVeType: number;
+					}[];
+				};
+			};
+		};
+		webCommandMetadata?: {
 			url?: string;
 			sendPost?: boolean;
 			webPageType?: string;
@@ -186,6 +201,9 @@ type NavigationEndpoint = {
 			sourcePlaylistId?: string;
 		}[];
 	};
+	pingingEndpoint?: {
+		hack: boolean;
+	};
 }
 
 type Accessibility = {
@@ -194,7 +212,7 @@ type Accessibility = {
 	}
 };
 
-type URLData = {
+type LoggingURL = {
 	baseUrl: string;
 	headers?: {
 		headerType: string;
@@ -202,6 +220,16 @@ type URLData = {
 	attributionSrcMode?: string;
 	elapsedMediaTimeSeconds?: number;
 	offsetMilliseconds?: number;
+}
+
+type Icon = {
+	iconType: string;
+}
+
+type OverlayRenderer = {
+	text: TextRenderer;
+	style?: string;
+	icon?: Icon;
 }
 
 type TextRenderer = {
@@ -221,10 +249,7 @@ export type RawPlayerData = {
 		visitorData: string;
 		serviceTrackingParams: {
 			service: string;
-			params: {
-				key: string;
-				value: string;
-			}[];
+			params: Parameter[];
 		}[];
 		maxAgeSeconds: number;
 		mainAppWebResponseContext?: {
@@ -239,19 +264,17 @@ export type RawPlayerData = {
 		};
 	};
 	playabilityStatus: {
-		backgroundability?: {};
-		offlineability?: {};
+		backgroundability?: unknown;
+		offlineability?: unknown;
 		contextParams?: string;
-		pictureInPicture?: {};
+		pictureInPicture?: unknown;
 		playableInEmbed?: boolean;
 		status?: "OK" | "LIVE_STREAM_OFFLINE" | "FULLSCREEN_ONLY" | "LOGIN_REQUIRED" | "CONTENT_CHECK_REQUIRED" | "AGE_CHECK_REQUIRED";
-		ypcClickwrap?: {};
+		ypcClickwrap?: unknown;
 		errorScreen?: {
 			playerErrorMessageRenderer?: {
 				subreason?: TextRenderer;
-				icon?: {
-					iconType: string;
-				};
+				icon?: Icon;
 				reason?: TextRenderer;
 				thumbnail?: Thumbnail;
 				proceedButton?: {
@@ -386,15 +409,15 @@ export type RawPlayerData = {
 		};
 	}[];
 	playbackTracking?: {
-		videostatsPlaybackUrl: URLData;
-		videostatsDelayplayUrl: URLData;
-		videostatsWatchtimeUrl: URLData;
-		ptrackingUrl: URLData;
-		qoeUrl: URLData;
-		atrUrl: URLData;
+		videostatsPlaybackUrl: LoggingURL;
+		videostatsDelayplayUrl: LoggingURL;
+		videostatsWatchtimeUrl: LoggingURL;
+		ptrackingUrl: LoggingURL;
+		qoeUrl: LoggingURL;
+		atrUrl: LoggingURL;
 		videostatsScheduledFlushWalltimeSeconds: number[];
 		videostatsDefaultFlushIntervalSeconds: number;
-		youtubeRemarketingUrl?: URLData;
+		youtubeRemarketingUrl?: LoggingURL;
 	};
 	videoDetails?: {
 		videoId?: string;
@@ -1057,9 +1080,7 @@ export type RawPlayerData = {
 								buttonRenderer: {
 									style: string;
 									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									navigationEndpoint: NavigationEndpoint
 									trackingParams: string;
 								};
@@ -1122,9 +1143,7 @@ export type RawPlayerData = {
 																	style: string;
 																	size: string;
 																	isDisabled: boolean;
-																	icon: {
-																		iconType: string;
-																	};
+																	icon: Icon;
 																	trackingParams: string;
 																};
 															};
@@ -1134,9 +1153,7 @@ export type RawPlayerData = {
 													};
 												};
 											};
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											trackingParams: string;
 											accessibilityData: Accessibility;
 										};
@@ -1186,37 +1203,34 @@ export type RawPlayerData = {
 						renderingContent: {
 							instreamVideoAdRenderer: {
 								pings: {
-									impressionPings: URLData;
-									errorPings: URLData[];
-									mutePings: URLData[];
-									unmutePings: URLData[];
-									pausePings: URLData[];
-									rewindPings: URLData[];
-									resumePings: URLData[];
-									closePings: URLData[];
-									fullscreenPings: URLData[];
-									activeViewViewablePings?: URLData[];
-									endFullscreenPings: URLData[];
-									activeViewMeasurablePings?: URLData[];
-									abandonPings: URLData[];
-									activeViewFullyViewableAudibleHalfDurationPings?: URLData[];
-									startPings?: URLData[];
-									firstQuartilePings?: URLData[];
-									secondQuartilePings?: URLData[];
-									thirdQuartilePings?: URLData[];
-									completePings?: URLData[];
+									impressionPings: LoggingURL;
+									errorPings: LoggingURL[];
+									mutePings: LoggingURL[];
+									unmutePings: LoggingURL[];
+									pausePings: LoggingURL[];
+									rewindPings: LoggingURL[];
+									resumePings: LoggingURL[];
+									closePings: LoggingURL[];
+									fullscreenPings: LoggingURL[];
+									activeViewViewablePings?: LoggingURL[];
+									endFullscreenPings: LoggingURL[];
+									activeViewMeasurablePings?: LoggingURL[];
+									abandonPings: LoggingURL[];
+									activeViewFullyViewableAudibleHalfDurationPings?: LoggingURL[];
+									startPings?: LoggingURL[];
+									firstQuartilePings?: LoggingURL[];
+									secondQuartilePings?: LoggingURL[];
+									thirdQuartilePings?: LoggingURL[];
+									completePings?: LoggingURL[];
 									activeViewTracking?: {
 										trafficType: string;
 									};
-									progressPings?: URLData[];
-									skipPings?: URLData[];
-									clickthroughPings?: URLData[];
+									progressPings?: LoggingURL[];
+									skipPings?: LoggingURL[];
+									clickthroughPings?: LoggingURL[];
 								};
 								clickthroughEndpoint: NavigationEndpoint;
-								csiParameters: {
-									key: string;
-									value: string;
-								}[];
+								csiParameters: Parameter[];
 								playerVars: string;
 								elementId: string;
 								trackingParams: string;
@@ -1342,35 +1356,11 @@ export type RawPlayerData = {
 					endMs: string;
 					title: TextRenderer;
 					metadata: TextRenderer;
-					endpoint: {
-						clickTrackingParams: string;
-						commandMetadata: {
-							interactionLoggingCommandMetadata: {
-								loggingExpectations?: {
-									screenCreatedLoggingExpectations: {
-										expectedParentScreens: {
-											screenVeType: number;
-										}[];
-									};
-								};
-							};
-							webCommandMetadata?: {
-								url: string;
-								webPageType: string;
-								rootVe: number;
-							};
-						};
-						watchEndpoint: {
-							videoId: string;
-						};
-					};
+					endpoint: NavigationEndpoint;
 					trackingParams: string;
 					id: string;
 					thumbnailOverlays: {
-						thumbnailOverlayTimeStatusRenderer: {
-							text: TextRenderer;
-							style: string;
-						};
+						thumbnailOverlayTimeStatusRenderer: OverlayRenderer;
 					}[];
 				};
 			}[];
@@ -1396,9 +1386,7 @@ export type RawPlayerData = {
 					};
 				};
 			};
-			icon: {
-				iconType: string;
-			};
+			icon: Icon;
 			showInPip: boolean;
 			trackingParams: string;
 		};
@@ -1415,10 +1403,7 @@ export type RawSearchData = {
 		visitorData: string;
 		serviceTrackingParams: {
 			service: string;
-			params: {
-				key: string;
-				value: string;
-			}[];
+			params: Parameter[];
 		}[];
 		mainAppWebResponseContext: {
 			loggedOut: boolean;
@@ -1469,7 +1454,7 @@ export type RawSearchData = {
 																lengthText: TextRenderer;
 																navigationEndpoint: {
 																	clickTrackingParams: string;
-																	loggingUrls: URLData[];
+																	loggingUrls: LoggingURL[];
 																	commandMetadata: {
 																		webCommandMetadata: {
 																			url: string;
@@ -1493,9 +1478,7 @@ export type RawSearchData = {
 																	buttonRenderer: {
 																		style: string;
 																		text: TextRenderer;
-																		icon: {
-																			iconType: string;
-																		};
+																		icon: Icon;
 																		trackingParams: string;
 																		command: {
 																			clickTrackingParams: string;
@@ -1538,18 +1521,11 @@ export type RawSearchData = {
 																	};
 																};
 																thumbnailOverlays: {
-																	thumbnailOverlayTimeStatusRenderer?: {
-																		text: TextRenderer;
-																		style: string;
-																	};
+																	thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
 																	thumbnailOverlayToggleButtonRenderer?: {
 																		isToggled: boolean;
-																		untoggledIcon: {
-																			iconType: string;
-																		};
-																		toggledIcon: {
-																			iconType: string;
-																		};
+																		untoggledIcon: Icon;
+																		toggledIcon: Icon;
 																		untoggledTooltip: string;
 																		toggledTooltip: string;
 																		untoggledServiceEndpoint: NavigationEndpoint;
@@ -1560,20 +1536,8 @@ export type RawSearchData = {
 																	};
 																}[];
 																activeView: {
-																	viewableCommands: {
-																		clickTrackingParams: string;
-																		loggingUrls: URLData[];
-																		pingingEndpoint: {
-																			hack: boolean;
-																		};
-																	}[];
-																	endOfSessionCommands: {
-																		clickTrackingParams: string;
-																		loggingUrls: URLData[];
-																		pingingEndpoint: {
-																			hack: boolean;
-																		};
-																	}[];
+																	viewableCommands: NavigationEndpoint[];
+																	endOfSessionCommands: NavigationEndpoint[];
 																	regexUriMacroValidator: {
 																		emptyMap: boolean;
 																	};
@@ -1609,9 +1573,7 @@ export type RawSearchData = {
 									};
 									ownerBadges: {
 										metadataBadgeRenderer: {
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											style: string;
 											tooltip: string;
 											trackingParams: string;
@@ -1702,16 +1664,12 @@ export type RawSearchData = {
 															accessibilityData?: {
 																label: string;
 															};
-															icon?: {
-																iconType: string;
-															};
+															icon?: Icon;
 														};
 													}[];
 													ownerBadges?: {
 														metadataBadgeRenderer: {
-															icon: {
-																iconType: string;
-															};
+															icon: Icon;
 															style: string;
 															tooltip: string;
 															trackingParams: string;
@@ -1730,9 +1688,7 @@ export type RawSearchData = {
 															items: {
 																menuServiceItemRenderer: {
 																	text: TextRenderer;
-																	icon: {
-																		iconType: string;
-																	};
+																	icon: Icon;
 																	serviceEndpoint: {
 																		clickTrackingParams: string;
 																		commandMetadata: {
@@ -1801,17 +1757,10 @@ export type RawSearchData = {
 														};
 													};
 													thumbnailOverlays: {
-														thumbnailOverlayTimeStatusRenderer?: {
-															text: TextRenderer;
-															style: string;
-														};
+														thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
 														thumbnailOverlayToggleButtonRenderer?: {
-															untoggledIcon: {
-																iconType: string;
-															};
-															toggledIcon: {
-																iconType: string;
-															};
+															untoggledIcon: Icon;
+															toggledIcon: Icon;
 															untoggledTooltip: string;
 															toggledTooltip: string;
 															untoggledServiceEndpoint: {
@@ -1849,18 +1798,9 @@ export type RawSearchData = {
 															isToggled?: boolean;
 															toggledServiceEndpoint?: NavigationEndpoint;
 														};
-														thumbnailOverlayNowPlayingRenderer?: {
-															text: TextRenderer;
-														};
-														thumbnailOverlayLoadingPreviewRenderer?: {
-															text: TextRenderer;
-														};
-														thumbnailOverlayInlineUnplayableRenderer?: {
-															text: TextRenderer;
-															icon: {
-																iconType: string;
-															};
-														};
+														thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
+														thumbnailOverlayLoadingPreviewRenderer?: OverlayRenderer;
+														thumbnailOverlayInlineUnplayableRenderer?: OverlayRenderer;
 													}[];
 													detailedMetadataSnippets?: {
 														snippetText: TextRenderer;
@@ -1879,10 +1819,7 @@ export type RawSearchData = {
 														watchEndpoint: {
 															videoId: string;
 															playerParams: string;
-															playerExtraUrlParams: {
-																key: string;
-																value: string;
-															}[];
+															playerExtraUrlParams: Parameter[];
 															watchEndpointSupportedOnesieConfig: {
 																html5PlaybackOnesieConfig: {
 																	commonConfig: {
@@ -1982,9 +1919,7 @@ export type RawSearchData = {
 																			style: string;
 																			size: string;
 																			isDisabled: boolean;
-																			icon: {
-																				iconType: string;
-																			};
+																			icon: Icon;
 																			trackingParams: string;
 																		};
 																	};
@@ -1993,9 +1928,7 @@ export type RawSearchData = {
 																			style: string;
 																			size: string;
 																			isDisabled: boolean;
-																			icon: {
-																				iconType: string;
-																			};
+																			icon: Icon;
 																			trackingParams: string;
 																		};
 																	};
@@ -2006,9 +1939,7 @@ export type RawSearchData = {
 																	style: string;
 																	size: string;
 																	isDisabled: boolean;
-																	icon: {
-																		iconType: string;
-																	};
+																	icon: Icon;
 																	trackingParams: string;
 																	accessibilityData: Accessibility;
 																};
@@ -2018,9 +1949,7 @@ export type RawSearchData = {
 																	style: string;
 																	size: string;
 																	isDisabled: boolean;
-																	icon: {
-																		iconType: string;
-																	};
+																	icon: Icon;
 																	trackingParams: string;
 																	accessibilityData: Accessibility;
 																};
@@ -2149,16 +2078,12 @@ export type RawSearchData = {
 											accessibilityData?: {
 												label: string;
 											};
-											icon?: {
-												iconType: string;
-											};
+											icon?: Icon;
 										};
 									}[];
 									ownerBadges?: {
 										metadataBadgeRenderer: {
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											style: string;
 											tooltip: string;
 											trackingParams: string;
@@ -2177,9 +2102,7 @@ export type RawSearchData = {
 											items: {
 												menuServiceItemRenderer: {
 													text: TextRenderer;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													serviceEndpoint: {
 														clickTrackingParams: string;
 														commandMetadata: {
@@ -2249,12 +2172,8 @@ export type RawSearchData = {
 									};
 									thumbnailOverlays: {
 										thumbnailOverlayToggleButtonRenderer?: {
-											untoggledIcon: {
-												iconType: string;
-											};
-											toggledIcon: {
-												iconType: string;
-											};
+											untoggledIcon: Icon;
+											toggledIcon: Icon;
 											untoggledTooltip: string;
 											toggledTooltip: string;
 											untoggledServiceEndpoint: {
@@ -2292,25 +2211,10 @@ export type RawSearchData = {
 											isToggled?: boolean;
 											toggledServiceEndpoint?: NavigationEndpoint;
 										};
-										thumbnailOverlayNowPlayingRenderer?: {
-											text: TextRenderer;
-										};
-										thumbnailOverlayLoadingPreviewRenderer?: {
-											text: TextRenderer;
-										};
-										thumbnailOverlayTimeStatusRenderer?: {
-											text: TextRenderer;
-											style: string;
-											icon?: {
-												iconType: string;
-											};
-										};
-										thumbnailOverlayInlineUnplayableRenderer?: {
-											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
-										};
+										thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
+										thumbnailOverlayLoadingPreviewRenderer?: OverlayRenderer;
+										thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
+										thumbnailOverlayInlineUnplayableRenderer?: OverlayRenderer;
 									}[];
 									detailedMetadataSnippets?: {
 										snippetText: TextRenderer;
@@ -2330,10 +2234,7 @@ export type RawSearchData = {
 											videoId: string;
 											params: string;
 											playerParams: string;
-											playerExtraUrlParams: {
-												key: string;
-												value: string;
-											}[];
+											playerExtraUrlParams: Parameter[];
 											watchEndpointSupportedOnesieConfig: {
 												html5PlaybackOnesieConfig: {
 													commonConfig: {
@@ -2432,9 +2333,7 @@ export type RawSearchData = {
 															style: string;
 															size: string;
 															isDisabled: boolean;
-															icon: {
-																iconType: string;
-															};
+															icon: Icon;
 															trackingParams: string;
 														};
 													};
@@ -2443,9 +2342,7 @@ export type RawSearchData = {
 															style: string;
 															size: string;
 															isDisabled: boolean;
-															icon: {
-																iconType: string;
-															};
+															icon: Icon;
 															trackingParams: string;
 														};
 													};
@@ -2456,9 +2353,7 @@ export type RawSearchData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 													accessibilityData: Accessibility;
 												};
@@ -2468,9 +2363,7 @@ export type RawSearchData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 													accessibilityData: Accessibility;
 												};
@@ -2530,9 +2423,7 @@ export type RawSearchData = {
 											items: {
 												menuNavigationItemRenderer: {
 													text: TextRenderer;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													navigationEndpoint: {
 														clickTrackingParams: string;
 														commandMetadata: {
@@ -2542,10 +2433,7 @@ export type RawSearchData = {
 														};
 														userFeedbackEndpoint: {
 															additionalDatas: {
-																userFeedbackEndpointProductSpecificValueData: {
-																	key: string;
-																	value: string;
-																};
+																userFeedbackEndpointProductSpecificValueData: Parameter;
 															}[];
 														};
 													};
@@ -2616,9 +2504,7 @@ export type RawSearchData = {
 													items: {
 														menuNavigationItemRenderer: {
 															text: TextRenderer;
-															icon: {
-																iconType: string;
-															};
+															icon: Icon;
 															navigationEndpoint: {
 																clickTrackingParams: string;
 																commandMetadata: {
@@ -2628,10 +2514,7 @@ export type RawSearchData = {
 																};
 																userFeedbackEndpoint: {
 																	additionalDatas: {
-																		userFeedbackEndpointProductSpecificValueData: {
-																			key: string;
-																			value: string;
-																		};
+																		userFeedbackEndpointProductSpecificValueData: Parameter;
 																	}[];
 																};
 															};
@@ -2659,10 +2542,7 @@ export type RawSearchData = {
 												watchEndpoint: {
 													videoId: string;
 													playerParams: string;
-													playerExtraUrlParams: {
-														key: string;
-														value: string;
-													}[];
+													playerExtraUrlParams: Parameter[];
 													watchEndpointSupportedOnesieConfig: {
 														html5PlaybackOnesieConfig: {
 															commonConfig: {
@@ -2682,9 +2562,7 @@ export type RawSearchData = {
 										};
 									}[];
 									trackingParams: string;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 								};
 								radioRenderer?: {
 									playlistId: string;
@@ -2777,19 +2655,10 @@ export type RawSearchData = {
 									longBylineText: TextRenderer;
 									thumbnailOverlays: {
 										thumbnailOverlayBottomPanelRenderer?: {
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 										};
-										thumbnailOverlayHoverTextRenderer?: {
-											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
-										};
-										thumbnailOverlayNowPlayingRenderer?: {
-											text: TextRenderer;
-										};
+										thumbnailOverlayHoverTextRenderer?: OverlayRenderer;
+										thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 									}[];
 									videoCountShortText: TextRenderer;
 								};
@@ -2820,9 +2689,7 @@ export type RawSearchData = {
 										richListHeaderRenderer: {
 											title: TextRenderer;
 											trackingParams: string;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 										};
 									};
 									style: {
@@ -2833,9 +2700,7 @@ export type RawSearchData = {
 											style: string;
 											size: string;
 											isDisabled: boolean;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											trackingParams: string;
 										};
 									};
@@ -2844,9 +2709,7 @@ export type RawSearchData = {
 											style: string;
 											size: string;
 											isDisabled: boolean;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											trackingParams: string;
 										};
 									};
@@ -2854,9 +2717,7 @@ export type RawSearchData = {
 								backgroundPromoRenderer?: {
 									title: TextRenderer;
 									bodyText: TextRenderer;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									trackingParams: string;
 									style: {
 										value: string;
@@ -2935,9 +2796,7 @@ export type RawSearchData = {
 									longBylineText: TextRenderer;
 									ownerBadges?: {
 										metadataBadgeRenderer: {
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											style: string;
 											tooltip: string;
 											trackingParams: string;
@@ -2994,21 +2853,9 @@ export type RawSearchData = {
 										};
 									};
 									thumbnailOverlays: {
-										thumbnailOverlayBottomPanelRenderer?: {
-											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
-										};
-										thumbnailOverlayHoverTextRenderer?: {
-											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
-										};
-										thumbnailOverlayNowPlayingRenderer?: {
-											text: TextRenderer;
-										};
+										thumbnailOverlayBottomPanelRenderer?: OverlayRenderer;
+										thumbnailOverlayHoverTextRenderer?: OverlayRenderer;
+										thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 									}[];
 									publishedTimeText?: TextRenderer;
 								};
@@ -3081,9 +2928,7 @@ export type RawSearchData = {
 									};
 									titleBadge?: {
 										metadataBadgeRenderer: {
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											style: string;
 											tooltip: string;
 											trackingParams: string;
@@ -3165,9 +3010,7 @@ export type RawSearchData = {
 									callToActionButton: {
 										callToActionButtonRenderer: {
 											label: TextRenderer;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											style: string;
 										};
 									};
@@ -3280,9 +3123,7 @@ export type RawSearchData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 												};
 											};
@@ -3291,9 +3132,7 @@ export type RawSearchData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 												};
 											};
@@ -3335,9 +3174,7 @@ export type RawSearchData = {
 							style: string;
 							size: string;
 							isDisabled: boolean;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							accessibility: {
 								label: string;
 							};
@@ -3349,9 +3186,7 @@ export type RawSearchData = {
 							style: string;
 							size: string;
 							isDisabled: boolean;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							accessibility: {
 								label: string;
 							};
@@ -3373,9 +3208,7 @@ export type RawSearchData = {
 					size: string;
 					isDisabled: boolean;
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					tooltip: string;
 					trackingParams: string;
 					accessibilityData: Accessibility;
@@ -3428,9 +3261,7 @@ export type RawSearchData = {
 		desktopTopbarRenderer: {
 			logo: {
 				topbarLogoRenderer: {
-					iconImage: {
-						iconType: string;
-					};
+					iconImage: Icon;
 					tooltipText: TextRenderer;
 					endpoint: {
 						clickTrackingParams: string;
@@ -3452,9 +3283,7 @@ export type RawSearchData = {
 			};
 			searchbox: {
 				fusionSearchboxRenderer: {
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					placeholderText: TextRenderer;
 					config: {
 						webSearchboxConfig: {
@@ -3483,9 +3312,7 @@ export type RawSearchData = {
 							style: string;
 							size: string;
 							isDisabled: boolean;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							trackingParams: string;
 							accessibilityData: Accessibility;
 						};
@@ -3495,9 +3322,7 @@ export type RawSearchData = {
 			trackingParams: string;
 			topbarButtons: {
 				topbarMenuButtonRenderer?: {
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					menuRequest: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -3533,9 +3358,7 @@ export type RawSearchData = {
 					style: string;
 					size: string;
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					navigationEndpoint: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -3687,9 +3510,7 @@ export type RawSearchData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 													accessibilityData: Accessibility;
 												};
@@ -3703,9 +3524,7 @@ export type RawSearchData = {
 							}[];
 						};
 					};
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					tooltip: string;
 					trackingParams: string;
 					accessibilityData: Accessibility;
@@ -3785,9 +3604,7 @@ export type RawSearchData = {
 							}[];
 							ownerBadges?: {
 								metadataBadgeRenderer: {
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									style: string;
 									tooltip: string;
 									trackingParams: string;
@@ -3806,9 +3623,7 @@ export type RawSearchData = {
 									items: {
 										menuServiceItemRenderer: {
 											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											serviceEndpoint: {
 												clickTrackingParams: string;
 												commandMetadata: {
@@ -3877,17 +3692,10 @@ export type RawSearchData = {
 								};
 							};
 							thumbnailOverlays: {
-								thumbnailOverlayTimeStatusRenderer?: {
-									text: TextRenderer;
-									style: string;
-								};
+								thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
 								thumbnailOverlayToggleButtonRenderer?: {
-									untoggledIcon: {
-										iconType: string;
-									};
-									toggledIcon: {
-										iconType: string;
-									};
+									untoggledIcon: Icon;
+									toggledIcon: Icon;
 									untoggledTooltip: string;
 									toggledTooltip: string;
 									untoggledServiceEndpoint: {
@@ -3925,12 +3733,8 @@ export type RawSearchData = {
 									isToggled?: boolean;
 									toggledServiceEndpoint?: NavigationEndpoint;
 								};
-								thumbnailOverlayNowPlayingRenderer?: {
-									text: TextRenderer;
-								};
-								thumbnailOverlayLoadingPreviewRenderer?: {
-									text: TextRenderer;
-								};
+								thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
+								thumbnailOverlayLoadingPreviewRenderer?: OverlayRenderer;
 							}[];
 							detailedMetadataSnippets?: {
 								snippetText: TextRenderer;
@@ -3950,10 +3754,7 @@ export type RawSearchData = {
 									videoId: string;
 									params: string;
 									playerParams: string;
-									playerExtraUrlParams: {
-										key: string;
-										value: string;
-									}[];
+									playerExtraUrlParams: Parameter[];
 									watchEndpointSupportedOnesieConfig: {
 										html5PlaybackOnesieConfig: {
 											commonConfig: {
@@ -4062,21 +3863,9 @@ export type RawSearchData = {
 								};
 							};
 							thumbnailOverlays: {
-								thumbnailOverlayBottomPanelRenderer?: {
-									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
-								};
-								thumbnailOverlayHoverTextRenderer?: {
-									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
-								};
-								thumbnailOverlayNowPlayingRenderer?: {
-									text: TextRenderer;
-								};
+								thumbnailOverlayBottomPanelRenderer?: OverlayRenderer;
+								thumbnailOverlayHoverTextRenderer?: OverlayRenderer;
+								thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 							}[];
 						};
 						reelShelfRenderer?: {
@@ -4086,9 +3875,7 @@ export type RawSearchData = {
 									items: {
 										menuNavigationItemRenderer: {
 											text: TextRenderer;
-											icon: {
-												iconType: string;
-											};
+											icon: Icon;
 											navigationEndpoint: {
 												clickTrackingParams: string;
 												commandMetadata: {
@@ -4098,10 +3885,7 @@ export type RawSearchData = {
 												};
 												userFeedbackEndpoint: {
 													additionalDatas: {
-														userFeedbackEndpointProductSpecificValueData: {
-															key: string;
-															value: string;
-														};
+														userFeedbackEndpointProductSpecificValueData: Parameter;
 													}[];
 												};
 											};
@@ -4172,9 +3956,7 @@ export type RawSearchData = {
 											items: {
 												menuNavigationItemRenderer: {
 													text: TextRenderer;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													navigationEndpoint: {
 														clickTrackingParams: string;
 														commandMetadata: {
@@ -4184,10 +3966,7 @@ export type RawSearchData = {
 														};
 														userFeedbackEndpoint: {
 															additionalDatas: {
-																userFeedbackEndpointProductSpecificValueData: {
-																	key: string;
-																	value: string;
-																};
+																userFeedbackEndpointProductSpecificValueData: Parameter;
 															}[];
 														};
 													};
@@ -4215,10 +3994,7 @@ export type RawSearchData = {
 										watchEndpoint: {
 											videoId: string;
 											playerParams: string;
-											playerExtraUrlParams: {
-												key: string;
-												value: string;
-											}[];
+											playerExtraUrlParams: Parameter[];
 											watchEndpointSupportedOnesieConfig: {
 												html5PlaybackOnesieConfig: {
 													commonConfig: {
@@ -4238,9 +4014,7 @@ export type RawSearchData = {
 								};
 							}[];
 							trackingParams: string;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 						};
 					}[];
 					trackingParams: string;
@@ -4286,9 +4060,7 @@ export type RawSearchResultData = {
 		};
 		ownerBadges: {
 			metadataBadgeRenderer: {
-				icon: {
-					iconType: string;
-				};
+				icon: Icon;
 				style: string;
 				tooltip: string;
 				trackingParams: string;
@@ -4408,16 +4180,12 @@ export type RawSearchResultData = {
 				accessibilityData?: {
 					label: string;
 				};
-				icon?: {
-					iconType: string;
-				};
+				icon?: Icon;
 			};
 		}[];
 		ownerBadges?: {
 			metadataBadgeRenderer: {
-				icon: {
-					iconType: string;
-				};
+				icon: Icon;
 				style: string;
 				tooltip: string;
 				trackingParams: string;
@@ -4436,9 +4204,7 @@ export type RawSearchResultData = {
 				items: {
 					menuServiceItemRenderer: {
 						text: TextRenderer;
-						icon: {
-							iconType: string;
-						};
+						icon: Icon;
 						serviceEndpoint: {
 							clickTrackingParams: string;
 							commandMetadata: {
@@ -4508,12 +4274,8 @@ export type RawSearchResultData = {
 		};
 		thumbnailOverlays: {
 			thumbnailOverlayToggleButtonRenderer?: {
-				untoggledIcon: {
-					iconType: string;
-				};
-				toggledIcon: {
-					iconType: string;
-				};
+				untoggledIcon: Icon;
+				toggledIcon: Icon;
 				untoggledTooltip: string;
 				toggledTooltip: string;
 				untoggledServiceEndpoint: {
@@ -4551,25 +4313,10 @@ export type RawSearchResultData = {
 				isToggled?: boolean;
 				toggledServiceEndpoint?: NavigationEndpoint;
 			};
-			thumbnailOverlayNowPlayingRenderer?: {
-				text: TextRenderer;
-			};
-			thumbnailOverlayLoadingPreviewRenderer?: {
-				text: TextRenderer;
-			};
-			thumbnailOverlayTimeStatusRenderer?: {
-				text: TextRenderer;
-				style: string;
-				icon?: {
-					iconType: string;
-				};
-			};
-			thumbnailOverlayInlineUnplayableRenderer?: {
-				text: TextRenderer;
-				icon: {
-					iconType: string;
-				};
-			};
+			thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
+			thumbnailOverlayLoadingPreviewRenderer?: OverlayRenderer;
+			thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
+			thumbnailOverlayInlineUnplayableRenderer?: OverlayRenderer;
 		}[];
 		detailedMetadataSnippets?: {
 			snippetText: TextRenderer;
@@ -4589,10 +4336,7 @@ export type RawSearchResultData = {
 				videoId: string;
 				params: string;
 				playerParams: string;
-				playerExtraUrlParams: {
-					key: string;
-					value: string;
-				}[];
+				playerExtraUrlParams: Parameter[];
 				watchEndpointSupportedOnesieConfig: {
 					html5PlaybackOnesieConfig: {
 						commonConfig: {
@@ -4691,9 +4435,7 @@ export type RawSearchResultData = {
 								style: string;
 								size: string;
 								isDisabled: boolean;
-								icon: {
-									iconType: string;
-								};
+								icon: Icon;
 								trackingParams: string;
 							};
 						};
@@ -4702,9 +4444,7 @@ export type RawSearchResultData = {
 								style: string;
 								size: string;
 								isDisabled: boolean;
-								icon: {
-									iconType: string;
-								};
+								icon: Icon;
 								trackingParams: string;
 							};
 						};
@@ -4715,9 +4455,7 @@ export type RawSearchResultData = {
 						style: string;
 						size: string;
 						isDisabled: boolean;
-						icon: {
-							iconType: string;
-						};
+						icon: Icon;
 						trackingParams: string;
 						accessibilityData: Accessibility;
 					};
@@ -4727,9 +4465,7 @@ export type RawSearchResultData = {
 						style: string;
 						size: string;
 						isDisabled: boolean;
-						icon: {
-							iconType: string;
-						};
+						icon: Icon;
 						trackingParams: string;
 						accessibilityData: Accessibility;
 					};
@@ -4858,9 +4594,7 @@ export type RawSearchResultData = {
 		longBylineText: TextRenderer;
 		ownerBadges?: {
 			metadataBadgeRenderer: {
-				icon: {
-					iconType: string;
-				};
+				icon: Icon;
 				style: string;
 				tooltip: string;
 				trackingParams: string;
@@ -4917,21 +4651,9 @@ export type RawSearchResultData = {
 			};
 		};
 		thumbnailOverlays: {
-			thumbnailOverlayBottomPanelRenderer?: {
-				text: TextRenderer;
-				icon: {
-					iconType: string;
-				};
-			};
-			thumbnailOverlayHoverTextRenderer?: {
-				text: TextRenderer;
-				icon: {
-					iconType: string;
-				};
-			};
-			thumbnailOverlayNowPlayingRenderer?: {
-				text: TextRenderer;
-			};
+			thumbnailOverlayBottomPanelRenderer?: OverlayRenderer;
+			thumbnailOverlayHoverTextRenderer?: OverlayRenderer;
+			thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 		}[];
 		publishedTimeText?: TextRenderer;
 	};
@@ -4983,9 +4705,7 @@ export type RawSearchResultData = {
 				};
 				titleBadge?: {
 					metadataBadgeRenderer: {
-						icon: {
-							iconType: string;
-						};
+						icon: Icon;
 						style: string;
 						tooltip: string;
 						trackingParams: string;
@@ -5067,9 +4787,7 @@ export type RawSearchResultData = {
 				callToActionButton: {
 					callToActionButtonRenderer: {
 						label: TextRenderer;
-						icon: {
-							iconType: string;
-						};
+						icon: Icon;
 						style: string;
 					};
 				};
@@ -5182,9 +4900,7 @@ export type RawSearchResultData = {
 								style: string;
 								size: string;
 								isDisabled: boolean;
-								icon: {
-									iconType: string;
-								};
+								icon: Icon;
 								trackingParams: string;
 							};
 						};
@@ -5193,9 +4909,7 @@ export type RawSearchResultData = {
 								style: string;
 								size: string;
 								isDisabled: boolean;
-								icon: {
-									iconType: string;
-								};
+								icon: Icon;
 								trackingParams: string;
 							};
 						};
@@ -5225,10 +4939,7 @@ export type RawBrowseData = {
 		visitorData: string;
 		serviceTrackingParams: {
 			service: string;
-			params: {
-				key: string;
-				value: string;
-			}[];
+			params: Parameter[];
 		}[];
 		mainAppWebResponseContext: {
 			loggedOut: boolean;
@@ -5247,9 +4958,7 @@ export type RawBrowseData = {
 					style: string;
 					size: string;
 					isDisabled: boolean;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					trackingParams: string;
 					accessibilityData: Accessibility;
 				};
@@ -5344,9 +5053,7 @@ export type RawBrowseData = {
 															items: {
 																menuServiceItemRenderer: {
 																	text: TextRenderer;
-																	icon: {
-																		iconType: string;
-																	};
+																	icon: Icon;
 																	serviceEndpoint: {
 																		clickTrackingParams: string;
 																		commandMetadata: {
@@ -5394,13 +5101,8 @@ export type RawBrowseData = {
 														};
 													};
 													thumbnailOverlays: {
-														thumbnailOverlayTimeStatusRenderer?: {
-															text: TextRenderer;
-															style: string;
-														};
-														thumbnailOverlayNowPlayingRenderer?: {
-															text: TextRenderer;
-														};
+														thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
+														thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 													}[];
 													videoInfo: TextRenderer;
 												};
@@ -5495,12 +5197,7 @@ export type RawBrowseData = {
 						};
 					};
 					thumbnailOverlays: {
-						thumbnailOverlayHoverTextRenderer: {
-							text: TextRenderer;
-							icon: {
-								iconType: string;
-							};
-						};
+						thumbnailOverlayHoverTextRenderer: OverlayRenderer;
 					};
 				};
 			};
@@ -5514,12 +5211,8 @@ export type RawBrowseData = {
 					};
 					isToggled: boolean;
 					isDisabled: boolean;
-					defaultIcon: {
-						iconType: string;
-					};
-					toggledIcon: {
-						iconType: string;
-					};
+					defaultIcon: Icon;
+					toggledIcon: Icon;
 					trackingParams: string;
 					defaultTooltip: string;
 					toggledTooltip: string;
@@ -5612,9 +5305,7 @@ export type RawBrowseData = {
 							}[];
 						};
 					};
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					tooltip: string;
 					trackingParams: string;
 					accessibilityData: Accessibility;
@@ -5625,9 +5316,7 @@ export type RawBrowseData = {
 					items?: {
 						menuNavigationItemRenderer: {
 							text: TextRenderer;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							navigationEndpoint: {
 								clickTrackingParams: string;
 								commandMetadata: {
@@ -5659,9 +5348,7 @@ export type RawBrowseData = {
 					size: string;
 					isDisabled: boolean;
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					navigationEndpoint: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -5698,9 +5385,7 @@ export type RawBrowseData = {
 					size: string;
 					isDisabled: boolean;
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					navigationEndpoint: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -5765,9 +5450,7 @@ export type RawBrowseData = {
 				};
 			};
 			byline: {
-				playlistBylineRenderer: {
-					text: TextRenderer;
-				};
+				playlistBylineRenderer: OverlayRenderer;
 			}[];
 			descriptionTapText?: TextRenderer;
 			subtitle?: TextRenderer;
@@ -5784,9 +5467,7 @@ export type RawBrowseData = {
 		desktopTopbarRenderer: {
 			logo: {
 				topbarLogoRenderer: {
-					iconImage: {
-						iconType: string;
-					};
+					iconImage: Icon;
 					tooltipText: TextRenderer;
 					endpoint: {
 						clickTrackingParams: string;
@@ -5808,9 +5489,7 @@ export type RawBrowseData = {
 			};
 			searchbox: {
 				fusionSearchboxRenderer: {
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					placeholderText: TextRenderer;
 					config: {
 						webSearchboxConfig: {
@@ -5839,9 +5518,7 @@ export type RawBrowseData = {
 							style: string;
 							size: string;
 							isDisabled: boolean;
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							trackingParams: string;
 							accessibilityData: Accessibility;
 						};
@@ -5851,9 +5528,7 @@ export type RawBrowseData = {
 			trackingParams: string;
 			topbarButtons: {
 				topbarMenuButtonRenderer?: {
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					menuRequest: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -5889,9 +5564,7 @@ export type RawBrowseData = {
 					style: string;
 					size: string;
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					navigationEndpoint: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -6043,9 +5716,7 @@ export type RawBrowseData = {
 													style: string;
 													size: string;
 													isDisabled: boolean;
-													icon: {
-														iconType: string;
-													};
+													icon: Icon;
 													trackingParams: string;
 													accessibilityData: Accessibility;
 												};
@@ -6059,9 +5730,7 @@ export type RawBrowseData = {
 							}[];
 						};
 					};
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					tooltip: string;
 					trackingParams: string;
 					accessibilityData: Accessibility;
@@ -6089,9 +5758,7 @@ export type RawBrowseData = {
 							items: {
 								menuNavigationItemRenderer: {
 									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									navigationEndpoint: {
 										clickTrackingParams: string;
 										commandMetadata: {
@@ -6167,12 +5834,8 @@ export type RawBrowseData = {
 									};
 									isToggled: boolean;
 									isDisabled: boolean;
-									defaultIcon: {
-										iconType: string;
-									};
-									toggledIcon: {
-										iconType: string;
-									};
+									defaultIcon: Icon;
+									toggledIcon: Icon;
 									trackingParams: string;
 									defaultTooltip: string;
 									toggledTooltip: string;
@@ -6260,9 +5923,7 @@ export type RawBrowseData = {
 											}[];
 										};
 									};
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									accessibility: {
 										label: string;
 									};
@@ -6303,12 +5964,7 @@ export type RawBrowseData = {
 						};
 					};
 					thumbnailOverlays: {
-						thumbnailOverlaySidePanelRenderer: {
-							text: TextRenderer;
-							icon: {
-								iconType: string;
-							};
-						};
+						thumbnailOverlaySidePanelRenderer: OverlayRenderer;
 					}[];
 					navigationEndpoint: {
 						clickTrackingParams: string;
@@ -6339,9 +5995,7 @@ export type RawBrowseData = {
 					};
 					badges?: {
 						metadataBadgeRenderer: {
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							style: string;
 							label: string;
 							trackingParams: string;
@@ -6447,10 +6101,7 @@ export type RawBrowseContinuationData = {
 		visitorData: string;
 		serviceTrackingParams: {
 			service: string;
-			params: {
-				key: string;
-				value: string;
-			}[];
+			params: Parameter[];
 		}[];
 		mainAppWebResponseContext: {
 			loggedOut: boolean;
@@ -6479,9 +6130,7 @@ export type RawBrowseContinuationData = {
 					style: string;
 					size: string;
 					isDisabled: boolean;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					trackingParams: string;
 					accessibilityData: Accessibility;
 				};
@@ -6571,9 +6220,7 @@ export type RawBrowseContinuationData = {
 							items: {
 								menuServiceItemRenderer: {
 									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									serviceEndpoint: {
 										clickTrackingParams: string;
 										commandMetadata: {
@@ -6621,13 +6268,8 @@ export type RawBrowseContinuationData = {
 						};
 					};
 					thumbnailOverlays: {
-						thumbnailOverlayTimeStatusRenderer?: {
-							text: TextRenderer;
-							style: string;
-						};
-						thumbnailOverlayNowPlayingRenderer?: {
-							text: TextRenderer;
-						};
+						thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
+						thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 					}[];
 					videoInfo: TextRenderer;
 				};
@@ -6656,9 +6298,7 @@ export type RawBrowseContinuationData = {
 							items: {
 								menuNavigationItemRenderer: {
 									text: TextRenderer;
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									navigationEndpoint: {
 										clickTrackingParams: string;
 										commandMetadata: {
@@ -6734,12 +6374,8 @@ export type RawBrowseContinuationData = {
 									};
 									isToggled: boolean;
 									isDisabled: boolean;
-									defaultIcon: {
-										iconType: string;
-									};
-									toggledIcon: {
-										iconType: string;
-									};
+									defaultIcon: Icon;
+									toggledIcon: Icon;
 									trackingParams: string;
 									defaultTooltip: string;
 									toggledTooltip: string;
@@ -6827,9 +6463,7 @@ export type RawBrowseContinuationData = {
 											}[];
 										};
 									};
-									icon: {
-										iconType: string;
-									};
+									icon: Icon;
 									accessibility: {
 										label: string;
 									};
@@ -6870,12 +6504,7 @@ export type RawBrowseContinuationData = {
 						};
 					};
 					thumbnailOverlays: {
-						thumbnailOverlaySidePanelRenderer: {
-							text: TextRenderer;
-							icon: {
-								iconType: string;
-							};
-						};
+						thumbnailOverlaySidePanelRenderer: OverlayRenderer;
 					}[];
 					navigationEndpoint: {
 						clickTrackingParams: string;
@@ -6906,9 +6535,7 @@ export type RawBrowseContinuationData = {
 					};
 					badges: {
 						metadataBadgeRenderer: {
-							icon: {
-								iconType: string;
-							};
+							icon: Icon;
 							style: string;
 							label: string;
 							trackingParams: string;
@@ -7025,9 +6652,7 @@ export type RawPlaylistItemData = {
 			items: {
 				menuServiceItemRenderer: {
 					text: TextRenderer;
-					icon: {
-						iconType: string;
-					};
+					icon: Icon;
 					serviceEndpoint: {
 						clickTrackingParams: string;
 						commandMetadata: {
@@ -7075,13 +6700,8 @@ export type RawPlaylistItemData = {
 		};
 	};
 	thumbnailOverlays: {
-		thumbnailOverlayTimeStatusRenderer?: {
-			text: TextRenderer;
-			style: string;
-		};
-		thumbnailOverlayNowPlayingRenderer?: {
-			text: TextRenderer;
-		};
+		thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;
+		thumbnailOverlayNowPlayingRenderer?: OverlayRenderer;
 	}[];
 	videoInfo: TextRenderer;
 };

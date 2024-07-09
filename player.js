@@ -1,17 +1,14 @@
-import { AudioPlayerStatus, AudioResource, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
+import { AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
 import { EmbedBuilder } from "discord.js";
-import EventEmitter from "ws";
+import { EventEmitter } from "events";
+import { createWriteStream, existsSync } from "fs";
+import { Readable } from "stream";
 import ytdl from "ytdl-core";
 import { formatDurationMillis } from "./utils.js";
-import { PlaylistItem } from "./innertube/index.js";
-import fs, { existsSync, write } from "fs";
 
-/**
- * @type {{[key: string]: Player}}
- */
 const PLAYERS = {};
 
-class Player extends EventEmitter.EventEmitter {
+class Player extends EventEmitter {
     id;
     #subscription;
     #connection = null;
@@ -31,7 +28,7 @@ class Player extends EventEmitter.EventEmitter {
             this.connection = null;
             // subscribe and handle state change
             this.#subscription = value.subscribe(this.player);
-            value.on("stateChange", (oldState, newState) => {
+            value.on("stateChange", (_oldState, newState) => {
                 if (newState.status === VoiceConnectionStatus.Destroyed || newState.status === VoiceConnectionStatus.Disconnected) this.stop();
             });
             value.on("error", (e) => {
@@ -102,7 +99,9 @@ class Player extends EventEmitter.EventEmitter {
             this.stop();
             throw new Error("the audio connection was invalidated");
         }
-        if (track.resource === null || track.resource.started)
+        if (track.resource instanceof Promise)
+            track.resource = await track.resource;
+        else if (track.resource === null || track.resource.started)
             track.resource = await track.getResource();
         track.resource.volume.setVolume(this.volume);
         this.player.play(track.resource);
@@ -111,7 +110,7 @@ class Player extends EventEmitter.EventEmitter {
         this.nowPlaying = track;
         // prepare the next track's resource
         if (this.queue.length > 0 && this.queue[0].resource === null)
-            this.queue[0].resource = await this.queue[0].getResource();
+            this.queue[0].resource = this.queue[0].getResource();
     }
 
     pause() {
@@ -151,7 +150,7 @@ class Player extends EventEmitter.EventEmitter {
         }
         this.queue.push(track);
         if (this.queue.length === 1)
-            track.resource = await track.getResource();
+            track.resource = track.getResource();
         return false;
     }
 }
@@ -194,18 +193,22 @@ class Track {
         return eb.toJSON();
     }
 
-    /**
-     * 
-     * @param {ytdl.videoInfo} info 
-     * @param {*} download 
-     * @returns 
-     */
+    static fromURL(url, title, options) {
+        if (typeof url === "string")
+            url = new URL(url);
+        const getResource = async () => createAudioResource(Readable.fromWeb((await fetch(url)).body), { inlineVolume: true });
+        title = title || url.pathname.length > 1 ? url.pathname.substring(url.pathname.lastIndexOf('/') + 1) : "Unknown Title";
+        options = options || {};
+        options.url = options.url || url.toString();
+        return new Track(getResource, title, options);
+    }
+
     static fromVideoInfo(info, download) {
         const details = info.videoDetails;
         const getResource = download ? async () => {
             const path = `./audio/${details.videoId}.webm`;
-            return createAudioResource(fs.existsSync(path) ? path : await new Promise((resolve, reject) => {
-                const writeStream = fs.createWriteStream(path);
+            return createAudioResource(existsSync(path) ? path : await new Promise((resolve, reject) => {
+                const writeStream = createWriteStream(path);
                 writeStream.once("finish", () => resolve(path));
                 writeStream.once("error", (e) => reject(e));
                 ytdl.downloadFromInfo(info, { quality: "highestaudio" }).pipe(writeStream);
@@ -224,8 +227,8 @@ class Track {
         const getResource = download ?
             async () => {
                 const path = `./audio/${item.id}.webm`;
-                return createAudioResource(fs.existsSync(path) ? path : await new Promise((resolve, reject) => {
-                    const writeStream = fs.createWriteStream(path);
+                return createAudioResource(existsSync(path) ? path : await new Promise((resolve, reject) => {
+                    const writeStream = createWriteStream(path);
                     writeStream.once("finish", () => resolve(path));
                     writeStream.once("error", (e) => reject(e));
                     ytdl(item.id, { quality: "highestaudio" }).pipe(writeStream);
@@ -236,7 +239,9 @@ class Track {
         const options = {};
         options.url = `https://www.youtube.com/watch?v=${item.id}`;
         options.author = { name: item.videoOwnerChannelTitle, url: `https://www.youtube.com/channel/${item.videoOwnerChannelId}` };
-        options.thumbnail = (item.thumbnails.maxres || item.thumbnails.high || item.thumbnails.standard || item.thumbnails.medium || item.thumbnails.default)?.url;
+        const thumbnail = item.thumbnails.maxres || item.thumbnails.high || item.thumbnails.standard || item.thumbnails.medium || item.thumbnails.default;
+        if (thumbnail)
+            options.thumbnail = thumbnail.url;
         options.duration = item.duration * 1000;
         return new Track(getResource, title, options);
     }
@@ -257,4 +262,3 @@ export {
     Track,
     getPlayer
 };
-

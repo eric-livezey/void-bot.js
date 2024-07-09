@@ -1,10 +1,10 @@
 import { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voice";
 import { APIEmbed, Snowflake } from "discord.js";
-import EventEmitter from "ws";
+import { EventEmitter } from "events";
 import ytdl from "ytdl-core";
 import { PlaylistItem } from "./innertube";
 
-declare class Player extends EventEmitter.EventEmitter {
+declare class Player extends EventEmitter {
     /**
      * The id of guild which the player is for
      */
@@ -53,25 +53,65 @@ declare class Player extends EventEmitter.EventEmitter {
      */
     constructor(id: Snowflake);
 
+    /**
+     * Plays a track.
+     * 
+     * @param track the track to play 
+     */
     play(track: Track): Promise<void>;
 
+    /**
+     * Pauses the currently playing track. Returns whether the player was successfully paused.
+     */
     pause(): boolean;
 
+    /**
+     * Unpauses the currently playing track. Returns whether the player was successfully unpaused.
+     */
     unpause(): boolean;
 
+    /**
+     * Skips the current track.
+     */
     skip(): Promise<void>;
 
+    /**
+     * Stops the current track and clears the queue.
+     */
     stop(): void;
 
+    /**
+     * Enqueue a track. If nothing is playing, it will played immediately, otherwise it will be added to the queue.
+     * 
+     * @param track the track to enqueue
+     */
     enqueue(track: Track): Promise<boolean>;
 }
 
 declare class Track<T = unknown> {
+    /**
+     * A method which gets a new audio resource to play
+     */
     getResource: () => Promise<AudioResource<T>> | AudioResource<T>;
-    resource: AudioResource<T> | null;
+    /**
+     * The audio resource, if any
+     */
+    resource: Promise<AudioResource<T>> | AudioResource<T> | null;
+    /**
+     * The title of the track
+     */
     title: string;
+    /**
+     * The url to embed in the track's title
+     */
     url: string | null;
+    /**
+     * Data about the author of the track
+     */
     author: { title: string, url?: string, iconURL?: string } | null;
+    /**
+     * The url to a thumbnail for the track
+     */
     thumbnail: string | null;
     /**
      * The duration of the track is milliseconds
@@ -91,13 +131,28 @@ declare class Track<T = unknown> {
     toEmbed(): APIEmbed;
 
     /**
+     * Creates a track from a URL.
+     * 
+     * @param url a url to create the track from
+     * @param title the title of the track, if no title is provided it will taken from the last part of the pathname
+     * @param options additional info about the track
+     */
+    static fromURL(url: string | URL, title?: string, options?: { url?: string, author?: { title: string, url?: string, iconURL?: string }, thumbnail?: string, duration?: number }): Track<null>;
+
+    /**
      * Creates a track from YouTube video.
      * 
      * @param info a videoInfo object to construct the track from
+     * @param download whether the track should be downloaded
      */
     static fromVideoInfo(info: ytdl.videoInfo, download?: boolean): Track<null>;
 
-
+    /**
+     * Creates a track from a playlist item.
+     * 
+     * @param item a PlaylistItem to construct the track from
+     * @param download whether the track should be downloaded
+     */
     static fromPlaylistItem(item: PlaylistItem, download?: boolean): Track<null>;
 }
 
@@ -110,6 +165,5 @@ declare function getPlayer(id: string): Player;
 
 export {
     Player,
-    Track,
-    getPlayer
+    Track, getPlayer
 };

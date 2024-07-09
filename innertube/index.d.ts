@@ -321,7 +321,7 @@ declare class PlaylistItem {
      */
     videoOwnerChannelTitle: string;
     /**
-     * The ID of the channel that uploaded this video.
+     * The ID that YouTube uses to uniquely identify the channel that uploaded this video.
      */
     videoOwnerChannelId: string;
     /**

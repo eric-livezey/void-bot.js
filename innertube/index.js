@@ -407,7 +407,8 @@ class PlaylistItem {
         this.videoOwnerChannelTitle = getRenderedText(data.shortBylineText);
         this.videoOwnerChannelId = data.shortBylineText.runs.find(value => value.navigationEndpoint && value.navigationEndpoint.browseEndpoint && value.navigationEndpoint.browseEndpoint.browseId).navigationEndpoint.browseEndpoint.browseId;
         this.playlistId = data.navigationEndpoint.watchEndpoint.playlistId;
-        this.position = Number(getRenderedText(data.index));
+        if (data.index)
+            this.position = Number(getRenderedText(data.index));
         this.videoId = this.id;
         this.privacyStatus = "public";
         this.duration = Number(data.lengthSeconds);
@@ -433,8 +434,10 @@ class Playlist {
         if ("header" in data) {
             const header = data.header;
             this.id = header.playlistHeaderRenderer.playlistId;
-            if ("ownerEndpoint" in header.playlistHeaderRenderer)
+            if ("ownerEndpoint" in header.playlistHeaderRenderer && "browseEndpoint" in header.playlistHeaderRenderer.ownerEndpoint)
                 this.channelId = header.playlistHeaderRenderer.ownerEndpoint.browseEndpoint.browseId;
+            else if (header.playlistHeaderRenderer.ownerText && header.playlistHeaderRenderer.ownerText.runs && header.playlistHeaderRenderer.ownerText.runs.length > 0 && header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint && header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint)
+                this.channelId = header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
             this.title = getRenderedText(header.playlistHeaderRenderer.title);
             if ("descriptionText" in header.playlistHeaderRenderer)
                 this.description = getRenderedText(header.playlistHeaderRenderer.descriptionText);

@@ -11,7 +11,7 @@ class CommandContext {
         else
             throw new TypeError("channel must be an instance of a text based channel");
         if (member instanceof GuildMember)
-            Object.defineProperty(this, "member", { value: member });
+            Object.defineProperties(this, { "member": { value: member }, "guild": { value: member.guild } });
         else if (member === null || member === undefined)
             Object.defineProperty(this, "member", { value: null });
         else
@@ -54,4 +54,3 @@ class InteractionCommandContext extends CommandContext {
 export {
     InteractionCommandContext, MessageCommandContext
 };
-
