@@ -1,7 +1,7 @@
 import { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voice";
 import { APIEmbed, Snowflake } from "discord.js";
 import { EventEmitter } from "events";
-import ytdl from "ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import { PlaylistItem } from "./innertube";
 
 declare class Player extends EventEmitter {
