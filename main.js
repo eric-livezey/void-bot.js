@@ -1,7 +1,7 @@
 import { joinVoiceChannel } from "@discordjs/voice";
+import ytdl from "@distube/ytdl-core";
 import { Attachment, Client, EmbedBuilder, Events, MessageFlags, Partials, VoiceChannel } from "discord.js";
-import { readFileSync } from "fs";
-import ytdl from "ytdl-core";
+import fs from "fs";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
 import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
 import { now } from "./innertube/utils.js";
@@ -9,7 +9,7 @@ import { evaluate } from "./math.js";
 import { Track, getPlayer } from "./player.js";
 import { formatDuration, formatDurationMillis } from "./utils.js";
 
-Object.assign(process.env, JSON.parse(readFileSync("./env.json")));
+Object.assign(process.env, JSON.parse(fs.readFileSync("./env.json")));
 
 // Global Variables
 const PREFIX = ".";
@@ -123,8 +123,9 @@ function createVoiceConnection(channel) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string} id 
+ * @param {boolean | undefined} forceInverse
  */
-async function playPlaylist_c(ctx, id) {
+async function playPlaylist_c(ctx, id, forceInverse) {
     // Get the playlist by id
     const playlist = await getPlaylist(id);
     if (playlist === null)
@@ -138,7 +139,7 @@ async function playPlaylist_c(ctx, id) {
         }
         if (listItem.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(listItem, shouldDownload));
+                await player.enqueue(Track.fromPlaylistItem(listItem, forceInverse ? !shouldDownload : shouldDownload));
             } catch {
                 continue;
             }
@@ -190,8 +191,9 @@ async function disconnect_c(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string | undefined} query 
  * @param {Attachment | undefined} attachment
+ * @param {boolean | undefined} forceInverse
  */
-async function play_c(ctx, query, attachment) {
+async function play_c(ctx, query, attachment, forceInverse) {
     // handle voice channel
     const channel = ctx.member.voice.channel;
     if (!channel)
@@ -247,7 +249,7 @@ async function play_c(ctx, query, attachment) {
             } catch (e) {
                 return await ctx.reply("An error occurred whilst trying to retrieve the requested video.\n\n" + e.message);
             }
-            track = Track.fromVideoInfo(info, shouldDownload);
+            track = Track.fromVideoInfo(info, forceInverse ? !shouldDownload : shouldDownload);
         }
     } else {
         // resume
@@ -698,8 +700,9 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "exec":
                     if (message.author.id === process.env.OWNER) {
                         try {
+                            let res = "Code Executed.";
                             eval(args.join(" "));
-                            await ctx.reply("Code executed");
+                            await ctx.reply(res);
                         } catch (e) {
                             await ctx.reply("Error:\n" + e.message);
                         }

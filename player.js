@@ -3,7 +3,7 @@ import { EmbedBuilder } from "discord.js";
 import { EventEmitter } from "events";
 import { createWriteStream, existsSync } from "fs";
 import { Readable } from "stream";
-import ytdl from "ytdl-core";
+import ytdl from "@distube/ytdl-core";
 import { formatDurationMillis } from "./utils.js";
 
 const PLAYERS = {};
@@ -94,6 +94,10 @@ class Player extends EventEmitter {
         this.emit("next");
     }
 
+    /**
+     * 
+     * @param {import("./player.d.ts").Track<null>} track 
+     */
     async play(track) {
         if (!this.isReady) {
             this.stop();
@@ -101,8 +105,10 @@ class Player extends EventEmitter {
         }
         if (track.resource instanceof Promise)
             track.resource = await track.resource;
-        else if (track.resource === null || track.resource.started)
+        else if (track.resource === null || track.resource.started || track.resource.ended)
             track.resource = await track.getResource();
+        if (track.resource.ended)
+            throw new Error("the resource was already ended");
         track.resource.volume.setVolume(this.volume);
         this.player.play(track.resource);
         if (this.isPaused)

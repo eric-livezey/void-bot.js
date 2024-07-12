@@ -40,7 +40,7 @@ declare class MessageCommandContext<InGuild extends boolean = boolean> extends C
      */
     public readonly message: Message<InGuild>;
 
-    private constructor(message: Message);
+    public constructor(message: Message<InGuild>);
 
     public reply(options: string | MessagePayload | MessageReplyOptions): Promise<Message<InGuild>>;
 }
@@ -51,7 +51,7 @@ declare class InteractionCommandContext extends CommandContext<true> {
      */
     public readonly interaction: ChatInputCommandInteraction;
 
-    private constructor(interaction: ChatInputCommandInteraction);
+    public constructor(interaction: ChatInputCommandInteraction);
 
     public reply(options: string | MessagePayload | InteractionReplyOptions): Promise<Message<true>>;
 }

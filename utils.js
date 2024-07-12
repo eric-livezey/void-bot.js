@@ -40,4 +40,4 @@ export {
     Duration,
     formatDuration,
     formatDurationMillis
-};
+}
