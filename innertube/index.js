@@ -79,13 +79,9 @@ class Client {
     }
 
 
-    /**
-     * @param {keyof ClientType} type 
-     */
     constructor(type) {
-        if (!(type in ClientType))
+        if (typeof type !== "string" || !(type in ClientType))
             throw new TypeError("invalid client type");
-
         this.id = ClientType[type];
         const info = ClientInfo[this.id];
         this.name = info.name;
@@ -95,12 +91,12 @@ class Client {
 
     /**
      * @param {string} endpoint 
-     * @param {{[key: string]: any}}
+     * @param {any} body
      */
     async request(endpoint, body) {
-        if (typeof endpoint !== "string")
+        if (typeof endpoint != "string")
             throw new TypeError("endpoint must of type string");
-        if (typeof body !== "undefined" && typeof body !== "object")
+        if (typeof body != "undefined" && typeof body != "object")
             throw new TypeError("body must of type object or undefined");
 
         const response = await fetch(`https://www.youtube.com/youtubei/v1${endpoint}?key=${API_KEY}`, {
@@ -702,9 +698,22 @@ class SearchListResponse {
     }
 }
 
+class Channel {
+    title;
+    subscriberCount;
+    /**
+     * @param {import("./rawTypes").RawChannelData} data 
+     */
+    constructor(data) {
+        this.title = data.metadata?.channelMetadataRenderer?.title;
+        this.subscriberCount = data.header?.pageHeaderRenderer?.content?.pageHeaderViewModel?.metadata?.contentMetadataViewModel?.metadataRows[1]?.metadataParts[0]?.text?.content;
+        // TODO: implement from innertube
+    }
+}
+
 /**
  * @param {string} id 
- * @deprecated in favor of `ytdl.getVideoInfo()`
+ * @deprecated
  */
 async function getVideo(id) {
     // const js = await getJs(await getPlayerId(id));
@@ -741,12 +750,12 @@ async function getVideo(id) {
 
 /**
  * @param {string} id
- * @param {boolean} unavailable
+ * @param {boolean} includeUnavailable
  */
-async function getPlaylist(id, unavailable = false) {
+async function getPlaylist(id, includeUnavailable = false) {
     const response = await CLIENTS.WEB.request("/browse", {
         browseId: "VL" + id,
-        params: unavailable ? "wgYCCAA%3D" : undefined
+        params: includeUnavailable ? "wgYCCAA%3D" : undefined
     });
     if (response.ok) {
         return new Playlist(await response.json());
@@ -766,6 +775,17 @@ async function listSearchResults(q, type = null) {
     })
     if (response.ok) {
         return new SearchListResponse(await response.json());
+    } else {
+        return null;
+    }
+}
+
+async function getChannel(id) {
+    const response = await CLIENTS.WEB.request("/browse", {
+        browseId: id,
+    });
+    if (response.ok) {
+        return new Channel(await response.json());
     } else {
         return null;
     }
@@ -870,6 +890,7 @@ export {
     getVideo,
     getPlaylist,
     listSearchResults,
+    getChannel,
     getDeviceCode,
     setBearerToken,
     getMusicSearchSuggestions,

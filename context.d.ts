@@ -1,4 +1,4 @@
-import { AnyThreadChannel, BaseMessageOptions, ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, PartialDMChannel, TextBasedChannel, User } from "discord.js";
+import { BaseMessageOptions, ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, TextBasedChannel, User } from "discord.js";
 
 declare abstract class CommandContext<InGuild extends boolean = boolean> {
     /**
@@ -12,7 +12,7 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
     /**
      * The channel in which the command was invoked.
      */
-    public readonly channel: Exclude<If<InGuild, GuildTextBasedChannel, TextBasedChannel>, PartialDMChannel | AnyThreadChannel>;
+    public readonly channel: If<InGuild, GuildTextBasedChannel, TextBasedChannel>;
     /**
      * The member who invoked the command or `null` if not in a guild.
      */
@@ -22,7 +22,7 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
      */
     public readonly guild: If<InGuild, Guild>;
 
-    protected constructor(user: User, channel: Exclude<TextBasedChannel, PartialDMChannel | AnyThreadChannel>, member?: GuildMember | null);
+    protected constructor(user: User, channel: TextBasedChannel, member?: GuildMember | null);
 
     /**
      * Returns `true` if the command was invoked via an interaction, else `false`.

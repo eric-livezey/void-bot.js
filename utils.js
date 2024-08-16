@@ -15,17 +15,17 @@ class Duration {
 
     format() {
         if (this.days > 0) {
-            return `${this.days}:${zFill(this.hours, 2)}:${zFill(this.minutes, 2)}:${zFill(this.seconds, 2)}`;
+            return `${this.days}:${zFill(this.hours)}:${zFill(this.minutes)}:${zFill(this.seconds)}`;
         } else if (this.hours > 0) {
-            return `${this.hours}:${zFill(this.minutes, 2)}:${zFill(this.seconds, 2)}`;
+            return `${this.hours}:${zFill(this.minutes)}:${zFill(this.seconds)}`;
         } else {
-            return `${zFill(this.minutes, 2)}:${zFill(this.seconds, 2)}`;
+            return `${zFill(this.minutes)}:${zFill(this.seconds)}`;
         }
     }
 }
 
-function zFill(arg, length) {
-    return `${("00" + arg).slice(-1 * length)}`;
+function zFill(arg) {
+    return arg.toString().padStart(2, "0");
 }
 
 function formatDuration(seconds) {

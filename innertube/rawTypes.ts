@@ -52,32 +52,32 @@ interface StreamType {
 }
 
 interface LatencyClass {
-	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_UNKNOWN: "UNKNOWN",
-	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_NORMAL: "NORMAL",
-	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_LOW: "LOW",
-	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_ULTRA_LOW: "ULTRALOW"
+	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_UNKNOWN: "UNKNOWN";
+	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_NORMAL: "NORMAL";
+	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_LOW: "LOW";
+	readonly MDE_STREAM_OPTIMIZATIONS_RENDERER_LATENCY_ULTRA_LOW: "ULTRALOW";
 }
 
 type Parameter = {
 	key: string;
 	value: string;
-}
+};
 
 type Range = {
 	start: string;
 	end: string;
-}
+};
 
 type AudioTrack = {
 	displayName: string;
 	id: string;
 	audioIsDefault: boolean;
-}
+};
 
 type ColorInfo = {
 	primaries: keyof ColorPrimaries;
 	transferCharacteristics?: keyof ColorTransferCharacteristics;
-}
+};
 
 type Format = {
 	mimeType?: string;
@@ -96,7 +96,7 @@ type Format = {
 	cipher?: string;
 	signatureCipher?: string;
 	url?: string;
-}
+};
 
 type VideoFormat = Format & {
 	width?: number;
@@ -106,7 +106,7 @@ type VideoFormat = Format & {
 	colorInfo?: ColorInfo;
 	projectionType?: keyof ProjectionType;
 	stereoLayout?: keyof StereoLayout;
-}
+};
 
 type AudioFormat = Format & {
 	audioSampleRate?: number;
@@ -116,7 +116,7 @@ type AudioFormat = Format & {
 	isDrc?: boolean;
 	loudnessDb?: number;
 	trackAbsoluteLoudnessLkfs?: number;
-}
+};
 
 type Thumbnail = {
 	thumbnails: {
@@ -124,7 +124,7 @@ type Thumbnail = {
 		width: number;
 		height: number;
 	}[];
-}
+};
 
 type NavigationEndpoint = {
 	clickTrackingParams: string;
@@ -145,6 +145,7 @@ type NavigationEndpoint = {
 			webPageType?: string;
 			rootVe?: number;
 			apiUrl?: string;
+			ignoreNavigation?: boolean;
 		};
 	};
 	watchEndpoint?: {
@@ -192,6 +193,35 @@ type NavigationEndpoint = {
 			};
 		};
 	};
+	signalServiceEndpoint?: {
+		signal: string;
+		actions: {
+			clickTrackingParams: string;
+			addToPlaylistCommand: {
+				openMiniplayer: boolean;
+				videoId: string;
+				listType: string;
+				onCreateListCommand: NavigationEndpoint;
+				videoIds: string[];
+			};
+		}[];
+	};
+	shareEntityServiceEndpoint?: {
+		serializedShareEntity: string;
+		commands: {
+			clickTrackingParams: string;
+			openPopupAction: {
+				popup: {
+					unifiedSharePanelRenderer: {
+						trackingParams: string;
+						showLoadingSpinner: boolean;
+					};
+				};
+				popupType: string;
+				beReused: boolean;
+			};
+		}[];
+	};
 	playlistEditEndpoint?: {
 		playlistId?: string;
 		actions: {
@@ -204,12 +234,17 @@ type NavigationEndpoint = {
 	pingingEndpoint?: {
 		hack: boolean;
 	};
-}
+	userFeedbackEndpoint?: {
+		additionalDatas: {
+			userFeedbackEndpointProductSpecificValueData: Parameter;
+		}[];
+	};
+};
 
 type Accessibility = {
 	accessibilityData?: {
 		label?: string;
-	}
+	};
 };
 
 type LoggingURL = {
@@ -220,17 +255,17 @@ type LoggingURL = {
 	attributionSrcMode?: string;
 	elapsedMediaTimeSeconds?: number;
 	offsetMilliseconds?: number;
-}
+};
 
 type Icon = {
 	iconType: string;
-}
+};
 
 type OverlayRenderer = {
 	text: TextRenderer;
 	style?: string;
 	icon?: Icon;
-}
+};
 
 type TextRenderer = {
 	simpleText?: string;
@@ -242,7 +277,26 @@ type TextRenderer = {
 		navigationEndpoint?: NavigationEndpoint;
 	}[];
 	accessibility?: Accessibility;
-}
+};
+
+type MenuRenderer = {
+	items: {
+		menuServiceItemRenderer?: {
+			text: TextRenderer;
+			icon: Icon;
+			serviceEndpoint?: Pick<NavigationEndpoint, "clickTrackingParams" | "signalServiceEndpoint" | "shareEntityServiceEndpoint">;
+			trackingParams: string;
+			hasSeparator?: boolean;
+		};
+		menuNavigationItemRenderer?: {
+			text: TextRenderer;
+			icon: Icon;
+			navigationEndpoint: Pick<NavigationEndpoint, "clickTrackingParams" | "commandMetadata" | "userFeedbackEndpoint">;
+		};
+	}[];
+	trackingParams: string;
+	accessibility: Accessibility;
+};
 
 export type RawPlayerData = {
 	responseContext: {
@@ -293,7 +347,7 @@ export type RawPlayerData = {
 				ypcTrailer?: {
 					ypcTrailerRenderer?: unknown;
 				};
-			}
+			};
 			playerLegacyDesktopYpcOfferRenderer?: {
 				itemTitle?: string;
 				itemBuyUrl?: unknown;
@@ -351,7 +405,7 @@ export type RawPlayerData = {
 	};
 	streamingData?: {
 		adaptiveFormats?: ((AudioFormat | VideoFormat) & {
-			distinctParams?: string
+			distinctParams?: string;
 		})[];
 		streamingUrlTemplate?: string;
 		formats?: (AudioFormat & VideoFormat)[];
@@ -443,7 +497,7 @@ export type RawPlayerData = {
 		isLiveDvrEnabled?: boolean;
 		liveChunkReadahead?: number;
 		isPrivate?: boolean;
-		// not found in base.js
+		// not found in base.js;
 		isOwnerViewing?: boolean;
 		allowRatings?: boolean;
 		isUnpluggedCorpus?: boolean;
@@ -560,7 +614,7 @@ export type RawPlayerData = {
 			allowInPlaceSwitch?: boolean;
 			loadPolicy?: string;
 			invideoUrl?: any;
-		}
+		};
 	}[];
 	playerConfig?: {
 		audioConfig: {
@@ -1081,7 +1135,7 @@ export type RawPlayerData = {
 									style: string;
 									text: TextRenderer;
 									icon: Icon;
-									navigationEndpoint: NavigationEndpoint
+									navigationEndpoint: NavigationEndpoint;
 									trackingParams: string;
 								};
 							};
@@ -1684,56 +1738,7 @@ export type RawSearchData = {
 													showActionMenu: boolean;
 													shortViewCountText: TextRenderer;
 													menu: {
-														menuRenderer: {
-															items: {
-																menuServiceItemRenderer: {
-																	text: TextRenderer;
-																	icon: Icon;
-																	serviceEndpoint: {
-																		clickTrackingParams: string;
-																		commandMetadata: {
-																			webCommandMetadata: {
-																				sendPost: boolean;
-																				apiUrl?: string;
-																			};
-																		};
-																		signalServiceEndpoint?: {
-																			signal: string;
-																			actions: {
-																				clickTrackingParams: string;
-																				addToPlaylistCommand: {
-																					openMiniplayer: boolean;
-																					videoId: string;
-																					listType: string;
-																					onCreateListCommand: NavigationEndpoint;
-																					videoIds: string[];
-																				};
-																			}[];
-																		};
-																		shareEntityServiceEndpoint?: {
-																			serializedShareEntity: string;
-																			commands: {
-																				clickTrackingParams: string;
-																				openPopupAction: {
-																					popup: {
-																						unifiedSharePanelRenderer: {
-																							trackingParams: string;
-																							showLoadingSpinner: boolean;
-																						};
-																					};
-																					popupType: string;
-																					beReused: boolean;
-																				};
-																			}[];
-																		};
-																	};
-																	trackingParams: string;
-																	hasSeparator?: boolean;
-																};
-															}[];
-															trackingParams: string;
-															accessibility: Accessibility;
-														};
+														menuRenderer: MenuRenderer;
 													};
 													channelThumbnailSupportedRenderers: {
 														channelThumbnailWithLinkRenderer: {
@@ -2419,31 +2424,7 @@ export type RawSearchData = {
 								reelShelfRenderer?: {
 									title: TextRenderer;
 									button: {
-										menuRenderer: {
-											items: {
-												menuNavigationItemRenderer: {
-													text: TextRenderer;
-													icon: Icon;
-													navigationEndpoint: {
-														clickTrackingParams: string;
-														commandMetadata: {
-															webCommandMetadata: {
-																ignoreNavigation: boolean;
-															};
-														};
-														userFeedbackEndpoint: {
-															additionalDatas: {
-																userFeedbackEndpointProductSpecificValueData: Parameter;
-															}[];
-														};
-													};
-													trackingParams: string;
-													accessibility: Accessibility;
-												};
-											}[];
-											trackingParams: string;
-											accessibility: Accessibility;
-										};
+										menuRenderer: MenuRenderer;
 									};
 									items: {
 										reelItemRenderer: {
@@ -2500,31 +2481,7 @@ export type RawSearchData = {
 												};
 											};
 											menu: {
-												menuRenderer: {
-													items: {
-														menuNavigationItemRenderer: {
-															text: TextRenderer;
-															icon: Icon;
-															navigationEndpoint: {
-																clickTrackingParams: string;
-																commandMetadata: {
-																	webCommandMetadata: {
-																		ignoreNavigation: boolean;
-																	};
-																};
-																userFeedbackEndpoint: {
-																	additionalDatas: {
-																		userFeedbackEndpointProductSpecificValueData: Parameter;
-																	}[];
-																};
-															};
-															trackingParams: string;
-															accessibility: Accessibility;
-														};
-													}[];
-													trackingParams: string;
-													accessibility: Accessibility;
-												};
+												menuRenderer: MenuRenderer;
 											};
 											trackingParams: string;
 											accessibility: Accessibility;
@@ -3871,31 +3828,7 @@ export type RawSearchData = {
 						reelShelfRenderer?: {
 							title: TextRenderer;
 							button: {
-								menuRenderer: {
-									items: {
-										menuNavigationItemRenderer: {
-											text: TextRenderer;
-											icon: Icon;
-											navigationEndpoint: {
-												clickTrackingParams: string;
-												commandMetadata: {
-													webCommandMetadata: {
-														ignoreNavigation: boolean;
-													};
-												};
-												userFeedbackEndpoint: {
-													additionalDatas: {
-														userFeedbackEndpointProductSpecificValueData: Parameter;
-													}[];
-												};
-											};
-											trackingParams: string;
-											accessibility: Accessibility;
-										};
-									}[];
-									trackingParams: string;
-									accessibility: Accessibility;
-								};
+								menuRenderer: MenuRenderer;
 							};
 							items: {
 								reelItemRenderer: {
@@ -3952,31 +3885,7 @@ export type RawSearchData = {
 										};
 									};
 									menu: {
-										menuRenderer: {
-											items: {
-												menuNavigationItemRenderer: {
-													text: TextRenderer;
-													icon: Icon;
-													navigationEndpoint: {
-														clickTrackingParams: string;
-														commandMetadata: {
-															webCommandMetadata: {
-																ignoreNavigation: boolean;
-															};
-														};
-														userFeedbackEndpoint: {
-															additionalDatas: {
-																userFeedbackEndpointProductSpecificValueData: Parameter;
-															}[];
-														};
-													};
-													trackingParams: string;
-													accessibility: Accessibility;
-												};
-											}[];
-											trackingParams: string;
-											accessibility: Accessibility;
-										};
+										menuRenderer: MenuRenderer;
 									};
 									trackingParams: string;
 									accessibility: Accessibility;
@@ -4923,6 +4832,2143 @@ export type RawSearchResultData = {
 		trackingParams: string;
 	};
 };
+
+export type RawChannelData = {
+	responseContext: {
+		serviceTrackingParams: Array<{
+			service: string;
+			params: Array<{
+				key: string;
+				value: string;
+			}>;
+		}>;
+		maxAgeSeconds: number;
+		mainAppWebResponseContext: {
+			datasyncId: string;
+			loggedOut: boolean;
+			trackingParam: string;
+		};
+		webResponseContextExtensionData: {
+			hasDecorated: boolean;
+		};
+	};
+	contents: {
+		twoColumnBrowseResultsRenderer: {
+			tabs: Array<{
+				tabRenderer?: {
+					endpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								url: string;
+								webPageType: string;
+								rootVe: number;
+								apiUrl: string;
+							};
+						};
+						browseEndpoint: {
+							browseId: string;
+							params: string;
+							canonicalBaseUrl: string;
+						};
+					};
+					title: string;
+					selected?: boolean;
+					content?: {
+						sectionListRenderer: {
+							contents: Array<{
+								itemSectionRenderer: {
+									contents: Array<{
+										shelfRenderer?: {
+											title: {
+												runs: Array<{
+													text: string;
+													navigationEndpoint?: {
+														clickTrackingParams: string;
+														showEngagementPanelEndpoint?: {
+															engagementPanel: {
+																engagementPanelSectionListRenderer: {
+																	header: {
+																		engagementPanelTitleHeaderRenderer: {
+																			title: TextRenderer;
+																			visibilityButton: {
+																				buttonRenderer: {
+																					style: string;
+																					size: string;
+																					isDisabled: boolean;
+																					icon: {
+																						iconType: string;
+																					};
+																					accessibility: {
+																						label: string;
+																					};
+																					trackingParams: string;
+																					accessibilityData: {
+																						accessibilityData: {
+																							label: string;
+																						};
+																					};
+																					command: {
+																						clickTrackingParams: string;
+																						changeEngagementPanelVisibilityAction: {
+																							targetId: string;
+																							visibility: string;
+																						};
+																					};
+																				};
+																			};
+																			trackingParams: string;
+																		};
+																	};
+																	content: {
+																		sectionListRenderer: {
+																			contents: Array<{
+																				itemSectionRenderer: {
+																					contents: Array<{
+																						continuationItemRenderer: {
+																							trigger: string;
+																							continuationEndpoint: {
+																								clickTrackingParams: string;
+																								commandMetadata: {
+																									webCommandMetadata: {
+																										sendPost: boolean;
+																										apiUrl: string;
+																									};
+																								};
+																								continuationCommand: {
+																									token: string;
+																									request: string;
+																								};
+																							};
+																						};
+																					}>;
+																					trackingParams: string;
+																					sectionIdentifier: string;
+																					targetId: string;
+																				};
+																			}>;
+																			trackingParams: string;
+																			scrollPaneStyle: {
+																				scrollable: boolean;
+																			};
+																		};
+																	};
+																	targetId: string;
+																	identifier: {
+																		surface: string;
+																		tag: string;
+																	};
+																	size: string;
+																};
+															};
+															identifier: {
+																surface: string;
+																tag: string;
+															};
+															engagementPanelPresentationConfigs: {
+																engagementPanelPopupPresentationConfig: {
+																	popupType: string;
+																};
+															};
+														};
+														commandMetadata?: {
+															webCommandMetadata: {
+																url: string;
+																webPageType: string;
+																rootVe: number;
+																apiUrl: string;
+															};
+														};
+														browseEndpoint?: {
+															browseId: string;
+														};
+													};
+												}>;
+											};
+											content: {
+												horizontalListRenderer: {
+													items: Array<{
+														gridVideoRenderer?: {
+															videoId: string;
+															thumbnail: {
+																thumbnails: Array<Thumbnail>;
+															};
+															title: TextRenderer;
+															publishedTimeText: TextRenderer;
+															viewCountText: TextRenderer;
+															navigationEndpoint: {
+																clickTrackingParams: string;
+																commandMetadata: {
+																	webCommandMetadata: {
+																		url: string;
+																		webPageType: string;
+																		rootVe: number;
+																	};
+																};
+																watchEndpoint: {
+																	videoId: string;
+																	watchEndpointSupportedOnesieConfig: {
+																		html5PlaybackOnesieConfig: {
+																			commonConfig: {
+																				url: string;
+																			};
+																		};
+																	};
+																	params?: string;
+																	startTimeSeconds?: number;
+																};
+															};
+															ownerBadges: Array<{
+																metadataBadgeRenderer: {
+																	icon: {
+																		iconType: string;
+																	};
+																	style: string;
+																	tooltip: string;
+																	trackingParams: string;
+																	accessibilityData: {
+																		label: string;
+																	};
+																};
+															}>;
+															trackingParams: string;
+															shortViewCountText: {
+																accessibility: {
+																	accessibilityData: {
+																		label: string;
+																	};
+																};
+																simpleText: string;
+															};
+															menu: {
+																menuRenderer: {
+																	items: Array<{
+																		menuServiceItemRenderer?: {
+																			text: TextRenderer;
+																			icon: {
+																				iconType: string;
+																			};
+																			serviceEndpoint: {
+																				clickTrackingParams: string;
+																				commandMetadata: {
+																					webCommandMetadata: {
+																						sendPost: boolean;
+																						apiUrl?: string;
+																					};
+																				};
+																				shareEntityServiceEndpoint?: {
+																					serializedShareEntity: string;
+																					commands: Array<{
+																						clickTrackingParams: string;
+																						openPopupAction: {
+																							popup: {
+																								unifiedSharePanelRenderer: {
+																									trackingParams: string;
+																									showLoadingSpinner: boolean;
+																								};
+																							};
+																							popupType: string;
+																							beReused: boolean;
+																						};
+																					}>;
+																				};
+																				signalServiceEndpoint?: {
+																					signal: string;
+																					actions: Array<{
+																						clickTrackingParams: string;
+																						addToPlaylistCommand: {
+																							openMiniplayer: boolean;
+																							videoId: string;
+																							listType: string;
+																							onCreateListCommand: {
+																								clickTrackingParams: string;
+																								commandMetadata: {
+																									webCommandMetadata: {
+																										sendPost: boolean;
+																										apiUrl: string;
+																									};
+																								};
+																								createPlaylistServiceEndpoint: {
+																									videoIds: Array<string>;
+																									params: string;
+																								};
+																							};
+																							videoIds: Array<string>;
+																						};
+																					}>;
+																				};
+																				playlistEditEndpoint?: {
+																					playlistId: string;
+																					actions: Array<{
+																						addedVideoId: string;
+																						action: string;
+																					}>;
+																				};
+																				addToPlaylistServiceEndpoint?: {
+																					videoId: string;
+																				};
+																			};
+																			trackingParams: string;
+																			hasSeparator?: boolean;
+																		};
+																		menuServiceItemDownloadRenderer?: {
+																			serviceEndpoint: {
+																				clickTrackingParams: string;
+																				offlineVideoEndpoint: {
+																					videoId: string;
+																					onAddCommand: {
+																						clickTrackingParams: string;
+																						getDownloadActionCommand: {
+																							videoId: string;
+																							params: string;
+																						};
+																					};
+																				};
+																			};
+																			trackingParams: string;
+																		};
+																	}>;
+																	trackingParams: string;
+																	accessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																};
+															};
+															thumbnailOverlays: Array<{
+																thumbnailOverlayTimeStatusRenderer?: {
+																	text: {
+																		accessibility: {
+																			accessibilityData: {
+																				label: string;
+																			};
+																		};
+																		simpleText: string;
+																	};
+																	style: string;
+																};
+																thumbnailOverlayToggleButtonRenderer?: {
+																	untoggledIcon: {
+																		iconType: string;
+																	};
+																	toggledIcon: {
+																		iconType: string;
+																	};
+																	untoggledTooltip: string;
+																	toggledTooltip: string;
+																	untoggledServiceEndpoint: {
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				sendPost: boolean;
+																				apiUrl?: string;
+																			};
+																		};
+																		signalServiceEndpoint?: {
+																			signal: string;
+																			actions: Array<{
+																				clickTrackingParams: string;
+																				addToPlaylistCommand: {
+																					openMiniplayer: boolean;
+																					videoId: string;
+																					listType: string;
+																					onCreateListCommand: {
+																						clickTrackingParams: string;
+																						commandMetadata: {
+																							webCommandMetadata: {
+																								sendPost: boolean;
+																								apiUrl: string;
+																							};
+																						};
+																						createPlaylistServiceEndpoint: {
+																							videoIds: Array<string>;
+																							params: string;
+																						};
+																					};
+																					videoIds: Array<string>;
+																				};
+																			}>;
+																		};
+																		playlistEditEndpoint?: {
+																			playlistId: string;
+																			actions: Array<{
+																				addedVideoId: string;
+																				action: string;
+																			}>;
+																		};
+																	};
+																	untoggledAccessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																	toggledAccessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																	trackingParams: string;
+																	isToggled?: boolean;
+																	toggledServiceEndpoint?: {
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				sendPost: boolean;
+																				apiUrl: string;
+																			};
+																		};
+																		playlistEditEndpoint: {
+																			playlistId: string;
+																			actions: Array<{
+																				action: string;
+																				removedVideoId: string;
+																			}>;
+																		};
+																	};
+																};
+																thumbnailOverlayNowPlayingRenderer?: {
+																	text: TextRenderer;
+																};
+																thumbnailOverlayResumePlaybackRenderer?: {
+																	percentDurationWatched: number;
+																};
+															}>;
+															richThumbnail?: {
+																movingThumbnailRenderer: {
+																	movingThumbnailDetails: {
+																		thumbnails: Array<Thumbnail>;
+																		logAsMovingThumbnail: boolean;
+																	};
+																	enableHoveredLogging: boolean;
+																	enableOverlay: boolean;
+																};
+															};
+															shortBylineText?: TextRenderer;
+															badges?: Array<{
+																metadataBadgeRenderer: {
+																	style: string;
+																	label: string;
+																	trackingParams: string;
+																	accessibilityData: {
+																		label: string;
+																	};
+																};
+															}>;
+														};
+														gridChannelRenderer?: {
+															channelId: string;
+															thumbnail: {
+																thumbnails: Array<Thumbnail>;
+															};
+															videoCountText: TextRenderer;
+															subscriberCountText: {
+																accessibility: {
+																	accessibilityData: {
+																		label: string;
+																	};
+																};
+																simpleText: string;
+															};
+															navigationEndpoint: {
+																clickTrackingParams: string;
+																commandMetadata: {
+																	webCommandMetadata: {
+																		url: string;
+																		webPageType: string;
+																		rootVe: number;
+																		apiUrl: string;
+																	};
+																};
+																browseEndpoint: {
+																	browseId: string;
+																	canonicalBaseUrl: string;
+																};
+															};
+															title: TextRenderer;
+															subscribeButton: {
+																subscribeButtonRenderer: {
+																	buttonText: TextRenderer;
+																	subscribed: boolean;
+																	enabled: boolean;
+																	type: string;
+																	channelId: string;
+																	showPreferences: boolean;
+																	subscribedButtonText: TextRenderer;
+																	unsubscribedButtonText: TextRenderer;
+																	trackingParams: string;
+																	unsubscribeButtonText: TextRenderer;
+																	style: {
+																		styleType: string;
+																	};
+																	subscribeAccessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																	unsubscribeAccessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																	subscribedEntityKey: string;
+																	onSubscribeEndpoints: Array<{
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				sendPost: boolean;
+																				apiUrl: string;
+																			};
+																		};
+																		subscribeEndpoint: {
+																			channelIds: Array<string>;
+																			params: string;
+																		};
+																	}>;
+																	onUnsubscribeEndpoints: Array<{
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				sendPost: boolean;
+																			};
+																		};
+																		signalServiceEndpoint: {
+																			signal: string;
+																			actions: Array<{
+																				clickTrackingParams: string;
+																				openPopupAction: {
+																					popup: {
+																						confirmDialogRenderer: {
+																							trackingParams: string;
+																							dialogMessages: Array<TextRenderer>;
+																							confirmButton: {
+																								buttonRenderer: {
+																									style: string;
+																									size: string;
+																									isDisabled: boolean;
+																									text: TextRenderer;
+																									serviceEndpoint: {
+																										clickTrackingParams: string;
+																										commandMetadata: {
+																											webCommandMetadata: {
+																												sendPost: boolean;
+																												apiUrl: string;
+																											};
+																										};
+																										unsubscribeEndpoint: {
+																											channelIds: Array<string>;
+																											params: string;
+																										};
+																									};
+																									accessibility: {
+																										label: string;
+																									};
+																									trackingParams: string;
+																								};
+																							};
+																							cancelButton: {
+																								buttonRenderer: {
+																									style: string;
+																									size: string;
+																									isDisabled: boolean;
+																									text: TextRenderer;
+																									accessibility: {
+																										label: string;
+																									};
+																									trackingParams: string;
+																								};
+																							};
+																							primaryIsCancel: boolean;
+																						};
+																					};
+																					popupType: string;
+																				};
+																			}>;
+																		};
+																	}>;
+																};
+															};
+															ownerBadges?: Array<{
+																metadataBadgeRenderer: {
+																	icon: {
+																		iconType: string;
+																	};
+																	style: string;
+																	tooltip: string;
+																	trackingParams: string;
+																	accessibilityData: {
+																		label: string;
+																	};
+																};
+															}>;
+															trackingParams: string;
+														};
+													}>;
+													trackingParams: string;
+													collapsedItemCount?: number;
+													visibleItemCount: number;
+													nextButton: {
+														buttonRenderer: {
+															style: string;
+															size: string;
+															isDisabled: boolean;
+															icon: {
+																iconType: string;
+															};
+															accessibility: {
+																label: string;
+															};
+															trackingParams: string;
+														};
+													};
+													previousButton: {
+														buttonRenderer: {
+															style: string;
+															size: string;
+															isDisabled: boolean;
+															icon: {
+																iconType: string;
+															};
+															accessibility: {
+																label: string;
+															};
+															trackingParams: string;
+														};
+													};
+													itemSizeConstraint?: string;
+												};
+											};
+											trackingParams: string;
+											endpoint?: {
+												clickTrackingParams: string;
+												showEngagementPanelEndpoint?: {
+													engagementPanel: {
+														engagementPanelSectionListRenderer: {
+															header: {
+																engagementPanelTitleHeaderRenderer: {
+																	title: TextRenderer;
+																	visibilityButton: {
+																		buttonRenderer: {
+																			style: string;
+																			size: string;
+																			isDisabled: boolean;
+																			icon: {
+																				iconType: string;
+																			};
+																			accessibility: {
+																				label: string;
+																			};
+																			trackingParams: string;
+																			accessibilityData: {
+																				accessibilityData: {
+																					label: string;
+																				};
+																			};
+																			command: {
+																				clickTrackingParams: string;
+																				changeEngagementPanelVisibilityAction: {
+																					targetId: string;
+																					visibility: string;
+																				};
+																			};
+																		};
+																	};
+																	trackingParams: string;
+																};
+															};
+															content: {
+																sectionListRenderer: {
+																	contents: Array<{
+																		itemSectionRenderer: {
+																			contents: Array<{
+																				continuationItemRenderer: {
+																					trigger: string;
+																					continuationEndpoint: {
+																						clickTrackingParams: string;
+																						commandMetadata: {
+																							webCommandMetadata: {
+																								sendPost: boolean;
+																								apiUrl: string;
+																							};
+																						};
+																						continuationCommand: {
+																							token: string;
+																							request: string;
+																						};
+																					};
+																				};
+																			}>;
+																			trackingParams: string;
+																			sectionIdentifier: string;
+																			targetId: string;
+																		};
+																	}>;
+																	trackingParams: string;
+																	scrollPaneStyle: {
+																		scrollable: boolean;
+																	};
+																};
+															};
+															targetId: string;
+															identifier: {
+																surface: string;
+																tag: string;
+															};
+															size: string;
+														};
+													};
+													identifier: {
+														surface: string;
+														tag: string;
+													};
+													engagementPanelPresentationConfigs: {
+														engagementPanelPopupPresentationConfig: {
+															popupType: string;
+														};
+													};
+												};
+												commandMetadata?: {
+													webCommandMetadata: {
+														url: string;
+														webPageType: string;
+														rootVe: number;
+														apiUrl: string;
+													};
+												};
+												browseEndpoint?: {
+													browseId: string;
+												};
+											};
+											subtitle?: TextRenderer;
+											playAllButton?: {
+												buttonRenderer: {
+													style: string;
+													size: string;
+													isDisabled: boolean;
+													text: TextRenderer;
+													icon: {
+														iconType: string;
+													};
+													navigationEndpoint: {
+														clickTrackingParams: string;
+														commandMetadata: {
+															webCommandMetadata: {
+																url: string;
+																webPageType: string;
+																rootVe: number;
+															};
+														};
+														watchEndpoint: {
+															videoId: string;
+															playlistId: string;
+															loggingContext: {
+																vssLoggingContext: {
+																	serializedContextData: string;
+																};
+															};
+															watchEndpointSupportedOnesieConfig: {
+																html5PlaybackOnesieConfig: {
+																	commonConfig: {
+																		url: string;
+																	};
+																};
+															};
+														};
+													};
+													trackingParams: string;
+												};
+											};
+										};
+										reelShelfRenderer?: {
+											title: TextRenderer;
+											button: {
+												menuRenderer: {
+													items: Array<{
+														menuNavigationItemRenderer: {
+															text: TextRenderer;
+															icon: {
+																iconType: string;
+															};
+															navigationEndpoint: {
+																clickTrackingParams: string;
+																commandMetadata: {
+																	webCommandMetadata: {
+																		ignoreNavigation: boolean;
+																	};
+																};
+																userFeedbackEndpoint: {
+																	additionalDatas: Array<{
+																		userFeedbackEndpointProductSpecificValueData: {
+																			key: string;
+																			value: string;
+																		};
+																	}>;
+																};
+															};
+															trackingParams: string;
+															accessibility: {
+																accessibilityData: {
+																	label: string;
+																};
+															};
+														};
+													}>;
+													trackingParams: string;
+													accessibility: {
+														accessibilityData: {
+															label: string;
+														};
+													};
+												};
+											};
+											items: Array<{
+												reelItemRenderer: {
+													videoId: string;
+													headline: TextRenderer;
+													thumbnail: {
+														thumbnails: Array<Thumbnail>;
+														isOriginalAspectRatio: boolean;
+													};
+													viewCountText: {
+														accessibility: {
+															accessibilityData: {
+																label: string;
+															};
+														};
+														simpleText: string;
+													};
+													navigationEndpoint: {
+														clickTrackingParams: string;
+														commandMetadata: {
+															webCommandMetadata: {
+																url: string;
+																webPageType: string;
+																rootVe: number;
+															};
+														};
+														reelWatchEndpoint: {
+															videoId: string;
+															playerParams: string;
+															thumbnail: {
+																thumbnails: Array<Thumbnail>;
+																isOriginalAspectRatio: boolean;
+															};
+															overlay: {
+																reelPlayerOverlayRenderer: {
+																	style: string;
+																	trackingParams: string;
+																	reelPlayerNavigationModel: string;
+																};
+															};
+															params: string;
+															sequenceProvider: string;
+															sequenceParams: string;
+															loggingContext: {
+																vssLoggingContext: {
+																	serializedContextData: string;
+																};
+																qoeLoggingContext: {
+																	serializedContextData: string;
+																};
+															};
+															ustreamerConfig: string;
+														};
+													};
+													menu: {
+														menuRenderer: {
+															items: Array<{
+																menuNavigationItemRenderer: {
+																	text: TextRenderer;
+																	icon: {
+																		iconType: string;
+																	};
+																	navigationEndpoint: {
+																		clickTrackingParams: string;
+																		commandMetadata: {
+																			webCommandMetadata: {
+																				ignoreNavigation: boolean;
+																			};
+																		};
+																		userFeedbackEndpoint: {
+																			additionalDatas: Array<{
+																				userFeedbackEndpointProductSpecificValueData: {
+																					key: string;
+																					value: string;
+																				};
+																			}>;
+																		};
+																	};
+																	trackingParams: string;
+																	accessibility: {
+																		accessibilityData: {
+																			label: string;
+																		};
+																	};
+																};
+															}>;
+															trackingParams: string;
+															accessibility: {
+																accessibilityData: {
+																	label: string;
+																};
+															};
+														};
+													};
+													trackingParams: string;
+													accessibility: {
+														accessibilityData: {
+															label: string;
+														};
+													};
+													style: string;
+													videoType: string;
+													loggingDirectives: {
+														trackingParams: string;
+														visibility: {
+															types: string;
+														};
+														enableDisplayloggerExperiment: boolean;
+													};
+												};
+											}>;
+											trackingParams: string;
+											icon: {
+												iconType: string;
+											};
+										};
+									}>;
+									trackingParams: string;
+								};
+							}>;
+							trackingParams: string;
+							targetId: string;
+							disablePullToRefresh: boolean;
+						};
+					};
+					trackingParams: string;
+				};
+				expandableTabRenderer?: {
+					endpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								url: string;
+								webPageType: string;
+								rootVe: number;
+								apiUrl: string;
+							};
+						};
+						browseEndpoint: {
+							browseId: string;
+							params: string;
+							canonicalBaseUrl: string;
+						};
+					};
+					title: string;
+					selected: boolean;
+				};
+			}>;
+		};
+	};
+	header: {
+		pageHeaderRenderer: {
+			pageTitle: string;
+			content: {
+				pageHeaderViewModel: {
+					title: {
+						dynamicTextViewModel: {
+							text: {
+								content: string;
+								styleRuns: Array<{
+									startIndex: number;
+									styleRunExtensions: {
+										styleRunColorMapExtension: {
+											colorMap: Array<{
+												key: string;
+												value: number;
+											}>;
+										};
+									};
+								}>;
+								attachmentRuns: Array<{
+									startIndex: number;
+									length: number;
+									element: {
+										type: {
+											imageType: {
+												image: {
+													sources: Array<{
+														clientResource: {
+															imageName: string;
+														};
+														width: number;
+														height: number;
+													}>;
+												};
+											};
+										};
+										properties: {
+											layoutProperties: {
+												height: {
+													value: number;
+													unit: string;
+												};
+												width: {
+													value: number;
+													unit: string;
+												};
+												margin: {
+													left: {
+														value: number;
+														unit: string;
+													};
+												};
+											};
+										};
+									};
+									alignment: string;
+								}>;
+							};
+							maxLines: number;
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+								accessibilityContext: {
+									label: string;
+								};
+							};
+						};
+					};
+					image: {
+						decoratedAvatarViewModel: {
+							avatar: {
+								avatarViewModel: {
+									image: {
+										sources: Array<Thumbnail>;
+										processor: {
+											borderImageProcessor: {
+												circular: boolean;
+											};
+										};
+									};
+									avatarImageSize: string;
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										enableDisplayloggerExperiment: boolean;
+									};
+								};
+							};
+						};
+					};
+					metadata: {
+						contentMetadataViewModel: {
+							metadataRows: Array<{
+								metadataParts: Array<{
+									text: {
+										content: string;
+										styleRuns?: Array<{
+											startIndex: number;
+											length: number;
+										}>;
+									};
+									onLongPress?: {
+										innertubeCommand: {
+											clickTrackingParams: string;
+											copyTextEndpoint: {
+												text: string;
+											};
+										};
+									};
+									enableTruncation?: boolean;
+								}>;
+							}>;
+							delimiter: string;
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+							};
+						};
+					};
+					actions: {
+						flexibleActionsViewModel: {
+							actionsRows: Array<{
+								actions: Array<{
+									subscribeButtonViewModel: {
+										subscribeButtonContent: {
+											buttonText: string;
+											accessibilityText: string;
+											imageName: string;
+											subscribeState: {
+												key: string;
+												subscribed: boolean;
+											};
+											onTapCommand: {
+												innertubeCommand: {
+													clickTrackingParams: string;
+													commandMetadata: {
+														webCommandMetadata: {
+															sendPost: boolean;
+															apiUrl: string;
+														};
+													};
+													subscribeEndpoint: {
+														channelIds: Array<string>;
+														params: string;
+													};
+												};
+											};
+										};
+										unsubscribeButtonContent: {
+											buttonText: string;
+											accessibilityText: string;
+											imageName: string;
+											subscribeState: {
+												key: string;
+												subscribed: boolean;
+											};
+											onTapCommand: {
+												innertubeCommand: {
+													clickTrackingParams: string;
+													commandMetadata: {
+														webCommandMetadata: {
+															sendPost: boolean;
+														};
+													};
+													signalServiceEndpoint: {
+														signal: string;
+														actions: Array<{
+															clickTrackingParams: string;
+															openPopupAction: {
+																popup: {
+																	confirmDialogRenderer: {
+																		trackingParams: string;
+																		dialogMessages: Array<TextRenderer>;
+																		confirmButton: {
+																			buttonRenderer: {
+																				style: string;
+																				size: string;
+																				isDisabled: boolean;
+																				text: TextRenderer;
+																				serviceEndpoint: {
+																					clickTrackingParams: string;
+																					commandMetadata: {
+																						webCommandMetadata: {
+																							sendPost: boolean;
+																							apiUrl: string;
+																						};
+																					};
+																					unsubscribeEndpoint: {
+																						channelIds: Array<string>;
+																						params: string;
+																					};
+																				};
+																				accessibility: {
+																					label: string;
+																				};
+																				trackingParams: string;
+																			};
+																		};
+																		cancelButton: {
+																			buttonRenderer: {
+																				style: string;
+																				size: string;
+																				isDisabled: boolean;
+																				text: TextRenderer;
+																				accessibility: {
+																					label: string;
+																				};
+																				trackingParams: string;
+																			};
+																		};
+																		primaryIsCancel: boolean;
+																	};
+																};
+																popupType: string;
+															};
+														}>;
+													};
+												};
+											};
+										};
+										stateEntityStoreKey: string;
+										trackingParams: string;
+										disableNotificationBell: boolean;
+										buttonStyle: {
+											unsubscribedStateStyle: string;
+											subscribedStateStyle: string;
+											buttonSize: string;
+										};
+										backgroundStyle: string;
+										disableSubscribeButton: boolean;
+										onShowSubscriptionOptions: {
+											innertubeCommand: {
+												clickTrackingParams: string;
+												showSheetCommand: {
+													panelLoadingStrategy: {
+														inlineContent: {
+															sheetViewModel: {
+																content: {
+																	listViewModel: {
+																		listItems: Array<{
+																			listItemViewModel: {
+																				title: {
+																					content: string;
+																				};
+																				leadingImage: {
+																					sources: Array<{
+																						clientResource: {
+																							imageName: string;
+																						};
+																					}>;
+																				};
+																				isDisabled: boolean;
+																				isSelected?: boolean;
+																				selectionStyle?: string;
+																				rendererContext: {
+																					loggingContext: {
+																						loggingDirectives: {
+																							trackingParams: string;
+																							visibility: {
+																								types: string;
+																							};
+																						};
+																					};
+																					commandContext: {
+																						onTap: {
+																							innertubeCommand: {
+																								clickTrackingParams: string;
+																								commandMetadata: {
+																									webCommandMetadata: {
+																										sendPost: boolean;
+																										apiUrl?: string;
+																									};
+																								};
+																								modifyChannelNotificationPreferenceEndpoint?: {
+																									params: string;
+																								};
+																								signalServiceEndpoint?: {
+																									signal: string;
+																									actions: Array<{
+																										clickTrackingParams: string;
+																										openPopupAction: {
+																											popup: {
+																												confirmDialogRenderer: {
+																													trackingParams: string;
+																													dialogMessages: Array<TextRenderer>;
+																													confirmButton: {
+																														buttonRenderer: {
+																															style: string;
+																															size: string;
+																															isDisabled: boolean;
+																															text: TextRenderer;
+																															serviceEndpoint: {
+																																clickTrackingParams: string;
+																																commandMetadata: {
+																																	webCommandMetadata: {
+																																		sendPost: boolean;
+																																		apiUrl: string;
+																																	};
+																																};
+																																unsubscribeEndpoint: {
+																																	channelIds: Array<
+																																		string
+																																	>;
+																																	params: string;
+																																};
+																															};
+																															accessibility: {
+																																label: string;
+																															};
+																															trackingParams: string;
+																														};
+																													};
+																													cancelButton: {
+																														buttonRenderer: {
+																															style: string;
+																															size: string;
+																															isDisabled: boolean;
+																															text: TextRenderer;
+																															accessibility: {
+																																label: string;
+																															};
+																															trackingParams: string;
+																														};
+																													};
+																													primaryIsCancel: boolean;
+																												};
+																											};
+																											popupType: string;
+																										};
+																									}>;
+																								};
+																							};
+																						};
+																					};
+																				};
+																			};
+																		}>;
+																	};
+																};
+															};
+														};
+													};
+												};
+											};
+										};
+										channelId: string;
+										enableSubscribeButtonPostClickAnimation: boolean;
+										notificationStateEntityStoreKeys: {
+											subsNotificationStateKey: string;
+										};
+										bellAccessibilityData: {
+											offLabel: string;
+											allLabel: string;
+											occasionalLabel: string;
+											disabledLabel: string;
+										};
+										loggingDirectives: {
+											trackingParams: string;
+											visibility: {
+												types: string;
+											};
+											enableDisplayloggerExperiment: boolean;
+										};
+									};
+								}>;
+							}>;
+							minimumRowHeight: number;
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+							};
+						};
+					};
+					description: {
+						descriptionPreviewViewModel: {
+							description: {
+								content: string;
+							};
+							maxLines: number;
+							truncationText: {
+								content: string;
+								styleRuns: Array<{
+									startIndex: number;
+									length: number;
+									weight: number;
+								}>;
+							};
+							alwaysShowTruncationText: boolean;
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+								accessibilityContext: {
+									label: string;
+								};
+								commandContext: {
+									onTap: {
+										innertubeCommand: {
+											clickTrackingParams: string;
+											showEngagementPanelEndpoint: {
+												engagementPanel: {
+													engagementPanelSectionListRenderer: {
+														header: {
+															engagementPanelTitleHeaderRenderer: {
+																title: TextRenderer;
+																visibilityButton: {
+																	buttonRenderer: {
+																		style: string;
+																		size: string;
+																		isDisabled: boolean;
+																		icon: {
+																			iconType: string;
+																		};
+																		accessibility: {
+																			label: string;
+																		};
+																		trackingParams: string;
+																		accessibilityData: {
+																			accessibilityData: {
+																				label: string;
+																			};
+																		};
+																		command: {
+																			clickTrackingParams: string;
+																			changeEngagementPanelVisibilityAction: {
+																				targetId: string;
+																				visibility: string;
+																			};
+																		};
+																	};
+																};
+																trackingParams: string;
+															};
+														};
+														content: {
+															sectionListRenderer: {
+																contents: Array<{
+																	itemSectionRenderer: {
+																		contents: Array<{
+																			continuationItemRenderer: {
+																				trigger: string;
+																				continuationEndpoint: {
+																					clickTrackingParams: string;
+																					commandMetadata: {
+																						webCommandMetadata: {
+																							sendPost: boolean;
+																							apiUrl: string;
+																						};
+																					};
+																					continuationCommand: {
+																						token: string;
+																						request: string;
+																					};
+																				};
+																			};
+																		}>;
+																		trackingParams: string;
+																		sectionIdentifier: string;
+																		targetId: string;
+																	};
+																}>;
+																trackingParams: string;
+																scrollPaneStyle: {
+																	scrollable: boolean;
+																};
+															};
+														};
+														targetId: string;
+														identifier: {
+															surface: string;
+															tag: string;
+														};
+													};
+												};
+												identifier: {
+													surface: string;
+													tag: string;
+												};
+												engagementPanelPresentationConfigs: {
+													engagementPanelPopupPresentationConfig: {
+														popupType: string;
+													};
+												};
+											};
+										};
+									};
+								};
+							};
+						};
+					};
+					attribution: {
+						attributionViewModel: {
+							text: {
+								content: string;
+								commandRuns: Array<{
+									startIndex: number;
+									length: number;
+									onTap: {
+										innertubeCommand: {
+											clickTrackingParams: string;
+											commandMetadata: {
+												webCommandMetadata: {
+													url: string;
+													webPageType: string;
+													rootVe: number;
+												};
+											};
+											urlEndpoint: {
+												url: string;
+												target: string;
+											};
+										};
+									};
+								}>;
+								styleRuns: Array<{
+									weightLabel: string;
+									styleRunExtensions: {
+										styleRunColorMapExtension: {
+											colorMap: Array<{
+												key: string;
+												value: number;
+											}>;
+										};
+									};
+								}>;
+							};
+							suffix: {
+								content: string;
+								commandRuns: Array<{
+									startIndex: number;
+									length: number;
+									onTap: {
+										innertubeCommand: {
+											clickTrackingParams: string;
+											showEngagementPanelEndpoint: {
+												engagementPanel: {
+													engagementPanelSectionListRenderer: {
+														header: {
+															engagementPanelTitleHeaderRenderer: {
+																title: TextRenderer;
+																visibilityButton: {
+																	buttonRenderer: {
+																		style: string;
+																		size: string;
+																		isDisabled: boolean;
+																		icon: {
+																			iconType: string;
+																		};
+																		accessibility: {
+																			label: string;
+																		};
+																		trackingParams: string;
+																		accessibilityData: {
+																			accessibilityData: {
+																				label: string;
+																			};
+																		};
+																		command: {
+																			clickTrackingParams: string;
+																			changeEngagementPanelVisibilityAction: {
+																				targetId: string;
+																				visibility: string;
+																			};
+																		};
+																	};
+																};
+																trackingParams: string;
+															};
+														};
+														content: {
+															sectionListRenderer: {
+																contents: Array<{
+																	itemSectionRenderer: {
+																		contents: Array<{
+																			continuationItemRenderer: {
+																				trigger: string;
+																				continuationEndpoint: {
+																					clickTrackingParams: string;
+																					commandMetadata: {
+																						webCommandMetadata: {
+																							sendPost: boolean;
+																							apiUrl: string;
+																						};
+																					};
+																					continuationCommand: {
+																						token: string;
+																						request: string;
+																					};
+																				};
+																			};
+																		}>;
+																		trackingParams: string;
+																		sectionIdentifier: string;
+																		targetId: string;
+																	};
+																}>;
+																trackingParams: string;
+																scrollPaneStyle: {
+																	scrollable: boolean;
+																};
+															};
+														};
+														targetId: string;
+														identifier: {
+															surface: string;
+															tag: string;
+														};
+													};
+												};
+												identifier: {
+													surface: string;
+													tag: string;
+												};
+												engagementPanelPresentationConfigs: {
+													engagementPanelPopupPresentationConfig: {
+														popupType: string;
+													};
+												};
+											};
+										};
+									};
+								}>;
+								styleRuns: Array<{
+									fontName: string;
+									fontSize: number;
+									weightLabel: string;
+								}>;
+							};
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+							};
+						};
+					};
+					banner: {
+						imageBannerViewModel: {
+							image: {
+								sources: Array<Thumbnail>;
+							};
+							style: string;
+							rendererContext: {
+								loggingContext: {
+									loggingDirectives: {
+										trackingParams: string;
+										visibility: {
+											types: string;
+										};
+										clientVeSpec: {
+											uiType: number;
+											veCounter: number;
+										};
+									};
+								};
+							};
+						};
+					};
+					rendererContext: {
+						loggingContext: {
+							loggingDirectives: {
+								trackingParams: string;
+								visibility: {
+									types: string;
+								};
+								clientVeSpec: {
+									uiType: number;
+									veCounter: number;
+								};
+							};
+						};
+					};
+				};
+			};
+		};
+	};
+	metadata: {
+		channelMetadataRenderer: {
+			title: string;
+			description: string;
+			rssUrl: string;
+			channelConversionUrl: string;
+			externalId: string;
+			keywords: string;
+			ownerUrls: Array<string>;
+			avatar: {
+				thumbnails: Array<Thumbnail>;
+			};
+			channelUrl: string;
+			isFamilySafe: boolean;
+			availableCountryCodes: Array<string>;
+			androidDeepLink: string;
+			androidAppindexingLink: string;
+			iosAppindexingLink: string;
+			vanityChannelUrl: string;
+		};
+	};
+	trackingParams: string;
+	topbar: {
+		desktopTopbarRenderer: {
+			logo: {
+				topbarLogoRenderer: {
+					iconImage: {
+						iconType: string;
+					};
+					tooltipText: TextRenderer;
+					endpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								url: string;
+								webPageType: string;
+								rootVe: number;
+								apiUrl: string;
+							};
+						};
+						browseEndpoint: {
+							browseId: string;
+						};
+					};
+					trackingParams: string;
+					overrideEntityKey: string;
+				};
+			};
+			searchbox: {
+				fusionSearchboxRenderer: {
+					icon: {
+						iconType: string;
+					};
+					placeholderText: TextRenderer;
+					config: {
+						webSearchboxConfig: {
+							requestLanguage: string;
+							requestDomain: string;
+							hasOnscreenKeyboard: boolean;
+							focusSearchbox: boolean;
+						};
+					};
+					trackingParams: string;
+					searchEndpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								url: string;
+								webPageType: string;
+								rootVe: number;
+							};
+						};
+						searchEndpoint: {
+							query: string;
+						};
+					};
+					clearButton: {
+						buttonRenderer: {
+							style: string;
+							size: string;
+							isDisabled: boolean;
+							icon: {
+								iconType: string;
+							};
+							trackingParams: string;
+							accessibilityData: {
+								accessibilityData: {
+									label: string;
+								};
+							};
+						};
+					};
+				};
+			};
+			trackingParams: string;
+			topbarButtons: Array<{
+				topbarMenuButtonRenderer?: {
+					avatar?: {
+						thumbnails: Array<Thumbnail>;
+						accessibility: {
+							accessibilityData: {
+								label: string;
+							};
+						};
+					};
+					menuRequest?: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+								apiUrl: string;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								openPopupAction: {
+									popup: {
+										multiPageMenuRenderer: {
+											trackingParams: string;
+											style: string;
+											showLoadingSpinner: boolean;
+										};
+									};
+									popupType: string;
+									beReused: boolean;
+								};
+							}>;
+						};
+					};
+					trackingParams: string;
+					accessibility: {
+						accessibilityData: {
+							label: string;
+						};
+					};
+					tooltip: string;
+					icon?: {
+						iconType: string;
+					};
+					menuRenderer?: {
+						multiPageMenuRenderer: {
+							sections: Array<{
+								multiPageMenuSectionRenderer: {
+									items: Array<{
+										compactLinkRenderer: {
+											icon: {
+												iconType: string;
+											};
+											title: TextRenderer;
+											navigationEndpoint: {
+												clickTrackingParams: string;
+												commandMetadata: {
+													webCommandMetadata: {
+														url: string;
+														webPageType: string;
+														rootVe: number;
+														apiUrl?: string;
+													};
+												};
+												uploadEndpoint?: {
+													hack: boolean;
+												};
+												signalNavigationEndpoint?: {
+													signal: string;
+												};
+												browseEndpoint?: {
+													browseId: string;
+													params: string;
+												};
+											};
+											trackingParams: string;
+											style: string;
+										};
+									}>;
+									trackingParams: string;
+								};
+							}>;
+							trackingParams: string;
+							style: string;
+						};
+					};
+					style?: string;
+				};
+				notificationTopbarButtonRenderer?: {
+					icon: {
+						iconType: string;
+					};
+					menuRequest: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								openPopupAction: {
+									popup: {
+										multiPageMenuRenderer: {
+											trackingParams: string;
+											style: string;
+											showLoadingSpinner: boolean;
+										};
+									};
+									popupType: string;
+									beReused: boolean;
+								};
+							}>;
+						};
+					};
+					style: string;
+					trackingParams: string;
+					accessibility: {
+						accessibilityData: {
+							label: string;
+						};
+					};
+					tooltip: string;
+					updateUnseenCountEndpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+								apiUrl: string;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+						};
+					};
+					notificationCount: number;
+					handlerDatas: Array<string>;
+				};
+			}>;
+			hotkeyDialog: {
+				hotkeyDialogRenderer: {
+					title: TextRenderer;
+					sections: Array<{
+						hotkeyDialogSectionRenderer: {
+							title: TextRenderer;
+							options: Array<{
+								hotkeyDialogSectionOptionRenderer: {
+									label: TextRenderer;
+									hotkey: string;
+									hotkeyAccessibilityLabel?: {
+										accessibilityData: {
+											label: string;
+										};
+									};
+								};
+							}>;
+						};
+					}>;
+					dismissButton: {
+						buttonRenderer: {
+							style: string;
+							size: string;
+							isDisabled: boolean;
+							text: TextRenderer;
+							trackingParams: string;
+						};
+					};
+					trackingParams: string;
+				};
+			};
+			backButton: {
+				buttonRenderer: {
+					trackingParams: string;
+					command: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								signalAction: {
+									signal: string;
+								};
+							}>;
+						};
+					};
+				};
+			};
+			forwardButton: {
+				buttonRenderer: {
+					trackingParams: string;
+					command: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								signalAction: {
+									signal: string;
+								};
+							}>;
+						};
+					};
+				};
+			};
+			a11ySkipNavigationButton: {
+				buttonRenderer: {
+					style: string;
+					size: string;
+					isDisabled: boolean;
+					text: TextRenderer;
+					trackingParams: string;
+					command: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								signalAction: {
+									signal: string;
+								};
+							}>;
+						};
+					};
+				};
+			};
+			voiceSearchButton: {
+				buttonRenderer: {
+					style: string;
+					size: string;
+					isDisabled: boolean;
+					serviceEndpoint: {
+						clickTrackingParams: string;
+						commandMetadata: {
+							webCommandMetadata: {
+								sendPost: boolean;
+							};
+						};
+						signalServiceEndpoint: {
+							signal: string;
+							actions: Array<{
+								clickTrackingParams: string;
+								openPopupAction: {
+									popup: {
+										voiceSearchDialogRenderer: {
+											placeholderHeader: TextRenderer;
+											promptHeader: TextRenderer;
+											exampleQuery1: TextRenderer;
+											exampleQuery2: TextRenderer;
+											promptMicrophoneLabel: TextRenderer;
+											loadingHeader: TextRenderer;
+											connectionErrorHeader: TextRenderer;
+											connectionErrorMicrophoneLabel: TextRenderer;
+											permissionsHeader: TextRenderer;
+											permissionsSubtext: TextRenderer;
+											disabledHeader: TextRenderer;
+											disabledSubtext: TextRenderer;
+											microphoneButtonAriaLabel: TextRenderer;
+											exitButton: {
+												buttonRenderer: {
+													style: string;
+													size: string;
+													isDisabled: boolean;
+													icon: {
+														iconType: string;
+													};
+													trackingParams: string;
+													accessibilityData: {
+														accessibilityData: {
+															label: string;
+														};
+													};
+												};
+											};
+											trackingParams: string;
+											microphoneOffPromptHeader: TextRenderer;
+										};
+									};
+									popupType: string;
+								};
+							}>;
+						};
+					};
+					icon: {
+						iconType: string;
+					};
+					tooltip: string;
+					trackingParams: string;
+					accessibilityData: {
+						accessibilityData: {
+							label: string;
+						};
+					};
+				};
+			};
+		};
+	};
+	microformat: {
+		microformatDataRenderer: {
+			urlCanonical: string;
+			title: string;
+			description: string;
+			thumbnail: {
+				thumbnails: Array<Thumbnail>;
+			};
+			siteName: string;
+			appName: string;
+			androidPackage: string;
+			iosAppStoreId: string;
+			iosAppArguments: string;
+			ogType: string;
+			urlApplinksWeb: string;
+			urlApplinksIos: string;
+			urlApplinksAndroid: string;
+			urlTwitterIos: string;
+			urlTwitterAndroid: string;
+			twitterCardType: string;
+			twitterSiteHandle: string;
+			schemaDotOrgType: string;
+			noindex: boolean;
+			unlisted: boolean;
+			familySafe: boolean;
+			tags: Array<string>;
+			availableCountries: Array<string>;
+			linkAlternates: Array<{
+				hrefUrl: string;
+			}>;
+		};
+	};
+	onResponseReceivedActions: Array<{
+		clickTrackingParams: string;
+		resetChannelUnreadCountCommand: {
+			channelId: string;
+		};
+	}>;
+	frameworkUpdates: {
+		entityBatchUpdate: {
+			mutations: Array<{
+				entityKey: string;
+				type: string;
+				payload: {
+					subscriptionStateEntity?: {
+						key: string;
+						subscribed: boolean;
+					};
+					subscriptionNotificationStateEntity?: {
+						key: string;
+						state: string;
+					};
+				};
+			}>;
+			timestamp: {
+				seconds: string;
+				nanos: number;
+			};
+		};
+	};
+};
+
+;
 
 export type RawBrowseData = {
 	error?: {
@@ -6643,61 +8689,12 @@ export type RawPlaylistItemData = {
 	index: TextRenderer;
 	shortBylineText: TextRenderer;
 	lengthText: TextRenderer;
-	navigationEndpoint: NavigationEndpoint;
+	navigationEndpoint: Pick<NavigationEndpoint, "clickTrackingParams" | "commandMetadata" | "watchEndpoint">;
 	lengthSeconds: string;
 	trackingParams: string;
 	isPlayable: boolean;
 	menu: {
-		menuRenderer: {
-			items: {
-				menuServiceItemRenderer: {
-					text: TextRenderer;
-					icon: Icon;
-					serviceEndpoint: {
-						clickTrackingParams: string;
-						commandMetadata: {
-							webCommandMetadata: {
-								sendPost: boolean;
-								apiUrl?: string;
-							};
-						};
-						signalServiceEndpoint?: {
-							signal: string;
-							actions: {
-								clickTrackingParams: string;
-								addToPlaylistCommand: {
-									openMiniplayer: boolean;
-									videoId: string;
-									listType: string;
-									onCreateListCommand: NavigationEndpoint;
-									videoIds: string[];
-								};
-							}[];
-						};
-						shareEntityServiceEndpoint?: {
-							serializedShareEntity: string;
-							commands: {
-								clickTrackingParams: string;
-								openPopupAction: {
-									popup: {
-										unifiedSharePanelRenderer: {
-											trackingParams: string;
-											showLoadingSpinner: boolean;
-										};
-									};
-									popupType: string;
-									beReused: boolean;
-								};
-							}[];
-						};
-					};
-					trackingParams: string;
-					hasSeparator?: boolean;
-				};
-			}[];
-			trackingParams: string;
-			accessibility: Accessibility;
-		};
+		menuRenderer: MenuRenderer;
 	};
 	thumbnailOverlays: {
 		thumbnailOverlayTimeStatusRenderer?: OverlayRenderer;

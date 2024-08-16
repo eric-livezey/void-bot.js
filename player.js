@@ -1,9 +1,9 @@
 import { AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, createAudioPlayer, createAudioResource, getVoiceConnection } from "@discordjs/voice";
+import ytdl from "@distube/ytdl-core";
 import { EmbedBuilder } from "discord.js";
 import { EventEmitter } from "events";
 import { createWriteStream, existsSync } from "fs";
 import { Readable } from "stream";
-import ytdl from "@distube/ytdl-core";
 import { formatDurationMillis } from "./utils.js";
 
 const PLAYERS = {};
@@ -61,6 +61,7 @@ class Player extends EventEmitter {
     get isPaused() {
         return this.player.state.status === AudioPlayerStatus.Paused;
     }
+    player;
 
     constructor(id) {
         super({ captureRejections: true });
@@ -71,9 +72,9 @@ class Player extends EventEmitter {
         this.queue = [];
         this.loop = false;
         this.volume = 1;
-        this.player.on("stateChange", async (oldState, newState) => {
+        this.player.on(AudioPlayerStatus.Idle, async (oldState, newState) => {
             // play next track when the track finished
-            if (oldState.status === AudioPlayerStatus.Playing && newState.status === AudioPlayerStatus.Idle)
+            if (oldState.status === AudioPlayerStatus.Playing)
                 await this.#next();
         });
         this.player.on("error", (e) => {

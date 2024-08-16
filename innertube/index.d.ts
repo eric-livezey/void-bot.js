@@ -1,4 +1,5 @@
-import { RawBrowseData, RawPlayerData, RawPlaylistItemData, RawSearchData, RawSearchResultData } from "./rawTypes";
+import { RawBrowseData, RawChannelData, RawPlayerData, RawPlaylistItemData, RawSearchData, RawSearchResultData } from "./rawTypes";
+import ytdl from "@distube/ytdl-core";
 
 interface Thumbnail {
     /**
@@ -503,9 +504,20 @@ declare class SearchListResponse<T extends SearchResultType> {
 }
 
 /**
+ * Represents a YouTube channel.
+ */
+declare class Channel {
+    title: string;
+    subscriberCount: string;
+
+    constructor(data: RawChannelData);
+}
+
+/**
  * Returns the video with the matching ID.
  * 
  * @param id Specifies a YouTube video ID for the resource that is being retrieved. In a `video` resource, the `id` property specifies the video's ID.
+ * @deprecated in favor of {@linkcode ytdl}.
  */
 declare function getVideo(id: string): Promise<Video | null>;
 
@@ -524,6 +536,8 @@ declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlis
  * @param type Restricts the search query to only retrieve a particular type of resource.
  */
 declare function listSearchResults<T extends SearchResultType = SearchResultType>(q: string, type?: T): Promise<SearchListResponse<T>>;
+
+declare function getChannel(id: string): Promise<Channel | null>;
 
 /**
  * Returns an object representing a device code and verification URL for a linking device. You must visit `verificationUrl` and enter `userCode` before `expires` in order for the `deviceCode` to be valid.
@@ -550,9 +564,11 @@ export {
     Playlist,
     SearchResult,
     SearchListResponse,
+    Channel,
     getVideo,
     getPlaylist,
     listSearchResults,
+    getChannel,
     getDeviceCode,
     setBearerToken,
     getMusicSearchSuggestions

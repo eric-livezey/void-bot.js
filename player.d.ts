@@ -90,7 +90,7 @@ declare class Player extends EventEmitter {
 
 declare class Track<T = unknown> {
     /**
-     * A method which gets a new audio resource to play
+     * A function which gets a new audio resource to play
      */
     getResource: () => Promise<AudioResource<T>> | AudioResource<T>;
     /**

@@ -1,9 +1,9 @@
 import { joinVoiceChannel } from "@discordjs/voice";
 import ytdl from "@distube/ytdl-core";
-import { Attachment, Client, EmbedBuilder, Events, MessageFlags, Partials, VoiceChannel } from "discord.js";
+import { Attachment, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
-import { SearchResultType, getPlaylist, listSearchResults } from "./innertube/index.js";
+import { SearchResultType, getChannel, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
 import { now } from "./innertube/utils.js";
 import { evaluate } from "./math.js";
 import { Track, getPlayer } from "./player.js";
@@ -224,7 +224,7 @@ async function play_c(ctx, query, attachment, forceInverse) {
                 if (ctx.user.id === process.env.OWNER) // owner only
                     track = Track.fromURL(url);
                 else
-                    return await ctx.channel.send("That URL does not correspond to a YouTube video or playlist.");
+                    return await ctx.reply("That URL does not correspond to a YouTube video or playlist.");
             }
         } else {
             // Search
@@ -353,9 +353,7 @@ async function loop_c(ctx) {
  */
 async function nowPlaying_c(ctx) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
-        return await ctx.reply("Nothing is playing.");
-    return await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] });
+    return player.isPlaying ? await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] }) : await ctx.reply("Nothing is playing.");
 }
 
 /**
@@ -518,21 +516,15 @@ CLIENT.once(Events.ClientReady, async (client) => {
 CLIENT.on(Events.InteractionCreate, (interaction) => {
     if (interaction.isButton()) {
         // Page update interaction for queue
-        var page = Number(interaction.customId.split(".")[1]);
-        var player = getPlayer(interaction.guild.id);
+        let page = Number(interaction.customId.split(".")[1]);
+        const player = getPlayer(interaction.guild.id);
         // Decrease page number until it is valid
         while (player.queue.length <= (page - 1) * 25) {
             page--;
         }
         if (player.queue.length == 0) {
             // The queue is empty
-            var response = nowPlaying_c(interaction.guild)
-            if (typeof response == "string") {
-                // Clear embeds
-                response = { content: response, embeds: [] };
-            }
-            // Clear components
-            response.components = [];
+            const response = player.isPlaying ? { content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()], components: [] } : { content: "Nothing is playing.", embeds: [], components: [] };
             interaction.update(response);
             return;
         }
@@ -611,6 +603,9 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "leave":
                 case "disconnect":
+                case "kys":
+                case "fuckoff":
+                case "die":
                     // Disconnect
                     await disconnect_c(ctx);
                     break;
