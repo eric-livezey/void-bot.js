@@ -17,31 +17,18 @@ const JS_CACHE = {};
  */
 const BEARER_TOKEN = {};
 
-function createReadOnlyObject(properties) {
-    const obj = Object.create(null);
-
-    for (const entry of Object.entries(properties)) {
-        Object.defineProperty(obj, entry[0], { value: entry[1] });
-    }
-
-    return obj;
-}
-
-/**
- * @type {{readonly 1:{name:"WEB";version:"2.20240620.05.00";platform:"DESKTOP"};readonly 2:{name:"MWEB";version:"2.20240620.05.00";platform:"MOBILE"};readonly 67:{name:"WEB_REMIX";version:"1.20240617.01.00";platform:"DESKTOP";};}}
- */
-const ClientInfo = createReadOnlyObject({
-    1: createReadOnlyObject({
+const ClientInfo = Object.freeze({
+    1: Object.freeze({
         name: "WEB",
         version: "2.20240620.05.00",
         platform: "DESKTOP"
     }),
-    2: createReadOnlyObject({
+    2: Object.freeze({
         name: "MWEB",
         version: "2.20240620.05.00",
         platform: "MOBILE"
     }),
-    67: createReadOnlyObject({
+    67: Object.freeze({
         name: "WEB_REMIX",
         version: "1.20240617.01.00",
         platform: "DESKTOP"
@@ -49,9 +36,15 @@ const ClientInfo = createReadOnlyObject({
 })
 
 /**
- * @type {{readonly WEB:1;readonly MWEB:2;readonly WEB_REMIX:67;}}
+ * @type {typeof import("./index.d.ts").SearchResultType}
  */
-const ClientType = createReadOnlyObject({
+const SearchResultType = Object.freeze({
+    VIDEO: 0,
+    CHANNEL: 1,
+    PLAYLIST: 2
+});
+
+const ClientType = Object.freeze({
     "WEB": 1,
     "MWEB": 2,
     "WEB_REMIX": 67
@@ -113,21 +106,11 @@ class Client {
 /**
  * @type {{readonly WEB:Client;readonly MWEB:Client;readonly WEB_REMIX:Client;}}
  */
-const CLIENTS = createReadOnlyObject({
+const CLIENTS = Object.freeze({
     "WEB": new Client("WEB"),
     "MWEB": new Client("MWEB"),
     "WEB_REMIX": new Client("WEB_REMIX")
 });
-
-/**
- * @param {string} videoId 
- */
-async function getPlayerId(videoId) {
-    // Fetch source video HTML
-    const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
-    // Find the player id
-    return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
-}
 
 /**
  * @param {string} html 
@@ -135,6 +118,16 @@ async function getPlayerId(videoId) {
 function extractPlayerId(html) {
     // Find the player id
     return html.match(/\/s\/player\/(?<id>((?!\/).)+)\/player_ias\.vflset\/en_US\/base\.js/).groups["id"];
+}
+
+/**
+ * @param {string} videoId 
+ */
+async function getPlayerId(videoId) {
+    // Fetch source video HTML
+    const html = await (await fetch(`https://www.youtube.com/watch?v=${videoId}`)).text();
+    // Extract the player id
+    return extractPlayerId(html);
 }
 
 /**
@@ -150,7 +143,7 @@ async function getJs(playerId) {
         // Find the function for deciphering signature ciphers
         const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
         // Find the signature timestamp
-        const signatureTimestamp = js.match(/signatureTimestamp:(?<timestamp>[0-9]+)(,|\})/).groups["timestamp"];
+        const signatureTimestamp = js.match(/signatureTimestamp:(?<st>[0-9]+)(,|\})/).groups["st"];
         // Evaluate the code that will save a new object to the cache
         eval(`${functions};JS_CACHE[playerId]={decipher:(a)=>${decipher},signatureTimestamp:${signatureTimestamp}}`);
     }
@@ -167,25 +160,6 @@ function decipher(js, cipher) {
     url.searchParams.set(cipher.get("sp"), encodeURIComponent(js.decipher(cipher.get("s"))));
     return url.toString();
 }
-
-/**
- * @type {{readonly VIDEO:import("./index.d.ts").SearchResultType.VIDEO;readonly CHANNEL:import("./index.d.ts").SearchResultType.CHANNEL;readonly PLAYLIST:import("./index.d.ts").SearchResultType.PLAYLIST;}}
- */
-const SearchResultType = Object.create(null);
-Object.defineProperties(SearchResultType, {
-    VIDEO: {
-        enumerable: true,
-        value: "video"
-    },
-    CHANNEL: {
-        enumerable: true,
-        value: "channel"
-    },
-    PLAYLIST: {
-        enumerable: true,
-        value: "playlist"
-    }
-});
 
 class Video {
     id;
@@ -766,15 +740,37 @@ async function getPlaylist(id, includeUnavailable = false) {
 
 /**
  * @param {string} q 
- * @param {import("./index.d.ts").SearchResultType} type 
+ * @param {typeof SearchResultType} type 
  */
 async function listSearchResults(q, type = null) {
-    const response = await CLIENTS.WEB.request("/search", {
-        query: q,
-        params: type === SearchResultType.VIDEO ? "EgIQAQ%3D%3D" : type === SearchResultType.CHANNEL ? "EgIQAg%3D%3D" : type === SearchResultType.PLAYLIST ? "EgIQAw%3D%3D" : undefined
-    })
+    const payload = { query: q };
+    switch (type) {
+        case SearchResultType.VIDEO:
+            payload.params = "EgIQAQ%3D%3D";
+            break;
+        case SearchResultType.CHANNEL:
+            payload.params = "EgIQAg%3D%3D";
+            break;
+        case SearchResultType.PLAYLIST:
+            payload.params = "EgIQAw%3D%3D";
+            break;
+    }
+    const response = await CLIENTS.WEB.request("/search", payload)
     if (response.ok) {
         return new SearchListResponse(await response.json());
+    } else {
+        return null;
+    }
+}
+
+/**
+ * @param {string} q 
+ */
+async function listSongSearchResults(q) {
+    const response = await CLIENTS.WEB_REMIX.request("/search", { query: q, params: "EgWKAQIIAWoSEAMQBBAJEA4QChAFEBEQEBAV" });
+    if (response.ok) {
+        const json = await response.json();
+        return json.contents.tabbedSearchResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicShelfRenderer?.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.playlistItemData.videoId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
     } else {
         return null;
     }
@@ -795,18 +791,10 @@ async function getMusicSearchSuggestions(q) {
     const response = await CLIENTS.WEB_REMIX.request("music/get_search_suggestions", { input: q });
     if (response.ok) {
         const body = await response.json();
-        if (!("contents" in response)) {
+        if (!("contents" in body)) {
             return [];
         }
-        const suggestions = [];
-        for (const content of response.contents[0].searchSuggestionsSectionRenderer.contents) {
-            var text = "";
-            for (const run of content.searchSuggestionRenderer.suggestion.runs) {
-                text += run.text;
-            }
-            suggestions.push(text);
-        }
-        return suggestions;
+        return body.contents[0].searchSuggestionsSectionRenderer.contents.map(c => getRenderedText(c.searchSuggestionRenderer.suggestion));
     } else {
         return null;
     }
@@ -894,6 +882,7 @@ export {
     getDeviceCode,
     setBearerToken,
     getMusicSearchSuggestions,
+    listSongSearchResults,
 
     extractPlayerId,
     getPlayerId,

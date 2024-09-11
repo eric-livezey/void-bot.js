@@ -21,7 +21,7 @@ declare class Player extends EventEmitter {
     /**
      * The currently playing track
      */
-    nowPlaying: Track;
+    nowPlaying: Omit<Track, "resource"> & { resource: AudioResource<unknown> };
     /**
      * A list of tracks in the queue
      */
@@ -52,6 +52,8 @@ declare class Player extends EventEmitter {
      * @param id Guild ID
      */
     constructor(id: Snowflake);
+
+    #next(): Promise<void>;
 
     /**
      * Plays a track.
@@ -145,7 +147,7 @@ declare class Track<T = unknown> {
      * @param info a videoInfo object to construct the track from
      * @param download whether the track should be downloaded
      */
-    static fromVideoInfo(info: ytdl.videoInfo, download?: boolean): Track<null>;
+    static fromVideoInfo(info: ytdl.videoInfo, agent: ytdl.Agent, download?: boolean): Track<null>;
 
     /**
      * Creates a track from a playlist item.
@@ -153,7 +155,7 @@ declare class Track<T = unknown> {
      * @param item a PlaylistItem to construct the track from
      * @param download whether the track should be downloaded
      */
-    static fromPlaylistItem(item: PlaylistItem, download?: boolean): Track<null>;
+    static fromPlaylistItem(item: PlaylistItem, agent: ytdl.Agent, download?: boolean): Track<null>;
 }
 
 /**

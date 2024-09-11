@@ -1,5 +1,5 @@
 import { RawBrowseData, RawChannelData, RawPlayerData, RawPlaylistItemData, RawSearchData, RawSearchResultData } from "./rawTypes";
-import ytdl from "@distube/ytdl-core";
+import ytdl from "@distube/ytdl-core"; 
 
 interface Thumbnail {
     /**
@@ -46,15 +46,15 @@ declare enum SearchResultType {
     /**
      * Video search results.
      */
-    VIDEO = "video",
+    VIDEO = 0,
     /**
      * Channel search results.
      */
-    CHANNEL = "channel",
+    CHANNEL = 1,
     /**
      * Playlist search results.
      */
-    PLAYLIST = "playlist"
+    PLAYLIST = 2
 }
 
 /**
@@ -537,6 +537,13 @@ declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlis
  */
 declare function listSearchResults<T extends SearchResultType = SearchResultType>(q: string, type?: T): Promise<SearchListResponse<T>>;
 
+/**
+ * Returns a list of ids of songs which correspond to the given query.
+ * 
+ * @param q Specifies the query term to search for.
+ */
+declare function listSongSearchResults(q: string): Promise<{ id: string }[]>;
+
 declare function getChannel(id: string): Promise<Channel | null>;
 
 /**
@@ -571,5 +578,6 @@ export {
     getChannel,
     getDeviceCode,
     setBearerToken,
-    getMusicSearchSuggestions
+    getMusicSearchSuggestions,
+    listSongSearchResults
 }

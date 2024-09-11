@@ -104,17 +104,19 @@ class Player extends EventEmitter {
             this.stop();
             throw new Error("the audio connection was invalidated");
         }
+        this.nowPlaying = track;
         if (track.resource instanceof Promise)
             track.resource = await track.resource;
         else if (track.resource === null || track.resource.started || track.resource.ended)
             track.resource = await track.getResource();
-        if (track.resource.ended)
+        if (track.resource.ended) {
+            this.nowPlaying = null;
             throw new Error("the resource was already ended");
+        }
         track.resource.volume.setVolume(this.volume);
         this.player.play(track.resource);
         if (this.isPaused)
             this.player.unpause();
-        this.nowPlaying = track;
         // prepare the next track's resource
         if (this.queue.length > 0 && this.queue[0].resource === null)
             this.queue[0].resource = this.queue[0].getResource();
@@ -210,16 +212,11 @@ class Track {
         return new Track(getResource, title, options);
     }
 
-    static fromVideoInfo(info, download) {
+    static fromVideoInfo(info, agent, download) {
         const details = info.videoDetails;
         const getResource = download ? async () => {
             const path = `./audio/${details.videoId}.webm`;
-            return createAudioResource(existsSync(path) ? path : await new Promise((resolve, reject) => {
-                const writeStream = createWriteStream(path);
-                writeStream.once("finish", () => resolve(path));
-                writeStream.once("error", (e) => reject(e));
-                ytdl.downloadFromInfo(info, { quality: "highestaudio" }).pipe(writeStream);
-            }), { inlineVolume: true });
+            return createAudioResource(existsSync(path) ? path : await downloadYTFromInfo(info, path, agent), { inlineVolume: true });
         } : () => createAudioResource(ytdl.downloadFromInfo(info, { quality: "highestaudio" }), { inlineVolume: true });
         const title = details.title;
         const options = {};
@@ -230,16 +227,11 @@ class Track {
         return new Track(getResource, title, options);
     }
 
-    static fromPlaylistItem(item, download) {
+    static fromPlaylistItem(item, agent, download) {
         const getResource = download ?
             async () => {
                 const path = `./audio/${item.id}.webm`;
-                return createAudioResource(existsSync(path) ? path : await new Promise((resolve, reject) => {
-                    const writeStream = createWriteStream(path);
-                    writeStream.once("finish", () => resolve(path));
-                    writeStream.once("error", (e) => reject(e));
-                    ytdl(item.id, { quality: "highestaudio" }).pipe(writeStream);
-                }), { inlineVolume: true })
+                return createAudioResource(existsSync(path) ? path : downloadYT(item.id, path, agent), { inlineVolume: true })
             } :
             () => createAudioResource(ytdl(item.id, { quality: "highestaudio" }), { inlineVolume: true });
         const title = item.title;
@@ -252,6 +244,27 @@ class Track {
         options.duration = item.duration * 1000;
         return new Track(getResource, title, options);
     }
+}
+
+// keep track of in progress downloads so as not overwrite a file that's being read
+const downloads = {};
+
+async function downloadYTFromInfo(info, path, agent) {
+    return downloads[info.vid] || (downloads[info.vid] = new Promise((resolve, reject) => {
+        const writeStream = createWriteStream(path);
+        writeStream.once("finish", () => { delete downloads[info.vid]; resolve(path); });
+        writeStream.once("error", (e) => { delete downloads[info.vid]; reject(e); });
+        ytdl.downloadFromInfo(info, { quality: "highestaudio", agent }).pipe(writeStream);
+    }))
+}
+
+async function downloadYT(id, path, agent) {
+    return downloads[id] || (downloads[id] = new Promise((resolve, reject) => {
+        const writeStream = createWriteStream(path);
+        writeStream.once("finish", () => { delete downloads[id]; resolve(path); });
+        writeStream.once("error", (e) => { delete downloads[id]; reject(e); });
+        ytdl(id, { quality: "highestaudio", agent }).pipe(writeStream);
+    }));
 }
 
 function getPlayer(id) {

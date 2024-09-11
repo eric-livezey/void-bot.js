@@ -3,10 +3,10 @@ import ytdl from "@distube/ytdl-core";
 import { Attachment, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
-import { SearchResultType, getChannel, getPlaylist, getVideo, listSearchResults } from "./innertube/index.js";
+import { SearchResultType, getChannel, getPlaylist, getVideo, listSearchResults, listSongSearchResults } from "./innertube/index.js";
 import { now } from "./innertube/utils.js";
 import { evaluate } from "./math.js";
-import { Track, getPlayer } from "./player.js";
+import { Player, Track, getPlayer } from "./player.js";
 import { formatDuration, formatDurationMillis } from "./utils.js";
 
 Object.assign(process.env, JSON.parse(fs.readFileSync("./env.json")));
@@ -19,10 +19,7 @@ const CLIENT = new Client({
     partials: [Partials.Channel]
 });
 
-const YT_HEADERS = "COOKIE" in process.env && "ID" in process.env ? {
-    "Cookie": process.env.COOKIE,
-    "X-Youtube-Identity-Token": process.env.ID
-} : undefined;
+const AGENT = "COOKIE" in process.env ? ytdl.createAgent([{ name: "cookie", value: process.env.COOKIE }]) : ytdl.createAgent();
 
 const shouldDownload = true;
 
@@ -100,7 +97,7 @@ function createVoiceConnection(channel) {
         adapterCreator: channel.guild.voiceAdapterCreator,
         selfDeaf: false
     });
-    connection.on("error", () => {
+    connection.on("error", e => {
         timelog("A voice connection error occurred.\nAttempting to rejoin...");
         connection.rejoinAttempts = 0;
         while (connection.rejoinAttempts < 5) {
@@ -114,6 +111,51 @@ function createVoiceConnection(channel) {
         console.error(e);
     });
     return connection;
+}
+
+/**
+ * 
+ * @param {Player} player 
+ * @param {number} page 
+ * @returns 
+ */
+function getQueuePage(player, page) {
+    // Decrease page number until it is valid
+    while (player.queue.length <= (page - 1) * 25) page--;
+    if (player.queue.length == 0) {
+        // The queue is empty
+        return player.isPlaying ? { content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()], components: [] } : { content: "Nothing is playing.", embeds: [], components: [] };
+    }
+    var total = player.nowPlaying.duration / 1000;
+    for (const track of player.queue)
+        total += track.duration / 1000;
+    const eb = new EmbedBuilder()
+        .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total))})` });
+    if (page == 1) {
+        // Include now playing if on first page
+        eb.setAuthor({ name: "Now Playing:" })
+            .setTitle(player.nowPlaying.title)
+            .setURL(player.nowPlaying.url)
+            .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
+    }
+    // Append up to 25 tracks to the queue message
+    for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
+        eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
+    }
+    const response = { embeds: [eb.data], components: [{ type: 1, components: [] }] }
+    if (page > 1) {
+        // Add a previous page button
+        response.components[0].components.push({ type: 2, emoji: { id: null, name: "⬅️", animated: false }, style: 2, custom_id: "QUEUE_PAGE:" + (page - 1) });
+    }
+    if (player.queue.length > 25 * page) {
+        // Add a next page button
+        response.components[0].components.push({ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: "QUEUE_PAGE:" + (page + 1) })
+    }
+    if (response.components[0].components.length == 0) {
+        // No components
+        response.components = [];
+    }
+    return response;
 }
 
 // Commands
@@ -139,7 +181,7 @@ async function playPlaylist_c(ctx, id, forceInverse) {
         }
         if (listItem.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(listItem, forceInverse ? !shouldDownload : shouldDownload));
+                await player.enqueue(Track.fromPlaylistItem(listItem, AGENT, forceInverse ? !shouldDownload : shouldDownload));
             } catch {
                 continue;
             }
@@ -245,17 +287,25 @@ async function play_c(ctx, query, attachment, forceInverse) {
             // Get the video info
             let info;
             try {
-                info = await ytdl.getInfo(id, { requestOptions: { headers: YT_HEADERS } });
+                info = await ytdl.getInfo(id, { agent: AGENT });
             } catch (e) {
                 return await ctx.reply("An error occurred whilst trying to retrieve the requested video.\n\n" + e.message);
             }
-            track = Track.fromVideoInfo(info, forceInverse ? !shouldDownload : shouldDownload);
+            track = Track.fromVideoInfo(info, AGENT, forceInverse ? !shouldDownload : shouldDownload);
         }
     } else {
         // resume
         return await resume_c(ctx);
     }
     return await ctx.reply({ content: await player.enqueue(track) ? "**Now Playing:**" : "**Added to the Queue:**", embeds: [track.toEmbed()] });
+}
+
+async function play_music_c(ctx, query) {
+    const items = await listSongSearchResults(query).catch(() => []);
+    if (items.length === 0) {
+        return ctx.reply("There were no valid results for your query.");
+    }
+    return await play_c(ctx, "https://www.youtube.com/watch?v=" + items[0].id);
 }
 
 /**
@@ -360,24 +410,7 @@ async function nowPlaying_c(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function queue_c(ctx) {
-    const player = getPlayer(ctx.guild.id);
-    if (player.queue.length === 0)
-        return await nowPlaying_c(ctx);
-    let total = player.nowPlaying.duration / 1000;
-    for (let i = 0; i < player.queue.length; i++)
-        total += player.queue[i].duration / 1000;
-    const eb = new EmbedBuilder()
-        .setAuthor({ name: "Now Playing:" })
-        .setTitle(player.nowPlaying.title)
-        .setURL(player.nowPlaying.url)
-        .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
-        .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total))})` });
-    for (let i = 0; i < player.queue.length && i < 25; i++)
-        eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
-    let response = { embeds: [eb.toJSON()] }
-    if (player.queue.length > 25)
-        response.components = [{ type: 1, components: [{ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: (ctx.isInteraction() ? ctx.interaction.id : ctx.message.id) + ".2" }] }];
-    return await ctx.reply(response);
+    return await ctx.reply(getQueuePage(getPlayer(ctx.guild.id), 1));
 }
 
 /**
@@ -420,6 +453,19 @@ async function move_c(ctx, source, destination) {
     if (destination === 1 && player.queue[0].resource === null)
         player.queue[0].resource = player.queue[0].getResource();
     return await ctx.reply(`Moved \`${track.title}\` to index ${destination} in the queue.`);
+}
+
+/**
+ * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ */
+async function clear_c(ctx) {
+    const player = getPlayer(ctx.guild.id);
+    if (!player.isPlaying)
+        return ctx.reply("Nothing is playing.");
+    if (player.queue.length == 0)
+        return ctx.reply("The queue is already empty.");
+    player.queue = [];
+    return ctx.reply("Queue cleared.");
 }
 
 /**
@@ -480,22 +526,24 @@ async function help_c(ctx) {
     ctx.reply({
         embeds: [new EmbedBuilder().addFields(
             { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If any atachments are added, the bot will attempt to play them as audio, otherwise if no query is provided, attempts resume." },
-            { name: "pause", value: "Resumes the currently playing track." },
-            { name: "resume", value: "Pauses the currently playing track." },
+            { name: "playmusic|playm|pm [query]", value: "Plays a song from YouTube using the [query] as a search query. Should only find official music in search results (not videos). Note: This command is far less lenient about typos. They are likely to cause the command to return incorrect results." },
+            { name: "pause", value: "Pauses the currently playing track." },
+            { name: "resume", value: "Resumes the currently playing track." },
             { name: "skip", value: "Skips the currently playing track." },
             { name: "stop", value: "Stops the currently playing track and clears the queue." },
-            { name: "nowPlaying|np", value: "Displays the currently playing track." },
+            { name: "nowplaying|np", value: "Displays the currently playing track." },
             { name: "queue|q", value: "Displays the queue." },
             { name: "connect|join *[voice_channel]", value: "Makes the bot join a voice channel, either [voice_channel] or your current voice channel." },
             { name: "disconnect|leave", value: "Makes the bot leave it's current voice channel." },
-            { name: "remove [index]", value: "Remove track [index] from the queue." },
-            { name: "move [source_index] [destination index]", value: "Move the track at [source_index] to [destination_index]" },
+            { name: "remove [index]", value: "Removes track [index] from the queue." },
+            { name: "move [source_index] [destination index]", value: "Moves the track at [source_index] to [destination_index]" },
+            { name: "clear", value: "Clears the queue." },
             { name: "shuffle", value: "Shuffles the queue." },
             { name: "loop", value: "Loops the currently playing track." },
             { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
             { name: "evaluate|eval [expression]", value: "Evaluate a mathematical expression." },
-            { name: "volume [percentage]", value: "Set the volume to the specified percentage." },
-            { name: "help", value: "Display this message." }).data]
+            { name: "volume [percentage]", value: "Sets the volume to the specified percentage." },
+            { name: "help|h", value: "Displays this message." }).data]
     });
 }
 
@@ -516,48 +564,7 @@ CLIENT.once(Events.ClientReady, async (client) => {
 CLIENT.on(Events.InteractionCreate, (interaction) => {
     if (interaction.isButton()) {
         // Page update interaction for queue
-        let page = Number(interaction.customId.split(".")[1]);
-        const player = getPlayer(interaction.guild.id);
-        // Decrease page number until it is valid
-        while (player.queue.length <= (page - 1) * 25) {
-            page--;
-        }
-        if (player.queue.length == 0) {
-            // The queue is empty
-            const response = player.isPlaying ? { content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()], components: [] } : { content: "Nothing is playing.", embeds: [], components: [] };
-            interaction.update(response);
-            return;
-        }
-        var total = player.nowPlaying.duration / 1000;
-        for (var i = 0; i < player.queue.length; i++)
-            total += player.queue[i].duration / 1000;
-        var eb = new EmbedBuilder()
-            .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total / 1000))})` });
-        if (page == 1) {
-            // Include now playing if on first page
-            eb.setAuthor({ name: "Now Playing:" })
-                .setTitle(player.nowPlaying.title)
-                .setURL(player.nowPlaying.url)
-                .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
-        }
-        // Append up to 25 tracks to the queue message
-        for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
-            eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
-        }
-        var response = { embeds: [eb.data], components: [{ type: 1, components: [] }] }
-        if (page > 1) {
-            // Add a last page button
-            response.components[0].components.push({ type: 2, emoji: { id: null, name: "⬅️", animated: false }, style: 2, custom_id: interaction.customId.split(".")[0] + "." + (page - 1) });
-        }
-        if (player.queue.length > 25 * page) {
-            // Add a next page button
-            response.components[0].components.push({ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: interaction.customId.split(".")[0] + "." + (page + 1) })
-        }
-        if (response.components[0].components.length == 0) {
-            // No components
-            response.components = [];
-        }
-        interaction.update(response);
+        interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(interaction.customId.split(":")[1])));
     }
 });
 
@@ -565,7 +572,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
     if (message.channel.isDMBased()) {
         const channel = await CLIENT.channels.fetch("1008484508200357929");
         if (channel !== null && channel.isTextBased()) {
-            await channel.send(`From DM of <@${message.author.id}>:`);
+            await channel.send(`<@${process.env.OWNER}>\nFrom DM of <@${message.author.id}>:`);
             await channel.send({
                 content: message.content,
                 embeds: message.embeds.map(value => value.toJSON()),
@@ -612,6 +619,14 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "play":
                     await play_c(ctx, message.content.substring(cmd.length + 1).trim(), message.attachments.at(0));
                     break;
+                case "playmusic":
+                case "playm":
+                case "pm":
+                    if (args.length < 1)
+                        await ctx.reply("You must provide a query.");
+                    else
+                        await play_music_c(ctx, message.content.substring(cmd.length + 1).trim());
+                    break;
                 case "pause":
                     // Pause
                     await pause_c(ctx);
@@ -629,7 +644,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     // Skip
                     await skip_c(ctx);
                     break;
-                case "now-playing":
+                case "nowplaying":
                 case "np":
                     // Now Playing
                     await nowPlaying_c(ctx);
@@ -658,6 +673,10 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         await ctx.reply("Both indexes must be integers.");
                     else
                         await move_c(ctx, Number(args[0]), Number(args[1]))
+                    break;
+                case "clear":
+                    // Clear
+                    await clear_c(ctx);
                     break;
                 case "shuffle":
                     await shuffle_c(ctx);
@@ -690,9 +709,13 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     await evaluate_c(ctx, args.join(""));
                     break;
                 case "help":
+                case "h":
+                    // Help
                     await help_c(ctx);
                     break;
+                case "execute":
                 case "exec":
+                    // Execute
                     if (message.author.id === process.env.OWNER) {
                         try {
                             let res = "Code Executed.";
@@ -712,7 +735,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             try {
                 await message.channel.send("An error occurred whist processing your command.");
             } catch (e) {
-                console.error(`[${now()}] Failed to send response message:\n`);
+                console.error(`[${now()}] Failed to send response message:`);
                 console.error(e);
             }
         }

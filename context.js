@@ -3,17 +3,17 @@ import { ContextMenuCommandInteraction, DMChannel, GuildMember, Message, NewsCha
 class CommandContext {
     constructor(user, channel, member) {
         if (user instanceof User)
-            Object.defineProperties(this, { "user": { value: user }, "client": { value: user.client } });
+            Object.defineProperties(this, { "user": { value: user, enumerable: true  }, "client": { value: user.client } });
         else
             throw new TypeError("user must be an instance of User");
         if (channel instanceof DMChannel || channel instanceof NewsChannel || channel instanceof StageChannel || channel instanceof TextChannel || channel instanceof VoiceChannel)
-            Object.defineProperty(this, "channel", { value: channel });
+            Object.defineProperty(this, "channel", { value: channel, enumerable: true  });
         else
             throw new TypeError("channel must be an instance of a text based channel");
         if (member instanceof GuildMember)
-            Object.defineProperties(this, { "member": { value: member }, "guild": { value: member.guild } });
+            Object.defineProperties(this, { "member": { value: member, enumerable: true  }, "guild": { value: member.guild } });
         else if (member === null || member === undefined)
-            Object.defineProperty(this, "member", { value: null });
+            Object.defineProperty(this, "member", { value: null, enumerable: true  });
         else
             throw new TypeError("member must be an instance of a Member or null or undefined");
     }
@@ -27,7 +27,7 @@ class MessageCommandContext extends CommandContext {
     constructor(message) {
         super(message.author, message.channel, message.member);
         if (message instanceof Message)
-            Object.defineProperty(this, "message", { value: message });
+            Object.defineProperty(this, "message", { value: message, enumerable: true });
         else
             throw new TypeError("message must be an instance of Message");
     }
@@ -41,7 +41,7 @@ class InteractionCommandContext extends CommandContext {
     constructor(interaction) {
         super(interaction.user, interaction.channel, interaction.member);
         if (interaction instanceof ContextMenuCommandInteraction)
-            Object.defineProperty(this, "interaction", { value: interaction });
+            Object.defineProperty(this, "interaction", { value: interaction, enumerable: true  });
         else
             throw new TypeError("ineraction must be an instance of ContextMenuCommandInteraction");
     }
