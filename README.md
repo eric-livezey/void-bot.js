@@ -1,6 +1,6 @@
 # Void Bot
 
-Void Bot is a Discord bot that will play the audio from YouTube videos in voice calls. It uses [discord.js](https://discord.js.org) for Discord's API and <s>a YouTube downloader that I created</s> [ytdl-core](https://github.com/distubejs/ytdl-core). `main.js` uses text commands, while `main_BETA.js` uses slash commands. I would not recommend trying to use `main_BETA.js` at this time, as the audio tends to crash from network errors involved in streaming directly from YouTube and it is not properly updated. `main.js` works consistently when `shouldDownload` is set to `true` only because it downloads the entire track before hand. Because of this, it keeps every audio file in it's directory for caching which may lead to a large file size of the directory with many audio files. You can always just delete the `audio` folder to clear the cache.
+Void Bot is a Discord bot that will play the audio from YouTube videos in voice calls. It uses [discord.js](https://discord.js.org) for Discord's API and <s>a YouTube downloader that I created</s> [ytdl-core](https://github.com/distubejs/ytdl-core). `main.js` works consistently when `shouldDownload` is set to `true` only because it downloads the entire track before hand. Because of this, it keeps every audio file in it's directory for caching which may lead to a large file size of the directory with many audio files. The `audio` folder can always be deleted whenever the cache gets too big.
 
 # Usage
 
