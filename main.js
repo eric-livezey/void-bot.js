@@ -114,10 +114,9 @@ function createVoiceConnection(channel) {
 }
 
 /**
- * 
  * @param {Player} player 
  * @param {number} page 
- * @returns 
+ * @returns {import("discord.js").APIEmbed}
  */
 function getQueuePage(player, page) {
     // Decrease page number until it is valid
@@ -130,7 +129,7 @@ function getQueuePage(player, page) {
     for (const track of player.queue)
         total += track.duration / 1000;
     const eb = new EmbedBuilder()
-        .setFooter({ text: `${player.queue.length + 1} items (${formatDuration(Math.floor(total))})` });
+        .setFooter({ text: `${player.queue.length} items (${formatDuration(Math.floor(total))})` + (player.queue.length > 25 ? `\nPage ${page}/${Math.ceil(player.queue.length / 25)}` : "") });
     if (page == 1) {
         // Include now playing if on first page
         eb.setAuthor({ name: "Now Playing:" })
@@ -140,9 +139,10 @@ function getQueuePage(player, page) {
     }
     // Append up to 25 tracks to the queue message
     for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
-        eb.addFields({ name: i + 1 + ": " + player.queue[i].title, value: formatDurationMillis(player.queue[i].duration) });
+        const track = player.queue[i];
+        eb.addFields({ name: " ", value: `**${i + 1}: ${track.url ? `[${track.title}](${track.url})` : track.title}**\n${formatDurationMillis(track.duration)}` });
     }
-    const response = { embeds: [eb.data], components: [{ type: 1, components: [] }] }
+    const response = { embeds: [eb.toJSON()], components: [{ type: 1, components: [] }] }
     if (page > 1) {
         // Add a previous page button
         response.components[0].components.push({ type: 2, emoji: { id: null, name: "⬅️", animated: false }, style: 2, custom_id: "QUEUE_PAGE:" + (page - 1) });
@@ -167,34 +167,35 @@ function getQueuePage(player, page) {
  * @param {string} id 
  * @param {boolean | undefined} forceInverse
  */
-async function playPlaylist_c(ctx, id, forceInverse) {
+async function playPlaylist(ctx, id, forceInverse) {
     // Get the playlist by id
     const playlist = await getPlaylist(id);
     if (playlist === null)
         return await ctx.reply("That is not a valid YouTube playlist link.");
     const player = getPlayer(ctx.guild.id)
     let totalAdded = 0;
-    for (const listItem of await playlist.listItems()) {
+    for (const item of await playlist.listItems()) {
         if (!player.isReady) {
             player.stop();
             return await ctx.reply("A voice connection error occurred whilst adding the playlist.");
         }
-        if (listItem.playable) {
+        if (item.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(listItem, AGENT, forceInverse ? !shouldDownload : shouldDownload));
+                await player.enqueue(Track.fromPlaylistItem(item, AGENT, forceInverse ? !shouldDownload : shouldDownload));
             } catch {
                 continue;
             }
             totalAdded++;
         }
     }
+    const eb = new EmbedBuilder()
+        .setTitle(playlist.title || "Unknown")
+        .setURL("https://www.youtube.com/playlist?list=" + id)
+        .setThumbnail(playlist.thumbnails ? playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url : null);
+    if (playlist.channelTitle != null) eb.setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined });
     return await ctx.reply({
         content: "**Added " + totalAdded + " tracks to the queue:**",
-        embeds: [new EmbedBuilder()
-            .setTitle(playlist.title)
-            .setURL("https://www.youtube.com/playlist?list=" + id)
-            .setThumbnail(playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url)
-            .setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined }).data]
+        embeds: [eb.toJSON()]
     });
 }
 
@@ -261,7 +262,7 @@ async function play_c(ctx, query, attachment, forceInverse) {
                 // Attempt to extract a playlist ID
                 const listId = extractPlaylistID(url);
                 if (listId !== null)
-                    return await playPlaylist_c(ctx, listId);
+                    return await playPlaylist(ctx, listId);
                 // Non YouTube URL
                 if (ctx.user.id === process.env.OWNER) // owner only
                     track = Track.fromURL(url);
@@ -297,10 +298,11 @@ async function play_c(ctx, query, attachment, forceInverse) {
         // resume
         return await resume_c(ctx);
     }
-    return await ctx.reply({ content: await player.enqueue(track) ? "**Now Playing:**" : "**Added to the Queue:**", embeds: [track.toEmbed()] });
+    const pos = await player.enqueue(track);
+    return await ctx.reply(pos == 0 ? { content: "**Now Playing:**", embeds: [track.toEmbed()] } : { content: "**Added to the Queue:**", embeds: [track.toEmbed({ name: "Position", value: pos.toString(), inline: true })] });
 }
 
-async function play_music_c(ctx, query) {
+async function playMusic_c(ctx, query) {
     const items = await listSongSearchResults(query).catch(() => []);
     if (items.length === 0) {
         return ctx.reply("There were no valid results for your query.");
@@ -452,7 +454,7 @@ async function move_c(ctx, source, destination) {
     player.queue.splice(destination - 1, 0, track);
     if (destination === 1 && player.queue[0].resource === null)
         player.queue[0].resource = player.queue[0].getResource();
-    return await ctx.reply(`Moved \`${track.title}\` to index ${destination} in the queue.`);
+    return await ctx.reply({ content: `Moved **${track.url ? `[${track.title}](${track.url})` : track.title}** to index ${destination} in the queue.`, flags: [MessageFlags.SuppressEmbeds] });
 }
 
 /**
@@ -502,7 +504,7 @@ async function info_c(ctx, index) {
         return await ctx.reply("The queue is empty.");
     if (index < 1 || index > player.queue.length)
         return await ctx.reply(`${index} is not a valid index in the queue.`);
-    return await ctx.reply({ embeds: [player.queue[index - 1].toEmbed()] });
+    return await ctx.reply({ embeds: [player.queue[index - 1].toEmbed({ name: "Position", value: index.toString(), inline: true })] });
 }
 
 // Misc
@@ -526,7 +528,7 @@ async function help_c(ctx) {
     ctx.reply({
         embeds: [new EmbedBuilder().addFields(
             { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If any atachments are added, the bot will attempt to play them as audio, otherwise if no query is provided, attempts resume." },
-            { name: "playmusic|playm|pm [query]", value: "Plays a song from YouTube using the [query] as a search query. Should only find official music in search results (not videos). Note: This command is far less lenient about typos. They are likely to cause the command to return incorrect results." },
+            { name: "playmusic|playm|pm [query]", value: "Plays a song from YouTube using the [query] as a search query. Should only find official music in search results (not videos)." },
             { name: "pause", value: "Pauses the currently playing track." },
             { name: "resume", value: "Resumes the currently playing track." },
             { name: "skip", value: "Skips the currently playing track." },
@@ -535,15 +537,15 @@ async function help_c(ctx) {
             { name: "queue|q", value: "Displays the queue." },
             { name: "connect|join *[voice_channel]", value: "Makes the bot join a voice channel, either [voice_channel] or your current voice channel." },
             { name: "disconnect|leave", value: "Makes the bot leave it's current voice channel." },
-            { name: "remove [index]", value: "Removes track [index] from the queue." },
-            { name: "move [source_index] [destination index]", value: "Moves the track at [source_index] to [destination_index]" },
+            { name: "remove|rm [index]", value: "Removes track [index] from the queue." },
+            { name: "move|mv [source_index] [destination index]", value: "Moves the track at [source_index] to [destination_index]" },
             { name: "clear", value: "Clears the queue." },
             { name: "shuffle", value: "Shuffles the queue." },
             { name: "loop", value: "Loops the currently playing track." },
             { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
             { name: "evaluate|eval [expression]", value: "Evaluate a mathematical expression." },
             { name: "volume [percentage]", value: "Sets the volume to the specified percentage." },
-            { name: "help|h", value: "Displays this message." }).data]
+            { name: "help|h", value: "Displays this message." }).toJSON()]
     });
 }
 
@@ -554,7 +556,7 @@ CLIENT.once(Events.ClientReady, async (client) => {
     timelog(`Logged in as ${client.user.tag}`);
     // Update voice connections
     for (const guild of CLIENT.guilds.cache.values()) {
-        const channel = (await guild.members.fetch(CLIENT.user.id)).voice.channel;
+        const channel = (await guild.members.fetchMe()).voice.channel;
         if (channel !== null) {
             createVoiceConnection(channel);
         }
@@ -597,7 +599,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             switch (cmd) {
                 case "join":
                 case "connect":
-                    // Connect
+                    // Connect the bot
                     let channel;
                     if (args.length > 0) {
                         channel = args[0];
@@ -613,49 +615,52 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "kys":
                 case "fuckoff":
                 case "die":
-                    // Disconnect
+                    // Disconnect the bot
                     await disconnect_c(ctx);
                     break;
                 case "play":
+                    // Play something
                     await play_c(ctx, message.content.substring(cmd.length + 1).trim(), message.attachments.at(0));
                     break;
                 case "playmusic":
                 case "playm":
                 case "pm":
+                    // Play music from a query
                     if (args.length < 1)
                         await ctx.reply("You must provide a query.");
                     else
-                        await play_music_c(ctx, message.content.substring(cmd.length + 1).trim());
+                        await playMusic_c(ctx, message.content.substring(cmd.length + 1).trim());
                     break;
                 case "pause":
-                    // Pause
+                    // Pause the player
                     await pause_c(ctx);
                     break;
                 case "unpause":
                 case "resume":
-                    // Resume
+                    // Resume the player
                     await resume_c(ctx);
                     break;
                 case "stop":
-                    // Stop
+                    // Stop the player
                     await stop_c(ctx);
                     break;
                 case "skip":
-                    // Skip
+                    // Skip the current track
                     await skip_c(ctx);
                     break;
                 case "nowplaying":
                 case "np":
-                    // Now Playing
+                    // Display the currently playing track
                     await nowPlaying_c(ctx);
                     break;
                 case "queue":
                 case "q":
-                    // Queue
+                    // Display the queue
                     await queue_c(ctx);
                     break;
                 case "remove":
-                    // Remove
+                case "rm":
+                    // Remove a track from the queue
                     if (args.length < 1)
                         await ctx.reply("You must provide an index.");
                     else if (!/^[0-9]+$/.test(args[0]))
@@ -664,7 +669,8 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         await remove_c(ctx, Number(args[0]));
                     break;
                 case "move":
-                    // Move
+                case "mv":
+                    // Move a track in the queue
                     if (args.length < 1)
                         await ctx.reply("You must provide source and destination indexes.");
                     else if (args.length < 2)
@@ -675,27 +681,29 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         await move_c(ctx, Number(args[0]), Number(args[1]))
                     break;
                 case "clear":
-                    // Clear
+                    // Clear the queue
                     await clear_c(ctx);
                     break;
                 case "shuffle":
+                    // Shuffle the queue
                     await shuffle_c(ctx);
                     break;
                 case "loop":
-                    // Loop
+                    // Loop the player
                     await loop_c(ctx);
                     break;
                 case "info":
                 case "i":
-                    // Info
+                    // Display info for a specific track
                     if (args.length < 1)
                         await ctx.reply("You must provide an index.");
                     else if (!/^[0-9]+$/.test(args[0]))
                         await ctx.reply("Index must be an integer.");
                     else
-                        await ctx.reply(info_c(ctx, Number(args[0])));
+                        await info_c(ctx, Number(args[0]));
                     break;
                 case "volume":
+                    // Change the volume
                     if (args.length < 1)
                         await ctx.reply("You must provide a percentage.");
                     else if (!/^[0-9]+(\.[0-9]+)?$/.test(args[0]))
@@ -705,17 +713,17 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "evaluate":
                 case "eval":
-                    // Evaluate
+                    // Evaluate a mathematical expression
                     await evaluate_c(ctx, args.join(""));
                     break;
                 case "help":
                 case "h":
-                    // Help
+                    // Display the help message
                     await help_c(ctx);
                     break;
                 case "execute":
                 case "exec":
-                    // Execute
+                    // Execute code
                     if (message.author.id === process.env.OWNER) {
                         try {
                             let res = "Code Executed.";
@@ -727,14 +735,18 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                         break;
                     }
                 default:
+                    // Unrecognized command
                     await ctx.reply("Unrecognized command.\nUse `.help` for a list of commands.");
             }
         } catch (e) {
+            // An error occurred
             console.error(`[${now()}] Uncaught Error on "${cmd}":`);
             console.error(e);
             try {
+                // Attempt to send a message to notify about the error
                 await message.channel.send("An error occurred whist processing your command.");
             } catch (e) {
+                // An error occurred whilst trying to respond
                 console.error(`[${now()}] Failed to send response message:`);
                 console.error(e);
             }

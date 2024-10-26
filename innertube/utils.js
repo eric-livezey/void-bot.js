@@ -72,7 +72,9 @@ export class Duration {
     }
 
     format() {
-        if (this.days > 0) {
+        if (isNaN(this.total)) {
+            return "NaN";
+        } else if (this.days > 0) {
             return `${this.days}:${zFill(this.hours, 2)}:${zFill(this.minutes, 2)}:${zFill(this.seconds, 2)}`;
         } else if (this.hours > 0) {
             return `${this.hours}:${zFill(this.minutes, 2)}:${zFill(this.seconds, 2)}`;
@@ -205,7 +207,7 @@ export async function download(url, path) {
     if (contentLength === null || contentLength === 0) {
         return null;
     }
-    /* sending 100 asynchronous HTTP requests is somwhow faster than downloading it all at once due to YouTube's throttling */
+    /* sending 100 asynchronous HTTP requests is somehow faster than downloading it all at once due to YouTube's throttling */
     const data = new Array(100);
     const n = Math.floor(contentLength / data.length);
     for (var i = 0; i < data.length; i++) {

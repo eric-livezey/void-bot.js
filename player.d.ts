@@ -1,7 +1,7 @@
 import { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voice";
-import { APIEmbed, Snowflake } from "discord.js";
-import { EventEmitter } from "events";
 import ytdl from "@distube/ytdl-core";
+import { APIEmbed, APIEmbedField, Snowflake } from "discord.js";
+import { EventEmitter } from "events";
 import { PlaylistItem } from "./innertube";
 
 declare class Player extends EventEmitter {
@@ -87,14 +87,14 @@ declare class Player extends EventEmitter {
      * 
      * @param track the track to enqueue
      */
-    enqueue(track: Track): Promise<boolean>;
+    enqueue(track: Track): Promise<number>;
 }
 
 declare class Track<T = unknown> {
     /**
      * A function which gets a new audio resource to play
      */
-    getResource: () => Promise<AudioResource<T>> | AudioResource<T>;
+    getResource: () => Promise<AudioResource<T>>;
     /**
      * The audio resource, if any
      */
@@ -130,7 +130,7 @@ declare class Track<T = unknown> {
     /**
      * Returns an Embed reprentation of this track
      */
-    toEmbed(): APIEmbed;
+    toEmbed(...fields: APIEmbedField[]): APIEmbed;
 
     /**
      * Creates a track from a URL.
@@ -166,6 +166,6 @@ declare class Track<T = unknown> {
 declare function getPlayer(id: string): Player;
 
 export {
-    Player,
-    Track, getPlayer
+    getPlayer, Player,
+    Track
 };

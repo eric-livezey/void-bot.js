@@ -2,14 +2,13 @@ import { AudioPlayerStatus, VoiceConnection, VoiceConnectionStatus, createAudioP
 import ytdl from "@distube/ytdl-core";
 import { EmbedBuilder } from "discord.js";
 import { EventEmitter } from "events";
-import { createWriteStream, existsSync } from "fs";
+import { createWriteStream, existsSync, rmSync } from "fs";
 import { Readable } from "stream";
 import { formatDurationMillis } from "./utils.js";
 
 const PLAYERS = {};
 
 class Player extends EventEmitter {
-    id;
     #subscription;
     #connection = null;
     get connection() {
@@ -61,7 +60,6 @@ class Player extends EventEmitter {
     get isPaused() {
         return this.player.state.status === AudioPlayerStatus.Paused;
     }
-    player;
 
     constructor(id) {
         super({ captureRejections: true });
@@ -72,9 +70,9 @@ class Player extends EventEmitter {
         this.queue = [];
         this.loop = false;
         this.volume = 1;
-        this.player.on(AudioPlayerStatus.Idle, async (oldState, newState) => {
+        this.player.on(AudioPlayerStatus.Idle, async (oldState) => {
             // play next track when the track finished
-            if (oldState.status === AudioPlayerStatus.Playing)
+            if (oldState.status !== AudioPlayerStatus.Idle)
                 await this.#next();
         });
         this.player.on("error", (e) => {
@@ -85,33 +83,41 @@ class Player extends EventEmitter {
     }
 
     async #next() {
-        if (this.loop && this.isPlaying) {
-            await this.play(this.nowPlaying);
-        } else if (this.queue.length > 0) {
-            await this.play(this.queue.shift())
-        } else {
-            this.stop();
+        if (this.player.state.status !== AudioPlayerStatus.Idle) {
+            this.player.stop(true);
+            return;
         }
+        if (this.loop && this.isPlaying)
+            await this.play(this.nowPlaying);
+        else if (this.queue.length > 0)
+            await this.play(this.queue.shift())
+        else
+            this.stop(true);
         this.emit("next");
     }
 
     /**
-     * 
      * @param {import("./player.d.ts").Track<null>} track 
      */
     async play(track) {
         if (!this.isReady) {
-            this.stop();
+            this.skip();
             throw new Error("the audio connection was invalidated");
         }
         this.nowPlaying = track;
         if (track.resource instanceof Promise)
             track.resource = await track.resource;
-        else if (track.resource === null || track.resource.started || track.resource.ended)
-            track.resource = await track.getResource();
-        if (track.resource.ended) {
-            this.nowPlaying = null;
-            throw new Error("the resource was already ended");
+        if (track.resource === null || track.resource.ended) {
+            track.resource = await track.getResource().catch(() => null);
+            if (track.resource === null) {
+                this.skip();
+                throw new Error("player failed to get the audio resource");
+            }
+            if (track.resource.ended) {
+                this.skip();
+                throw new Error("the resource was already ended");
+            }
+            return await this.play(track);
         }
         track.resource.volume.setVolume(this.volume);
         this.player.play(track.resource);
@@ -155,12 +161,12 @@ class Player extends EventEmitter {
     async enqueue(track) {
         if (!this.isPlaying) {
             await this.play(track);
-            return true;
+            return 0;
         }
-        this.queue.push(track);
+        const length = this.queue.push(track);
         if (this.queue.length === 1)
             track.resource = track.getResource();
-        return false;
+        return length;
     }
 }
 
@@ -184,7 +190,7 @@ class Track {
         this.duration = options.duration || null;
     }
 
-    toEmbed() {
+    toEmbed(...fields) {
         const eb = new EmbedBuilder();
         eb.setTitle(this.title);
         if (this.url !== null)
@@ -197,8 +203,9 @@ class Track {
             let duration = formatDurationMillis(this.duration);
             if (this.resource !== null && this.resource.started)
                 duration = `${formatDurationMillis(this.resource.playbackDuration)}/${duration}`;
-            eb.addFields({ name: "Duration", value: duration });
+            eb.addFields({ name: "Duration", value: duration, inline: true });
         }
+        eb.addFields(fields);
         return eb.toJSON();
     }
 
@@ -217,7 +224,7 @@ class Track {
         const getResource = download ? async () => {
             const path = `./audio/${details.videoId}.webm`;
             return createAudioResource(existsSync(path) ? path : await downloadYTFromInfo(info, path, agent), { inlineVolume: true });
-        } : () => createAudioResource(ytdl.downloadFromInfo(info, { quality: "highestaudio" }), { inlineVolume: true });
+        } : async () => createAudioResource(ytdl.downloadFromInfo(info, { quality: "highestaudio" }), { inlineVolume: true });
         const title = details.title;
         const options = {};
         options.url = details.video_url;
@@ -231,9 +238,9 @@ class Track {
         const getResource = download ?
             async () => {
                 const path = `./audio/${item.id}.webm`;
-                return createAudioResource(existsSync(path) ? path : downloadYT(item.id, path, agent), { inlineVolume: true })
+                return createAudioResource(existsSync(path) ? path : await downloadYT(item.id, path, agent), { inlineVolume: true })
             } :
-            () => createAudioResource(ytdl(item.id, { quality: "highestaudio" }), { inlineVolume: true });
+            async () => createAudioResource(ytdl(item.id, { quality: "highestaudio", agent }), { inlineVolume: true });
         const title = item.title;
         const options = {};
         options.url = `https://www.youtube.com/watch?v=${item.id}`;
@@ -246,25 +253,41 @@ class Track {
     }
 }
 
-// keep track of in progress downloads so as not overwrite a file that's being read
+// keep track of in progress downloads to avoid downloading the same thing twice
 const downloads = {};
 
-async function downloadYTFromInfo(info, path, agent) {
-    return downloads[info.vid] || (downloads[info.vid] = new Promise((resolve, reject) => {
-        const writeStream = createWriteStream(path);
-        writeStream.once("finish", () => { delete downloads[info.vid]; resolve(path); });
-        writeStream.once("error", (e) => { delete downloads[info.vid]; reject(e); });
-        ytdl.downloadFromInfo(info, { quality: "highestaudio", agent }).pipe(writeStream);
-    }))
-}
-
-async function downloadYT(id, path, agent) {
+/**
+ * @param {import("stream").Readable} stream 
+ * @param {string} path 
+ * @param {string} id 
+ * @returns {Promise<String>}
+ */
+function download(stream, path, id) {
     return downloads[id] || (downloads[id] = new Promise((resolve, reject) => {
         const writeStream = createWriteStream(path);
-        writeStream.once("finish", () => { delete downloads[id]; resolve(path); });
-        writeStream.once("error", (e) => { delete downloads[id]; reject(e); });
-        ytdl(id, { quality: "highestaudio", agent }).pipe(writeStream);
+        writeStream.once("finish", () => {
+            delete downloads[id];
+            if (writeStream.bytesWritten === 0) {
+                rmSync(path);
+                reject("the write stream didn't write any data");
+            }
+            resolve(path);
+        });
+        writeStream.once("error", (e) => {
+            delete downloads[id];
+            rmSync(path);
+            reject(e);
+        });
+        stream.pipe(writeStream);
     }));
+}
+
+function downloadYTFromInfo(info, path, agent) {
+    return download(ytdl.downloadFromInfo(info, { quality: "highestaudio", agent }), path, info.vid);
+}
+
+function downloadYT(id, path, agent) {
+    return download(ytdl(id, { quality: "highestaudio", agent }), path, id);
 }
 
 function getPlayer(id) {
@@ -282,3 +305,4 @@ export {
     Track,
     getPlayer
 };
+

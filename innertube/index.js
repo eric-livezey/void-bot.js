@@ -770,7 +770,7 @@ async function listSongSearchResults(q) {
     const response = await CLIENTS.WEB_REMIX.request("/search", { query: q, params: "EgWKAQIIAWoSEAMQBBAJEA4QChAFEBEQEBAV" });
     if (response.ok) {
         const json = await response.json();
-        return json.contents.tabbedSearchResultsRenderer.tabs[0].tabRenderer.content.sectionListRenderer.contents[0].musicShelfRenderer?.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.playlistItemData.videoId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
+        return json.contents.tabbedSearchResultsRenderer.tabs.find(v => "tabRenderer" in v)?.tabRenderer.content.sectionListRenderer.contents.find(v => "musicShelfRenderer" in v)?.musicShelfRenderer.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.playlistItemData.videoId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
     } else {
         return null;
     }
@@ -787,6 +787,9 @@ async function getChannel(id) {
     }
 }
 
+/**
+ * @deprecated not functional due to API changes 
+ */
 async function getMusicSearchSuggestions(q) {
     const response = await CLIENTS.WEB_REMIX.request("music/get_search_suggestions", { input: q });
     if (response.ok) {
@@ -882,10 +885,5 @@ export {
     getDeviceCode,
     setBearerToken,
     getMusicSearchSuggestions,
-    listSongSearchResults,
-
-    extractPlayerId,
-    getPlayerId,
-    getJs,
-    decipher
+    listSongSearchResults
 }

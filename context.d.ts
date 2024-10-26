@@ -25,6 +25,10 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
     protected constructor(user: User, channel: TextBasedChannel, member?: GuildMember | null);
 
     /**
+     * Returns `true` if the command was invoked via a message, else `false`.
+     */
+    public isMessage(): this is MessageCommandContext;
+    /**
      * Returns `true` if the command was invoked via an interaction, else `false`.
      */
     public isInteraction(): this is InteractionCommandContext;
