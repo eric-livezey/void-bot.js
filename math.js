@@ -153,8 +153,6 @@ function evaluate(expression) {
     return operands.pop();
 }
 
-console.log(evaluate("1+(-2)"));
-
 export {
     evaluate
 }
