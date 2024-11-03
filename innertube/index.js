@@ -44,7 +44,7 @@ const SearchResultType = Object.freeze({
     PLAYLIST: 2
 });
 
-const ClientType = Object.freeze({
+const ClientId = Object.freeze({
     "WEB": 1,
     "MWEB": 2,
     "WEB_REMIX": 67
@@ -73,9 +73,9 @@ class Client {
 
 
     constructor(type) {
-        if (typeof type !== "string" || !(type in ClientType))
+        if (typeof type !== "string" || !(type in ClientId))
             throw new TypeError("invalid client type");
-        this.id = ClientType[type];
+        this.id = ClientId[type];
         const info = ClientInfo[this.id];
         this.name = info.name;
         this.version = info.version;
@@ -755,7 +755,7 @@ async function listSearchResults(q, type = null) {
             payload.params = "EgIQAw%3D%3D";
             break;
     }
-    const response = await CLIENTS.WEB.request("/search", payload)
+    const response = await CLIENTS.WEB.request("/search", payload);
     if (response.ok) {
         return new SearchListResponse(await response.json());
     } else {
@@ -769,8 +769,8 @@ async function listSearchResults(q, type = null) {
 async function listSongSearchResults(q) {
     const response = await CLIENTS.WEB_REMIX.request("/search", { query: q, params: "EgWKAQIIAWoSEAMQBBAJEA4QChAFEBEQEBAV" });
     if (response.ok) {
-        const json = await response.json();
-        return json.contents.tabbedSearchResultsRenderer.tabs.find(v => "tabRenderer" in v)?.tabRenderer.content.sectionListRenderer.contents.find(v => "musicShelfRenderer" in v)?.musicShelfRenderer.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.playlistItemData.videoId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
+        const data = await response.json();
+        return data.contents.tabbedSearchResultsRenderer.tabs.find(v => "tabRenderer" in v)?.tabRenderer.content.sectionListRenderer.contents.find(v => "musicShelfRenderer" in v)?.musicShelfRenderer.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.playlistItemData.videoId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
     } else {
         return null;
     }
@@ -787,17 +787,14 @@ async function getChannel(id) {
     }
 }
 
-/**
- * @deprecated not functional due to API changes 
- */
 async function getMusicSearchSuggestions(q) {
-    const response = await CLIENTS.WEB_REMIX.request("music/get_search_suggestions", { input: q });
+    const response = await CLIENTS.WEB_REMIX.request("/music/get_search_suggestions", { input: q });
     if (response.ok) {
-        const body = await response.json();
-        if (!("contents" in body)) {
+        const data = await response.json();
+        if (!("contents" in data)) {
             return [];
         }
-        return body.contents[0].searchSuggestionsSectionRenderer.contents.map(c => getRenderedText(c.searchSuggestionRenderer.suggestion));
+        return data.contents[0].searchSuggestionsSectionRenderer.contents.map(c => getRenderedText(c.searchSuggestionRenderer.suggestion));
     } else {
         return null;
     }
@@ -873,6 +870,7 @@ async function refreshBearerToken() {
 
 export {
     SearchResultType,
+    Client,
     Video,
     PlaylistItem,
     Playlist,

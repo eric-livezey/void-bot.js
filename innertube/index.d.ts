@@ -514,6 +514,31 @@ declare class Channel {
 }
 
 /**
+ * Represents a client for the innertube API.
+ */
+declare class Client {
+    id: number;
+    name: string;
+    version: string;
+    platform: "DESKTOP" | "MOBILE";
+
+    /**
+     * Creates a new client with the specified type.
+     * 
+     * @param type the client type
+     */
+    constructor(type: "WEB" | "MWEB" | "WEB_REMIX");
+
+    /**
+     * Request the API.
+     * 
+     * @param endpoint the endpoint of the request
+     * @param body the body of the request
+     */
+    request(endpoint: string, body?: object): Promise<Response>;
+}
+
+/**
  * Returns the video with the matching ID.
  * 
  * @param id Specifies a YouTube video ID for the resource that is being retrieved. In a `video` resource, the `id` property specifies the video's ID.
@@ -544,6 +569,11 @@ declare function listSearchResults<T extends SearchResultType = SearchResultType
  */
 declare function listSongSearchResults(q: string): Promise<{ id: string }[]>;
 
+/**
+ * Returns the channel with the matching ID.
+ * 
+ * @param id Specified a YouTube channel ID for the resource that is being retrieved.
+ */
 declare function getChannel(id: string): Promise<Channel | null>;
 
 /**
@@ -572,6 +602,7 @@ export {
     SearchResult,
     SearchListResponse,
     Channel,
+    Client,
     getVideo,
     getPlaylist,
     listSearchResults,
