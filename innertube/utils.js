@@ -88,11 +88,6 @@ export function zFill(arg, length) {
     return `${("00" + arg).slice(-1 * length)}`;
 }
 
-export function now() {
-    const now = new Date(Date.now());
-    return `${zFill(now.getMonth() + 1, 2)}/${zFill(now.getDate(), 2)}/${now.getFullYear()} ${zFill(now.getHours(), 2)}:${zFill(now.getMinutes(), 2)}:${zFill(now.getSeconds(), 2)}`;
-}
-
 export function typeify(data) {
     var string = "{";
     for (var key of Object.keys(data)) {

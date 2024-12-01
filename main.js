@@ -3,8 +3,7 @@ import ytdl from "@distube/ytdl-core";
 import { Attachment, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
-import { SearchResultType, getChannel, getPlaylist, getVideo, listSearchResults, listSongSearchResults } from "./innertube/index.js";
-import { now } from "./innertube/utils.js";
+import { SearchResultType, getChannel, getPlaylist, getPlaylistIdFromAlbumId, getVideo, listAlbumSearchResults, listSearchResults, listSongSearchResults } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 import { Player, Track, getPlayer } from "./player.js";
 import { formatDuration, formatDurationMillis } from "./utils.js";
@@ -84,7 +83,7 @@ function extractPlaylistID(url) {
 }
 
 function timelog(msg) {
-    console.log(`[${now()}]`, msg);
+    console.log(`[${new Date(Date.now()).toLocaleString()}]`, msg);
 }
 
 /**
@@ -232,8 +231,8 @@ async function disconnect_c(ctx) {
 
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
- * @param {string | undefined} query 
- * @param {Attachment | undefined} attachment
+ * @param {string | null | undefined} query 
+ * @param {Attachment | null | undefined} attachment
  * @param {boolean | undefined} forceInverse
  */
 async function play_c(ctx, query, attachment, forceInverse) {
@@ -302,12 +301,30 @@ async function play_c(ctx, query, attachment, forceInverse) {
     return await ctx.reply(pos == 0 ? { content: "**Now Playing:**", embeds: [track.toEmbed()] } : { content: "**Added to the Queue:**", embeds: [track.toEmbed({ name: "Position", value: pos.toString(), inline: true })] });
 }
 
+/**
+ * @param {CommandContext} ctx 
+ * @param {string} query 
+ */
 async function playMusic_c(ctx, query) {
     const items = await listSongSearchResults(query).catch(() => []);
     if (items.length === 0) {
         return ctx.reply("There were no valid results for your query.");
     }
     return await play_c(ctx, "https://www.youtube.com/watch?v=" + items[0].id);
+}
+
+/**
+ * 
+ * @param {CommandContext} ctx 
+ * @param {string} query 
+ */
+async function playAlbum_c(ctx, query) {
+    const items = await listAlbumSearchResults(query).catch(() => []);
+    if (items.length === 0) {
+        return ctx.reply("There were no valid results for your query.");
+    }
+    const id = await getPlaylistIdFromAlbumId(items[0].id);
+    return await play_c(ctx, "https://www.youtube.com/playlist?list=" + id);
 }
 
 /**
@@ -529,6 +546,7 @@ async function help_c(ctx) {
         embeds: [new EmbedBuilder().addFields(
             { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If any atachments are added, the bot will attempt to play them as audio, otherwise if no query is provided, attempts resume." },
             { name: "playmusic|playm|pm [query]", value: "Plays a song from YouTube using the [query] as a search query. Should only find official music in search results (not videos)." },
+            { name: "playalbum|playa|pa [query]", value: "Queues every song in a album from YouTube based off of the search query." },
             { name: "pause", value: "Pauses the currently playing track." },
             { name: "resume", value: "Resumes the currently playing track." },
             { name: "skip", value: "Skips the currently playing track." },
@@ -542,8 +560,8 @@ async function help_c(ctx) {
             { name: "clear", value: "Clears the queue." },
             { name: "shuffle", value: "Shuffles the queue." },
             { name: "loop", value: "Loops the currently playing track." },
-            { name: "info|i [index]", value: "Display info about a queued track at [index] in the queue." },
-            { name: "evaluate|eval [expression]", value: "Evaluate a mathematical expression." },
+            { name: "info|i [index]", value: "Displays info about a queued track at [index] in the queue." },
+            { name: "evaluate|eval [expression]", value: "Evaluates a mathematical expression." },
             { name: "volume [percentage]", value: "Sets the volume to the specified percentage." },
             { name: "help|h", value: "Displays this message." }).toJSON()]
     });
@@ -555,7 +573,7 @@ CLIENT.once(Events.ClientReady, async (client) => {
     // Ready
     timelog(`Logged in as ${client.user.tag}`);
     // Update voice connections
-    for (const guild of CLIENT.guilds.cache.values()) {
+    for (const guild of client.guilds.cache.values()) {
         const channel = (await guild.members.fetchMe()).voice.channel;
         if (channel !== null) {
             createVoiceConnection(channel);
@@ -563,10 +581,82 @@ CLIENT.once(Events.ClientReady, async (client) => {
     }
 });
 
-CLIENT.on(Events.InteractionCreate, (interaction) => {
+CLIENT.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
         // Page update interaction for queue
         interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(interaction.customId.split(":")[1])));
+    } else if (interaction.isChatInputCommand()) {
+        const ctx = new InteractionCommandContext(interaction);
+        const options = interaction.options;
+        // Ids are obviously unique to the version of the bot I use
+        switch (interaction.commandId) {
+            case "1310548215606542357":
+                await connect_c(ctx, options.getChannel("channel", false, [ChannelType.GuildVoice]));
+                break;
+            case "1310548217078747166":
+                await disconnect_c(ctx);
+                break;
+            case "1310147625114275930":
+                await play_c(ctx, options.getString("query", true));
+                break;
+            case "1310538948191457311":
+                await play_c(ctx, null, options.getAttachment("file", true))
+                break;
+            case "1310150411092623450":
+                await playMusic_c(ctx, options.getString("query", true));
+                break;
+            case "1310547396488466514":
+                await pause_c(ctx);
+                break;
+            case "1310547398581420095":
+                await resume_c(ctx);
+                break;
+            case "1310547401098006569":
+                await stop_c(ctx);
+                break;
+            case "1310547400120729651":
+                await skip_c(ctx);
+                break;
+            case "1310548304681238528":
+                await loop_c(ctx);
+                break;
+            case "1310547402536517652":
+                await nowPlaying_c(ctx);
+                break;
+            case "1310547482328961045":
+                await queue_c(ctx);
+                break;
+            case "1310548305910169610":
+                await info_c(ctx, options.getInteger("index", true));
+                break;
+            case "1310548218555138098":
+                await move_c(ctx, options.getInteger("source", true), options.getInteger("destination", true));
+                break;
+            case "1310548219817885706":
+                await remove_c(ctx, options.getInteger("index", true));
+                break;
+            case "1310548302835748934":
+                await shuffle_c(ctx);
+                break;
+            case "1310548221520515112":
+                await clear_c(ctx);
+                break;
+            case "1310548315271729173":
+                await volume_c(ctx, options.getNumber("percentage", true));
+                break;
+            case "1311586863437316096":
+                switch (options.getSubcommand()) {
+                    case "create":
+                        await createReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji", true), options.getRole("role", true));
+                        break;
+                    case "remove":
+                        await removeReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji"));
+                        break;
+                }
+                break;
+            default:
+                console.error("Unrecognized Command:", interaction);
+        }
     }
 });
 
@@ -631,6 +721,15 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else
                         await playMusic_c(ctx, message.content.substring(cmd.length + 1).trim());
                     break;
+                case "playalbum":
+                case "playa":
+                case "pa":
+                    // Play album from a query
+                    if (args.length < 1)
+                        await ctx.reply("You must provide a query.");
+                    else
+                        await playAlbum_c(ctx, message.content.substring(cmd.length + 1).trim());
+                    break;
                 case "pause":
                     // Pause the player
                     await pause_c(ctx);
@@ -672,11 +771,11 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "mv":
                     // Move a track in the queue
                     if (args.length < 1)
-                        await ctx.reply("You must provide source and destination indexes.");
+                        await ctx.reply("You must provide source and destination indices.");
                     else if (args.length < 2)
                         await ctx.reply("You must provide a destination index");
                     else if (!/^[0-9]+$/.test(args[0]) || !/^[0-9]+$/.test(args[1]))
-                        await ctx.reply("Both indexes must be integers.");
+                        await ctx.reply("Both indices must be integers.");
                     else
                         await move_c(ctx, Number(args[0]), Number(args[1]))
                     break;
@@ -740,14 +839,14 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             }
         } catch (e) {
             // An error occurred
-            console.error(`[${now()}] Uncaught Error on "${cmd}":`);
+            console.error(`[${new Date(Date.now()).toLocaleString()}] Uncaught Error on "${cmd}":`);
             console.error(e);
             try {
                 // Attempt to send a message to notify about the error
                 await message.channel.send("An error occurred whist processing your command.");
             } catch (e) {
                 // An error occurred whilst trying to respond
-                console.error(`[${now()}] Failed to send response message:`);
+                console.error(`[${new Date(Date.now()).toLocaleString()}] Failed to send response message:`);
                 console.error(e);
             }
         }

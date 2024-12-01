@@ -1,3 +1,4 @@
+import { createInterface } from "node:readline";
 import { MimeType, getRenderedText } from "./utils.js";
 
 const API_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
@@ -11,11 +12,6 @@ const CLIENT_SECRET = "SboVhoG9s0rNafixCSGGKXAT";
  * @type {{[key:string]:JS;}}
  */
 const JS_CACHE = {};
-
-/**
- * @type {{access_token:string;expires:number;refresh_token:string;} | {}}
- */
-const BEARER_TOKEN = {};
 
 const ClientInfo = Object.freeze({
     1: Object.freeze({
@@ -50,6 +46,115 @@ const ClientId = Object.freeze({
     "WEB_REMIX": 67
 });
 
+class OAuthClient {
+    #accessToken;
+    #expires;
+    #refreshToken;
+
+    get initialized() {
+        return this.#accessToken !== null;
+    }
+
+    constructor(id, secret) {
+        this.#accessToken = this.#expires = this.#refreshToken = null;
+        if (id === undefined) id = CLIENT_ID;
+        else if (typeof id !== "string") throw new TypeError("id must be a string");
+        if (secret === undefined) secret = CLIENT_SECRET;
+        else if (typeof secret !== "string") throw new TypeError("secret must be a string");
+        Object.defineProperties(this, {
+            id: {
+                value: id,
+                enumerable: true
+            },
+            secret: {
+                value: secret,
+                enumerable: true
+            }
+        });
+        Object.preventExtensions(this);
+    }
+
+    async #getCode() {
+        const start = new Date().getTime();
+        const data = await (await fetch("https://oauth2.googleapis.com/device/code", {
+            headers: {
+                "content-type": "application/json",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+            },
+            body: JSON.stringify({
+                "client_id": this.id,
+                "scope": "https://www.googleapis.com/auth/youtube"
+            }),
+            method: "POST"
+        })).json();
+        return {
+            deviceCode: data.device_code,
+            userCode: data.user_code,
+            expires: start + data.expires_in * 1000,
+            verificationUrl: data.verification_url
+        };
+    }
+
+    async #setToken(deviceCode) {
+        const start = new Date().getTime();
+        const response = await fetch("https://oauth2.googleapis.com/token", {
+            headers: {
+                "content-type": "application/json",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+            },
+            body: JSON.stringify({
+                client_id: this.id,
+                client_secret: this.secret,
+                device_code: deviceCode,
+                grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+            }),
+            method: "POST"
+        });
+        const data = await response.json();
+        this.#accessToken = data.access_token;
+        this.#expires = start + data.expires_in * 1000;
+        this.#refreshToken = data.refresh_token;
+    }
+
+    async getToken() {
+        if (this.#expires >= Date.now()) await this.refresh();
+        return this.#accessToken;
+    }
+
+    async initialize() {
+        const code = await this.#getCode();
+        const rl = createInterface(process.stdin, process.stdout);
+        await new Promise(resolve => {
+            rl.question(`Go to ${code.verificationUrl} and enter ${code.userCode}.`, resolve);
+        })
+        rl.close();
+        await this.#setToken(code.deviceCode);
+    }
+
+    async refresh() {
+        const start = new Date().getTime();
+        const response = await fetch("https://oauth2.googleapis.com/token", {
+            headers: {
+                "content-type": "application/json",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
+            },
+            body: JSON.stringify({
+                client_id: this.id,
+                client_secret: this.secret,
+                grant_type: "refresh_token",
+                refresh_token: this.#refreshToken
+            }),
+            method: "POST"
+        });
+        const data = await response.json();
+        this.#accessToken = data.access_token;
+        this.#expires = start + data.expires_in * 1000;
+        if ("refresh_token" in data) {
+            this.#refreshToken = data.refresh_token;
+        }
+    }
+}
+
 class Client {
     id;
     name;
@@ -71,7 +176,6 @@ class Client {
         }
     }
 
-
     constructor(type) {
         if (typeof type !== "string" || !(type in ClientId))
             throw new TypeError("invalid client type");
@@ -84,17 +188,17 @@ class Client {
 
     /**
      * @param {string} endpoint 
-     * @param {any} body
+     * @param {object | undefined} body
+     * @param {OAuthClient | undefined} auth
      */
-    async request(endpoint, body) {
+    async request(endpoint, body, auth) {
         if (typeof endpoint != "string")
             throw new TypeError("endpoint must of type string");
         if (typeof body != "undefined" && typeof body != "object")
             throw new TypeError("body must of type object or undefined");
-
         const response = await fetch(`https://www.youtube.com/youtubei/v1${endpoint}?key=${API_KEY}`, {
             method: "POST",
-            headers: this.headers,
+            headers: { ...this.headers, ...(auth && auth.initialized ? { Authorization: "Bearer ".concat(await auth.getToken()) } : {}) },
             body: JSON.stringify({ context: this.context, ...(body || {}) })
         });
         if (!response.ok)
@@ -103,13 +207,10 @@ class Client {
     }
 }
 
-/**
- * @type {{readonly WEB:Client;readonly MWEB:Client;readonly WEB_REMIX:Client;}}
- */
 const CLIENTS = Object.freeze({
-    "WEB": new Client("WEB"),
-    "MWEB": new Client("MWEB"),
-    "WEB_REMIX": new Client("WEB_REMIX")
+    WEB: new Client("WEB"),
+    MWEB: new Client("MWEB"),
+    WEB_REMIX: new Client("WEB_REMIX")
 });
 
 /**
@@ -228,15 +329,13 @@ class Video {
             this.channelTitle = videoDetails.author;
             this.tags = videoDetails.keywords;
             this.liveBroadcastContent = videoDetails.isLive ? "live" : videoDetails.isLiveContent ? "upcoming" : "none";
-            this.duration = (seconds => {
-                return {
-                    total: seconds,
-                    days: Math.floor(seconds / 86400),
-                    hours: Math.floor(seconds % 86400 / 3600),
-                    minutes: Math.floor(seconds % 3600 / 60),
-                    seconds: seconds % 60
-                }
-            })(Number(videoDetails.lengthSeconds));
+            this.duration = (seconds => ({
+                total: seconds,
+                days: Math.floor(seconds / 86400),
+                hours: Math.floor(seconds % 86400 / 3600),
+                minutes: Math.floor(seconds % 3600 / 60),
+                seconds: seconds % 60
+            }))(Number(videoDetails.lengthSeconds));
             this.privacyStatus = videoDetails.isUnpluggedCorpus ? "unlisted" : videoDetails.isPrivate || "messages" in data.playabilityStatus && data.playabilityStatus.messages[0] === "This is a private video. Please sign in to verify that you may see it." ? "private" : "public";
             this.viewCount = Number(videoDetails.viewCount);
         }
@@ -257,6 +356,7 @@ class Video {
                     this.liveStreamingDetails.actualEndTime = new Date(liveBroadcastDetails.endTimestamp);
             }
         }
+        // Even though the API does return this data, none of it is valid anymore.
         let streamingData;
         if (streamingData = data.streamingData) {
             this.projection = streamingData.adaptiveFormats[0].projectionType.toLowerCase();
@@ -291,32 +391,6 @@ class Video {
                 fileDetails.videoStreams = videoStreams;
                 fileDetails.audioStreams = audioStreams;
                 this.fileDetails = fileDetails;
-                // this.fileDetails = {
-                //     videoStreams: adaptiveFormats.filter(value => value.mimeType.startsWith("video")).map(value => {
-                //         return {
-                //             widthPixels: value.width,
-                //             heightPixels: value.height,
-                //             frameRateFps: value.fps,
-                //             aspectRatio: value.width / value.width,
-                //             codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                //             bitrateBps: value.bitrate,
-                //             url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                //             contentLength: value.contentLength
-                //         }
-                //     }),
-                //     audioStreams: adaptiveFormats.filter(value => value.mimeType.startsWith("audio")).map(value => {
-                //         return {
-                //             channelCount: value.audioChannels,
-                //             codec: value.mimeType.substring(value.mimeType.indexOf("codecs=") + 8, value.mimeType.length - 1),
-                //             bitrateBps: value.bitrate,
-                //             url: value.url ? value.url : decipher(js, new URLSearchParams(value.signatureCipher)),
-                //             contentLength: value.contentLength
-                //         }
-                //     }),
-                //     durationMs: streamingData.adaptiveFormats[0].approxDurationMs,
-                //     dashManifestUrl: streamingData.dashManifestUrl,
-                //     hlsManifestUrl: streamingData.hlsManifestUrl
-                // };
             }
         }
         this.dimension = null;
@@ -687,36 +761,22 @@ class Channel {
 
 /**
  * @param {string} id 
- * @deprecated
+ * @param {OAuthClient | undefined} auth
  */
-async function getVideo(id) {
-    // const js = await getJs(await getPlayerId(id));
-    // const response = await CLIENTS.WEB.request("/player", {
-    //     videoId: id,
-    //     playbackContext: {
-    //         contentPlaybackContext: {
-    //             signatureTimestamp: js.signatureTimestamp
-    //         }
-    //     },
-    //     racyCheckOk: false,
-    //     contentCheckOk: false
-    // })
-    const response = await fetch(`https://www.youtube.com/watch?v=${id}`, { headers: CLIENTS.WEB.headers });
+async function getVideo(id, auth) {
+    const js = await getJs(await getPlayerId(id));
+    const response = await CLIENTS.WEB.request("/player", {
+        videoId: id,
+        playbackContext: {
+            contentPlaybackContext: {
+                signatureTimestamp: js.signatureTimestamp
+            }
+        },
+        racyCheckOk: false,
+        contentCheckOk: false
+    }, auth);
     if (response.ok) {
-        // return new Video(await response.json(), js);
-        const text = await response.text();
-        const js = await getJs(extractPlayerId(text));
-        var start = text.indexOf("var ytInitialPlayerResponse = ") + "var ytInitialPlayerResponse = ".length;
-        var i = start + 1;
-        for (var p = 1; i < text.length && p > 0; i++) {
-            const c = text.charAt(i);
-            if (c == '{')
-                p++;
-            else if (c == '}')
-                p--;
-        }
-        const ytInitialPlayerResponse = JSON.parse(text.substring(start, i));
-        return new Video(ytInitialPlayerResponse, js);
+        return new Video(await response.json(), js);
     } else {
         return null;
     }
@@ -776,6 +836,30 @@ async function listSongSearchResults(q) {
     }
 }
 
+/**
+ * 
+ * @param {string} q 
+ */
+async function listAlbumSearchResults(q) {
+    const response = await CLIENTS.WEB_REMIX.request("/search", { query: q, params: "EgWKAQIYAWoQEAMQBBAJEAoQBRAREBAQFQ%3D%3D" });
+    if (response.ok) {
+        const data = await response.json();
+        return data.contents.tabbedSearchResultsRenderer.tabs.find(v => "tabRenderer" in v)?.tabRenderer.content.sectionListRenderer.contents.find(v => "musicShelfRenderer" in v)?.musicShelfRenderer.contents.map(v => { const r = v.musicResponsiveListItemRenderer; return { id: r.navigationEndpoint.browseEndpoint.browseId, title: getRenderedText(r.flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text) } }) || [];
+    } else {
+        return null;
+    }
+}
+
+async function getPlaylistIdFromAlbumId(id) {
+    const response =await CLIENTS.WEB_REMIX.request("/browse", { browseId: id  });
+    if (response.ok) {
+        const data = await response.json();
+        return new URL(data.microformat.microformatDataRenderer.urlCanonical).searchParams.get("list");
+    } else {
+        return null;
+    }
+}
+
 async function getChannel(id) {
     const response = await CLIENTS.WEB.request("/browse", {
         browseId: id,
@@ -800,88 +884,20 @@ async function getMusicSearchSuggestions(q) {
     }
 }
 
-async function getDeviceCode() {
-    // Arbitrarily subtract 30 seconds to account for time discrepencies
-    const start = new Date().getTime() - 30000;
-    const data = await (await fetch("https://oauth2.googleapis.com/device/code", {
-        headers: {
-            "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
-        },
-        body: JSON.stringify({
-            "client_id": CLIENT_ID,
-            "scope": "https://www.googleapis.com/auth/youtube"
-        }),
-        method: "POST"
-    })).json();
-    return {
-        deviceCode: data.device_code,
-        userCode: data.user_code,
-        expires: start + data.expires_in * 1000,
-        verificationUrl: data.verification_url
-    };
-}
-
-/**
- * @param {string} deviceCode 
- */
-async function setBearerToken(deviceCode) {
-    // Arbitrarily subtract 30 seconds to account for time discrepencies
-    const start = new Date().getTime() - 30000;
-    const response = await (await fetch("https://oauth2.googleapis.com/token", {
-        headers: {
-            "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
-        },
-        body: JSON.stringify({
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            device_code: deviceCode,
-            grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-        }),
-        method: "POST"
-    })).json();
-    BEARER_TOKEN.access_token = response.access_token;
-    BEARER_TOKEN.expires = start + response.expires_in * 1000;
-    BEARER_TOKEN.refresh_token = response.refresh_token;
-}
-
-async function refreshBearerToken() {
-    if (!BEARER_TOKEN.refresh_token) {
-        return;
-    }
-    const start = new Date().getTime() - 30000;
-    const response = await (await fetch("https://oauth2.googleapis.com/token", {
-        headers: {
-            "content-type": "application/json",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"
-        },
-        body: JSON.stringify({
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            grant_type: "refresh_token",
-            refresh_token: BEARER_TOKEN.refresh_token
-        }),
-        method: "POST"
-    })).json();
-    BEARER_TOKEN.access_token = response.access_token;
-    BEARER_TOKEN.expires = start + response.expires_in * 1000;
-}
-
 export {
     SearchResultType,
-    Client,
-    Video,
-    PlaylistItem,
+    OAuthClient,
     Playlist,
-    SearchResult,
+    PlaylistItem,
     SearchListResponse,
-    getVideo,
-    getPlaylist,
-    listSearchResults,
+    SearchResult,
+    Video,
     getChannel,
-    getDeviceCode,
-    setBearerToken,
     getMusicSearchSuggestions,
-    listSongSearchResults
-}
+    getPlaylist,
+    getVideo,
+    listSearchResults,
+    listSongSearchResults,
+    listAlbumSearchResults,
+    getPlaylistIdFromAlbumId
+};

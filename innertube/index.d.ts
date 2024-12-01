@@ -1,5 +1,5 @@
 import { RawBrowseData, RawChannelData, RawPlayerData, RawPlaylistItemData, RawSearchData, RawSearchResultData } from "./rawTypes";
-import ytdl from "@distube/ytdl-core"; 
+import ytdl from "@distube/ytdl-core";
 
 interface Thumbnail {
     /**
@@ -184,6 +184,7 @@ declare class Video {
     embedHtml?: string;
     /**
      * The `fileDetails` object encapsulates information about the video file that was uploaded to YouTube, including the file's resolution, duration, audio and video codecs, stream bitrates, and more.
+     * @deprecated Use {@linkcode ytdl}. YouTube massively changed how to retrieve media streams to the point that making this work again is a lot of work.
      */
     fileDetails?: {
         /**
@@ -514,37 +515,39 @@ declare class Channel {
 }
 
 /**
- * Represents a client for the innertube API.
+ * YouTube on TV OAuth flow.
+ * 
+ * Requires user to input a code for the token to be set. This should only need to be done once though.
  */
-declare class Client {
-    id: number;
-    name: string;
-    version: string;
-    platform: "DESKTOP" | "MOBILE";
+declare class OAuthClient {
+    #accessToken: string | null;
+    #expires: number | null;
+    #refreshToken: string | null;
 
-    /**
-     * Creates a new client with the specified type.
-     * 
-     * @param type the client type
-     */
-    constructor(type: "WEB" | "MWEB" | "WEB_REMIX");
+    readonly id: string;
+    readonly secret: string;
 
-    /**
-     * Request the API.
-     * 
-     * @param endpoint the endpoint of the request
-     * @param body the body of the request
-     */
-    request(endpoint: string, body?: object): Promise<Response>;
+    constructor();
+    constructor(id: string, secret: string);
+
+    #getCode(): Promise<{
+        deviceCode: string;
+        userCode: string;
+        expires: number;
+        verificationUrl: string;
+    }>;
+    #setToken(): Promise<string>;
+
+    getToken(): Promise<string>;
+    initialize(): Promise<void>;
 }
 
 /**
  * Returns the video with the matching ID.
  * 
  * @param id Specifies a YouTube video ID for the resource that is being retrieved. In a `video` resource, the `id` property specifies the video's ID.
- * @deprecated in favor of {@linkcode ytdl}.
  */
-declare function getVideo(id: string): Promise<Video | null>;
+declare function getVideo(id: string, auth?: OAuthClient): Promise<Video | null>;
 
 /**
  * Returns the playlist with the matching ID.
@@ -552,7 +555,7 @@ declare function getVideo(id: string): Promise<Video | null>;
  * @param id Specifies a YouTube playlist ID for the resource that is being retrieved. In a `playlist` resource, the id property specifies the playlist's YouTube playlist ID.
  * @param unavailable Indicates whether unavailable videos should be included in the playlist.
  */
-declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlist | null>;
+declare function getPlaylist(id: string, vl: boolean, unavailable?: boolean): Promise<Playlist | null>;
 
 /**
  * Returns a collection of search results that match the query parameters specified in the API request. By default, a search result set identifies matching `video`, `channel`, and `playlist` resources, but you can also configure queries to only retrieve a specific type of resource.
@@ -563,13 +566,6 @@ declare function getPlaylist(id: string, unavailable?: boolean): Promise<Playlis
 declare function listSearchResults<T extends SearchResultType = SearchResultType>(q: string, type?: T): Promise<SearchListResponse<T>>;
 
 /**
- * Returns a list of ids of songs which correspond to the given query.
- * 
- * @param q Specifies the query term to search for.
- */
-declare function listSongSearchResults(q: string): Promise<{ id: string }[]>;
-
-/**
  * Returns the channel with the matching ID.
  * 
  * @param id Specified a YouTube channel ID for the resource that is being retrieved.
@@ -577,20 +573,20 @@ declare function listSongSearchResults(q: string): Promise<{ id: string }[]>;
 declare function getChannel(id: string): Promise<Channel | null>;
 
 /**
- * Returns an object representing a device code and verification URL for a linking device. You must visit `verificationUrl` and enter `userCode` before `expires` in order for the `deviceCode` to be valid.
+ * Returns a list of ids of songs which correspond to the given query.
+ * 
+ * @param q Specifies the query term to search for.
  */
-declare function getDeviceCode(): Promise<{
-    deviceCode: string,
-    userCode: string,
-    expires: number,
-    verificationUrl: string
-}>
+declare function listSongSearchResults(q: string): Promise<{ id: string; title: string | null ;}[]>;
 
 /**
- * Sets the bearer token using the given device code. The device code can be obtained from the `deviceCode` property of the object returned from {@link getDeviceCode}.
- * @param deviceCode A device code
+ * Returns a list of ids of albums which correspond to the given query.
+ * 
+ * @param q Specifies the query term to search for
  */
-declare function setBearerToken(deviceCode: string): Promise<void>;
+declare function listAlbumSearchResults(q: string): Promise<{ id: string; title: string | null; }[]>;
+
+declare function getPlaylistIdFromAlbumId(id: string): Promise<string>;
 
 declare function getMusicSearchSuggestions(q: string): Promise<string[]>;
 
@@ -602,13 +598,13 @@ export {
     SearchResult,
     SearchListResponse,
     Channel,
-    Client,
+    OAuthClient,
     getVideo,
     getPlaylist,
     listSearchResults,
     getChannel,
-    getDeviceCode,
-    setBearerToken,
-    getMusicSearchSuggestions,
-    listSongSearchResults
+    listSongSearchResults,
+    listAlbumSearchResults,
+    getPlaylistIdFromAlbumId,
+    getMusicSearchSuggestions
 }

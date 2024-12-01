@@ -64,9 +64,7 @@ function applyOperation(leftOperand, rightOperand, operator) {
  * **NOTE**: There are currently a few errors with this function
  * - Exponents are evaluated left to right when they should be right to left
  * 
- * *I'll probably fix this at some point, but who knows when*
- * 
- * It's annoyingly difficult to handle these scenarios with the algorithm this uses
+ * *I'll probably fix this at some point, but who knows when since this is not a very important feature*
  * 
  * @param {string} expression a mathematical expression
  */
