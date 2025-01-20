@@ -51,6 +51,7 @@ class Player extends EventEmitter {
         if (this.isPlaying)
             this.nowPlaying.resource.volume.setVolume(this.#volume);
     }
+    download;
     get isReady() {
         return this.connection !== null && this.connection.state.status !== VoiceConnectionStatus.Destroyed && this.connection.state.status !== VoiceConnectionStatus.Disconnected;
     }
@@ -65,6 +66,7 @@ class Player extends EventEmitter {
         super({ captureRejections: true });
         Object.defineProperty(this, "id", { value: id });
         Object.defineProperty(this, "player", { value: createAudioPlayer() });
+        this.download = true;
         this.connection = getVoiceConnection(id) || null;
         this.nowPlaying = null;
         this.queue = [];
@@ -105,6 +107,7 @@ class Player extends EventEmitter {
             throw new Error("the audio connection was invalidated");
         }
         this.nowPlaying = track;
+        // resolve the audio resource
         if (track.resource instanceof Promise)
             track.resource = await track.resource;
         if (track.resource === null || track.resource.ended) {
@@ -119,8 +122,12 @@ class Player extends EventEmitter {
             }
             return await this.play(track);
         }
-        track.resource.volume.setVolume(this.volume);
+        // set the volume if possible
+        if (track.resource.volume !== undefined)
+            track.resource.volume.setVolume(this.volume);
+        // play the track's audio resource
         this.player.play(track.resource);
+        // unpause the player if paused
         if (this.isPaused)
             this.player.unpause();
         // prepare the next track's resource
@@ -196,7 +203,7 @@ class Track {
         if (this.url !== null)
             eb.setURL(this.url);
         if (this.author !== null)
-            eb.setAuthor(this.author)
+            eb.setAuthor(this.author);
         if (this.thumbnail !== null)
             eb.setThumbnail(this.thumbnail);
         if (this.duration !== null) {

@@ -20,8 +20,6 @@ const CLIENT = new Client({
 
 const AGENT = "COOKIE" in process.env ? ytdl.createAgent([{ name: "cookie", value: process.env.COOKIE }]) : ytdl.createAgent();
 
-const shouldDownload = true;
-
 // Utility Functions
 
 /**
@@ -131,10 +129,11 @@ function getQueuePage(player, page) {
         .setFooter({ text: `${player.queue.length} items (${formatDuration(Math.floor(total))})` + (player.queue.length > 25 ? `\nPage ${page}/${Math.ceil(player.queue.length / 25)}` : "") });
     if (page == 1) {
         // Include now playing if on first page
+        const nowPlayingEmbed = player.nowPlaying.toEmbed();
         eb.setAuthor({ name: "Now Playing:" })
-            .setTitle(player.nowPlaying.title)
-            .setURL(player.nowPlaying.url)
-            .setDescription(formatDurationMillis(player.nowPlaying.resource.playbackDuration) + "/" + formatDurationMillis(player.nowPlaying.duration))
+            .setTitle(nowPlayingEmbed.title || null)
+            .setURL(nowPlayingEmbed.url || null)
+            .setDescription(nowPlayingEmbed.description || null);
     }
     // Append up to 25 tracks to the queue message
     for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
@@ -180,7 +179,7 @@ async function playPlaylist(ctx, id, forceInverse) {
         }
         if (item.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(item, AGENT, forceInverse ? !shouldDownload : shouldDownload));
+                await player.enqueue(Track.fromPlaylistItem(item, AGENT, forceInverse ? !player.download : player.download));
             } catch {
                 continue;
             }
@@ -202,7 +201,7 @@ async function playPlaylist(ctx, id, forceInverse) {
 
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
- * @param {VoiceChannel | undefined} channel
+ * @param {VoiceChannel|null|undefined} channel
  */
 async function connect_c(ctx, channel) {
     channel = channel || ctx.member.voice.channel;
@@ -291,7 +290,7 @@ async function play_c(ctx, query, attachment, forceInverse) {
             } catch (e) {
                 return await ctx.reply("An error occurred whilst trying to retrieve the requested video.\n\n" + e.message);
             }
-            track = Track.fromVideoInfo(info, AGENT, forceInverse ? !shouldDownload : shouldDownload);
+            track = Track.fromVideoInfo(info, AGENT, forceInverse ? !player.download : player.download);
         }
     } else {
         // resume
@@ -570,7 +569,6 @@ async function help_c(ctx) {
 // Events
 
 CLIENT.once(Events.ClientReady, async (client) => {
-    // Ready
     timelog(`Logged in as ${client.user.tag}`);
     // Update voice connections
     for (const guild of client.guilds.cache.values()) {
@@ -679,13 +677,13 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 flags: message.flags.remove(MessageFlags.Crossposted, MessageFlags.IsCrosspost, MessageFlags.SourceMessageDeleted, MessageFlags.Urgent, MessageFlags.HasThread, MessageFlags.Ephemeral, MessageFlags.Loading, MessageFlags.FailedToMentionSomeRolesInThread, MessageFlags.ShouldShowLinkNotDiscordWarning, MessageFlags.IsVoiceMessage)
             });
         }
-    } else if (message.content.startsWith(PREFIX)) {
+    } else if (message.content.startsWith(PREFIX) && message.author.id !== CLIENT.user.id) {
         // Parse command name and arguments
         const args = message.content.split(" ");
         const cmd = args.shift().substring(PREFIX.length);
         try {
             const ctx = new MessageCommandContext(message);
-            // Handle Command
+            // Handle command
             switch (cmd) {
                 case "join":
                 case "connect":
@@ -693,10 +691,9 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     let channel;
                     if (args.length > 0) {
                         channel = args[0];
-                        if (/<#[0-9]+>/.test(channel))
+                        if (/^<#[0-9]+>$/.test(channel))
                             channel = channel.substring(2, channel.length - 1);
                         channel = await CLIENT.channels.fetch(channel).catch(() => null);
-                        channel = channel || undefined;
                     }
                     await connect_c(ctx, channel);
                     break;
@@ -810,6 +807,17 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else
                         await volume_c(ctx, Number(args[0]));
                     break;
+                case "toggledownload":
+                case "td":
+                    // Toggle between downloading and streaming for YouTube videos (Owner Only)
+                    if (message.author.id === process.env.OWNER) {
+                        const player = getPlayer(ctx.guild.id);
+                        player.download = !player.download;
+                        ctx.reply(`Downloads toggled ${player.download ? "on" : "off"}.`);
+                    } else {
+                        await ctx.reply("Unrecognized command.\nUse `.help` for a list of commands.");
+                    }
+                    break;
                 case "evaluate":
                 case "eval":
                     // Evaluate a mathematical expression
@@ -822,7 +830,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "execute":
                 case "exec":
-                    // Execute code
+                    // Execute code (Owner Only)
                     if (message.author.id === process.env.OWNER) {
                         try {
                             let res = "Code Executed.";

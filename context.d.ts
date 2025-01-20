@@ -22,7 +22,7 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
      */
     public readonly guild: If<InGuild, Guild>;
 
-    protected constructor(user: User, channel: TextBasedChannel, member?: GuildMember | null);
+    public constructor(user: User, channel: TextBasedChannel, member?: GuildMember | null);
 
     /**
      * Returns `true` if the command was invoked via a message, else `false`.
@@ -35,7 +35,7 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
     /**
      * Reply to the command.
      */
-    public abstract reply(message: string | MessagePayload | BaseMessageOptions): Promise<Message<InGuild>>;
+    public abstract reply(message: string | MessagePayload | BaseMessageOptions | InteractionReplyOptions): Promise<Message<InGuild>>;
 }
 
 declare class MessageCommandContext<InGuild extends boolean = boolean> extends CommandContext<InGuild> {

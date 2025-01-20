@@ -21,7 +21,7 @@ declare class Player extends EventEmitter {
     /**
      * The currently playing track
      */
-    nowPlaying: Omit<Track, "resource"> & { resource: AudioResource<unknown> };
+    nowPlaying: Track | null;
     /**
      * A list of tracks in the queue
      */
@@ -35,6 +35,7 @@ declare class Player extends EventEmitter {
      */
     get volume(): number;
     set volume(value);
+    download: boolean;
     /**
      * Whether the player is ready to play audio
      */

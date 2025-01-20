@@ -233,20 +233,22 @@ async function getPlayerId(videoId) {
 
 /**
  * @param {string} playerId 
+ * @deprecated doesn't do anything since I don't feel like updating the regex
  */
 async function getJs(playerId) {
     // Check if JS is already cached
     if (!JS_CACHE[playerId]) {
-        // Fetch JS with player id
-        const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text()).replaceAll("\n", "");
-        // Find the object containing decipher functions
-        const functions = js.match(/var ((?!=).)+=\{((?!:).)+:function(\(a,b\)\{var c=a\[0\];a\[0\]=a\[b%a\.length\];a\[b%a\.length\]=c\}|\(a\)\{a\.reverse\(\)\}|\(a,b\)\{a\.splice\(0,b\)\})((?!\}\}).)+\}\}/)[0];
-        // Find the function for deciphering signature ciphers
-        const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/)[0];
-        // Find the signature timestamp
-        const signatureTimestamp = js.match(/signatureTimestamp:(?<st>[0-9]+)(,|\})/).groups["st"];
-        // Evaluate the code that will save a new object to the cache
-        eval(`${functions};JS_CACHE[playerId]={decipher:(a)=>${decipher},signatureTimestamp:${signatureTimestamp}}`);
+        JS_CACHE[playerId] = { decipher: a => a, signatureTimeStamp: "" };
+        // // Fetch JS with player id
+        // const js = (await (await fetch(`https://www.youtube.com/s/player/${playerId}/player_ias.vflset/en_US/base.js`)).text());
+        // // Find the object containing decipher functions
+        // const functions = js.match(/var ((?!=).)+=\{((?!:).)+:function(\(.,.\)\{var .=.\[0\];.\[0\]=.\[.%.\.length\];.\[.%.\.length\]=.\}|\(.\)\{.\.reverse\(\)\}|\(.,.\)\{.\.splice\(0,.\)\})((?!\}\}).)+\}\}/s)[0];
+        // // Find the function for deciphering signature ciphers
+        // const decipher = js.match(/\{a=a\.split\(\"\"\);((?!\}).)+\}/s)[0];
+        // // Find the signature timestamp
+        // const signatureTimestamp = js.match(/signatureTimestamp:(?<st>[0-9]+)(,|\})/s).groups["st"];
+        // // Evaluate the code that will save a new object to the cache
+        // eval(`${functions};JS_CACHE[playerId]={decipher:(a)=>${decipher},signatureTimestamp:${signatureTimestamp}}`);
     }
     return JS_CACHE[playerId];
 }
@@ -475,58 +477,62 @@ class Playlist {
      * @param {import("./rawTypes").RawBrowseData} data 
      */
     constructor(data) {
-        if ("header" in data) {
+        if ("header" in data && "playlistHeaderRenderer" in data.header) {
             const header = data.header;
-            this.id = header.playlistHeaderRenderer.playlistId;
-            if ("ownerEndpoint" in header.playlistHeaderRenderer && "browseEndpoint" in header.playlistHeaderRenderer.ownerEndpoint)
-                this.channelId = header.playlistHeaderRenderer.ownerEndpoint.browseEndpoint.browseId;
-            else if (header.playlistHeaderRenderer.ownerText && header.playlistHeaderRenderer.ownerText.runs && header.playlistHeaderRenderer.ownerText.runs.length > 0 && header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint && header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint)
-                this.channelId = header.playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
-            this.title = getRenderedText(header.playlistHeaderRenderer.title);
-            if ("descriptionText" in header.playlistHeaderRenderer)
-                this.description = getRenderedText(header.playlistHeaderRenderer.descriptionText);
-            this.thumbnails = (thumbnailData => {
-                const thumbnails = {};
-                if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
-                    const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
-                    thumbnails.default = {
-                        url: url.replace("hqdefault.jpg", "default.jpg"),
-                        width: 120,
-                        height: 90
+            if ("playlistHeaderRenderer" in header) {
+                const playlistHeaderRenderer = header.playlistHeaderRenderer;
+                this.id = playlistHeaderRenderer.playlistId;
+                if ("ownerEndpoint" in playlistHeaderRenderer && "browseEndpoint" in playlistHeaderRenderer.ownerEndpoint)
+                    this.channelId = playlistHeaderRenderer.ownerEndpoint.browseEndpoint.browseId;
+                else if (playlistHeaderRenderer.ownerText && playlistHeaderRenderer.ownerText.runs && playlistHeaderRenderer.ownerText.runs.length > 0 && playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint && playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint)
+                    this.channelId = playlistHeaderRenderer.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId;
+                this.title = getRenderedText(playlistHeaderRenderer.title);
+                if ("descriptionText" in playlistHeaderRenderer)
+                    this.description = getRenderedText(playlistHeaderRenderer.descriptionText);
+                this.thumbnails = (thumbnailData => {
+                    const thumbnails = {};
+                    if (!new URL(thumbnailData[0].url).searchParams.has("v")) {
+                        const url = thumbnailData[0].url.substring(0, thumbnailData[0].url.indexOf("&rs="));
+                        thumbnails.default = {
+                            url: url.replace("hqdefault.jpg", "default.jpg"),
+                            width: 120,
+                            height: 90
+                        }
+                        thumbnails.medium = {
+                            url: url.replace("hqdefault.jpg", "mqdefault.jpg"),
+                            width: 320,
+                            height: 180
+                        }
+                        thumbnails.high = {
+                            url: url,
+                            width: 480,
+                            height: 360
+                        }
+                        thumbnails.standard = {
+                            url: url.replace("hqdefault.jpg", "sddefault.jpg"),
+                            width: 640,
+                            height: 480
+                        }
+                        thumbnails.maxres = {
+                            url: url.replace("hqdefault.jpg", "maxresdefault.jpg"),
+                            width: 1280,
+                            height: 720
+                        }
+                    } else {
+                        thumbnails.medium = thumbnailData[0];
+                        thumbnails.standard = thumbnailData[1];
+                        thumbnails.maxres = thumbnailData[2];
                     }
-                    thumbnails.medium = {
-                        url: url.replace("hqdefault.jpg", "mqdefault.jpg"),
-                        width: 320,
-                        height: 180
-                    }
-                    thumbnails.high = {
-                        url: url,
-                        width: 480,
-                        height: 360
-                    }
-                    thumbnails.standard = {
-                        url: url.replace("hqdefault.jpg", "sddefault.jpg"),
-                        width: 640,
-                        height: 480
-                    }
-                    thumbnails.maxres = {
-                        url: url.replace("hqdefault.jpg", "maxresdefault.jpg"),
-                        width: 1280,
-                        height: 720
-                    }
-                } else {
-                    thumbnails.medium = thumbnailData[0];
-                    thumbnails.standard = thumbnailData[1];
-                    thumbnails.maxres = thumbnailData[2];
-                }
-                return thumbnails;
-            })(header.playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails);
-            if ("ownerText" in header.playlistHeaderRenderer)
-                this.channelTitle = getRenderedText(header.playlistHeaderRenderer.ownerText)
-            else if ("subtitle" in header.playlistHeaderRenderer)
-                this.channelTitle = getRenderedText(header.playlistHeaderRenderer.subtitle);
-            this.privacyStatus = header.playlistHeaderRenderer.privacy.toLowerCase();
-            this.itemCount = Number(header.playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]);
+                    return thumbnails;
+                })(playlistHeaderRenderer.playlistHeaderBanner.heroPlaylistThumbnailRenderer.thumbnail.thumbnails);
+                if ("ownerText" in playlistHeaderRenderer)
+                    this.channelTitle = getRenderedText(playlistHeaderRenderer.ownerText)
+                else if ("subtitle" in playlistHeaderRenderer)
+                    this.channelTitle = getRenderedText(playlistHeaderRenderer.subtitle);
+                this.privacyStatus = playlistHeaderRenderer.privacy.toLowerCase();
+                this.itemCount = Number(playlistHeaderRenderer.numVideosText.runs[0].text.split(" ")[0]);
+            }
+            // TODO: Resolve metadata when playlistHeaderRenderer is not present
         } else {
             this.privacyStatus = "private"
         }
@@ -766,14 +772,14 @@ class Channel {
 async function getVideo(id, auth) {
     const js = await getJs(await getPlayerId(id));
     const response = await CLIENTS.WEB.request("/player", {
-        videoId: id,
-        playbackContext: {
-            contentPlaybackContext: {
-                signatureTimestamp: js.signatureTimestamp
-            }
-        },
-        racyCheckOk: false,
-        contentCheckOk: false
+        videoId: id//,
+        // playbackContext: {
+        //     contentPlaybackContext: {
+        //         signatureTimestamp: js.signatureTimestamp
+        //     }
+        // },
+        // racyCheckOk: false,
+        // contentCheckOk: false
     }, auth);
     if (response.ok) {
         return new Video(await response.json(), js);
@@ -851,7 +857,7 @@ async function listAlbumSearchResults(q) {
 }
 
 async function getPlaylistIdFromAlbumId(id) {
-    const response =await CLIENTS.WEB_REMIX.request("/browse", { browseId: id  });
+    const response = await CLIENTS.WEB_REMIX.request("/browse", { browseId: id });
     if (response.ok) {
         const data = await response.json();
         return new URL(data.microformat.microformatDataRenderer.urlCanonical).searchParams.get("list");
@@ -895,9 +901,10 @@ export {
     getChannel,
     getMusicSearchSuggestions,
     getPlaylist,
+    getPlaylistIdFromAlbumId,
     getVideo,
-    listSearchResults,
-    listSongSearchResults,
     listAlbumSearchResults,
-    getPlaylistIdFromAlbumId
+    listSearchResults,
+    listSongSearchResults
 };
+

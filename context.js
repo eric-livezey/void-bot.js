@@ -11,7 +11,7 @@ class CommandContext {
         else
             throw new TypeError("channel must be an instance of a text based channel");
         if (member instanceof GuildMember)
-            Object.defineProperties(this, { "member": { value: member, enumerable: true }, "guild": { value: member.guild } });
+            Object.defineProperties(this, { "member": { value: member, enumerable: true }, "guild": { value: member.guild, enumerable: true } });
         else if (member === null || member === undefined)
             Object.defineProperty(this, "member", { value: null, enumerable: true });
         else
