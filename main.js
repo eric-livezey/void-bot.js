@@ -1,12 +1,11 @@
 import { joinVoiceChannel } from "@discordjs/voice";
 import ytdl from "@distube/ytdl-core";
-import { Attachment, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
+import { ActionRowBuilder, Attachment, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
 import { InteractionCommandContext, MessageCommandContext } from "./context.js";
-import { SearchResultType, getChannel, getPlaylist, getPlaylistIdFromAlbumId, getVideo, listAlbumSearchResults, listSearchResults, listSongSearchResults } from "./innertube/index.js";
+import { SearchResultType, channelURL, getChannel, getPlaylist, getPlaylistIdFromAlbumId, getVideo, listAlbumSearchResults, listSearchResults, listSongSearchResults, playlistURL, videoURL } from "./innertube/index.js";
 import { evaluate } from "./math.js";
-import { Player, Track, getPlayer } from "./player.js";
-import { formatDuration, formatDurationMillis } from "./utils.js";
+import { Player, Track } from "./player.js";
 
 Object.assign(process.env, JSON.parse(fs.readFileSync("./env.json")));
 
@@ -85,6 +84,21 @@ function timelog(msg) {
 }
 
 /**
+ * @type {Record<import("discord.js").Snowflake, Player & { download: boolean }>}
+ */
+const PLAYERS = {};
+function getPlayer(guildId) {
+    if (!(guildId in PLAYERS)) {
+        PLAYERS[guildId] = new Player(guildId);
+        PLAYERS[guildId].on("error", (error) => {
+            console.error(error);
+        });
+        PLAYERS[guildId].download = true;
+    }
+    return PLAYERS[guildId];
+}
+
+/**
  * @param {import("discord.js").VoiceBasedChannel} channel 
  */
 function createVoiceConnection(channel) {
@@ -96,7 +110,6 @@ function createVoiceConnection(channel) {
     });
     connection.on("error", e => {
         timelog("A voice connection error occurred.\nAttempting to rejoin...");
-        connection.rejoinAttempts = 0;
         while (connection.rejoinAttempts < 5) {
             if (connection.rejoin()) {
                 timelog("Rejoin was successful.");
@@ -113,47 +126,42 @@ function createVoiceConnection(channel) {
 /**
  * @param {Player} player 
  * @param {number} page 
- * @returns {import("discord.js").APIEmbed}
+ * @returns {import("discord.js").MessageEditOptions}
  */
 function getQueuePage(player, page) {
-    // Decrease page number until it is valid
-    while (player.queue.length <= (page - 1) * 25) page--;
-    if (player.queue.length == 0) {
-        // The queue is empty
-        return player.isPlaying ? { content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()], components: [] } : { content: "Nothing is playing.", embeds: [], components: [] };
-    }
-    var total = player.nowPlaying.duration / 1000;
-    for (const track of player.queue)
-        total += track.duration / 1000;
-    const eb = new EmbedBuilder()
-        .setFooter({ text: `${player.queue.length} items (${formatDuration(Math.floor(total))})` + (player.queue.length > 25 ? `\nPage ${page}/${Math.ceil(player.queue.length / 25)}` : "") });
-    if (page == 1) {
-        // Include now playing if on first page
-        const nowPlayingEmbed = player.nowPlaying.toEmbed();
-        eb.setAuthor({ name: "Now Playing:" })
-            .setTitle(nowPlayingEmbed.title || null)
-            .setURL(nowPlayingEmbed.url || null)
-            .setDescription(nowPlayingEmbed.description || null);
-    }
-    // Append up to 25 tracks to the queue message
-    for (var i = (page - 1) * 25; i < player.queue.length && i < page * 25; i++) {
-        const track = player.queue[i];
-        eb.addFields({ name: " ", value: `**${i + 1}: ${track.url ? `[${track.title}](${track.url})` : track.title}**\n${formatDurationMillis(track.duration)}` });
-    }
-    const response = { embeds: [eb.toJSON()], components: [{ type: 1, components: [] }] }
-    if (page > 1) {
-        // Add a previous page button
-        response.components[0].components.push({ type: 2, emoji: { id: null, name: "⬅️", animated: false }, style: 2, custom_id: "QUEUE_PAGE:" + (page - 1) });
-    }
-    if (player.queue.length > 25 * page) {
-        // Add a next page button
-        response.components[0].components.push({ type: 2, emoji: { id: null, name: "➡️", animated: false }, style: 2, custom_id: "QUEUE_PAGE:" + (page + 1) })
-    }
-    if (response.components[0].components.length == 0) {
-        // No components
-        response.components = [];
-    }
-    return response;
+    const n = Math.max(Math.ceil(player.queue.length / 25) - 1, 0);
+    if ((page + 1) * 25 > player.queue.length)
+        page = n;
+    if (page < 0)
+        page = 0;
+    const embed = player.getEmbed(page);
+    const arb = new ActionRowBuilder();
+    if (page > 0)
+        arb.addComponents(
+            new ButtonBuilder()
+                .setEmoji("⬅️")
+                .setStyle(ButtonStyle.Secondary)
+                .setCustomId(`QUEUE_PAGE:${page - 1}`)
+        );
+    if (page < n)
+        arb.addComponents(
+            new ButtonBuilder()
+                .setEmoji("➡️")
+                .setStyle(ButtonStyle.Secondary)
+                .setCustomId(`QUEUE_PAGE:${page + 1}`)
+        );
+    let content;
+    if (embed === null)
+        content = "Nothing is playing."
+    else if (player.queue.length === 0)
+        content = "**Now Playing**";
+    const embeds = [];
+    if (embed !== null)
+        embeds.push(embed);
+    const components = [];
+    if (arb.components.length > 0)
+        components.push(arb.toJSON());
+    return { content, embeds, components };
 }
 
 // Commands
@@ -163,9 +171,8 @@ function getQueuePage(player, page) {
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string} id 
- * @param {boolean | undefined} forceInverse
  */
-async function playPlaylist(ctx, id, forceInverse) {
+async function playPlaylist(ctx, id) {
     // Get the playlist by id
     const playlist = await getPlaylist(id);
     if (playlist === null)
@@ -173,13 +180,13 @@ async function playPlaylist(ctx, id, forceInverse) {
     const player = getPlayer(ctx.guild.id)
     let totalAdded = 0;
     for (const item of await playlist.listItems()) {
-        if (!player.isReady) {
+        if (!player.ready) {
             player.stop();
             return await ctx.reply("A voice connection error occurred whilst adding the playlist.");
         }
         if (item.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(item, AGENT, forceInverse ? !player.download : player.download));
+                await player.enqueue(Track.fromPlaylistItem(item, { agent: AGENT, download: player.download }));
             } catch {
                 continue;
             }
@@ -188,9 +195,9 @@ async function playPlaylist(ctx, id, forceInverse) {
     }
     const eb = new EmbedBuilder()
         .setTitle(playlist.title || "Unknown")
-        .setURL("https://www.youtube.com/playlist?list=" + id)
+        .setURL(playlistURL(id))
         .setThumbnail(playlist.thumbnails ? playlist.thumbnails.maxres ? playlist.thumbnails.maxres.url : playlist.thumbnails.high.url : null);
-    if (playlist.channelTitle != null) eb.setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? "https://www.youtube.com/channel/" + playlist.channelId : undefined });
+    if (playlist.channelTitle != null) eb.setAuthor({ name: playlist.channelTitle, url: playlist.channelId ? channelURL(playlist.channelId) : undefined });
     return await ctx.reply({
         content: "**Added " + totalAdded + " tracks to the queue:**",
         embeds: [eb.toJSON()]
@@ -232,9 +239,8 @@ async function disconnect_c(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  * @param {string | null | undefined} query 
  * @param {Attachment | null | undefined} attachment
- * @param {boolean | undefined} forceInverse
  */
-async function play_c(ctx, query, attachment, forceInverse) {
+async function play_c(ctx, query, attachment) {
     // handle voice channel
     const channel = ctx.member.voice.channel;
     if (!channel)
@@ -283,21 +289,18 @@ async function play_c(ctx, query, attachment, forceInverse) {
             id = search.items[0].id.videoId;
         }
         if (track === null) {
-            // Get the video info
-            let info;
             try {
-                info = await ytdl.getInfo(id, { agent: AGENT });
+                track = await Track.fromVideoId(id, { agent: AGENT, download: player.download });
             } catch (e) {
-                return await ctx.reply("An error occurred whilst trying to retrieve the requested video.\n\n" + e.message);
+                return await ctx.reply(e.toString());
             }
-            track = Track.fromVideoInfo(info, AGENT, forceInverse ? !player.download : player.download);
         }
     } else {
         // resume
         return await resume_c(ctx);
     }
     const pos = await player.enqueue(track);
-    return await ctx.reply(pos == 0 ? { content: "**Now Playing:**", embeds: [track.toEmbed()] } : { content: "**Added to the Queue:**", embeds: [track.toEmbed({ name: "Position", value: pos.toString(), inline: true })] });
+    return await ctx.reply(pos === -1 ? "An error occurred whilst downloading audio." : pos == 0 ? { content: "**Now Playing:**", embeds: [track.toEmbed()] } : { content: "**Added to the Queue:**", embeds: [track.toEmbed({ name: "Position", value: pos.toString(), inline: true })] });
 }
 
 /**
@@ -309,7 +312,7 @@ async function playMusic_c(ctx, query) {
     if (items.length === 0) {
         return ctx.reply("There were no valid results for your query.");
     }
-    return await play_c(ctx, "https://www.youtube.com/watch?v=" + items[0].id);
+    return await play_c(ctx, videoURL(items[0].id, undefined));
 }
 
 /**
@@ -323,7 +326,7 @@ async function playAlbum_c(ctx, query) {
         return ctx.reply("There were no valid results for your query.");
     }
     const id = await getPlaylistIdFromAlbumId(items[0].id);
-    return await play_c(ctx, "https://www.youtube.com/playlist?list=" + id);
+    return await play_c(ctx, playlistURL(id));
 }
 
 /**
@@ -332,7 +335,7 @@ async function playAlbum_c(ctx, query) {
 async function skip_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
@@ -349,7 +352,7 @@ async function skip_c(ctx) {
 async function stop_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
@@ -365,13 +368,13 @@ async function stop_c(ctx) {
 async function pause_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
     if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return await ctx.reply("You must be in the same voice channel as the bot to use the command.");
-    if (player.isPaused)
+    if (player.paused)
         return await resume_c(ctx);
     player.pause();
     return await ctx.reply("Playback paused.")
@@ -383,13 +386,13 @@ async function pause_c(ctx) {
 async function resume_c(ctx) {
     const member = ctx.member;
     const player = getPlayer(member.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.")
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
     if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return await ctx.reply("You must be in the same voice channel as the bot to use the command.")
-    if (!player.isPaused)
+    if (!player.paused)
         return await ctx.reply("Playback is not paused.");
     player.unpause();
     return await ctx.reply("Playback resumed.")
@@ -421,14 +424,14 @@ async function loop_c(ctx) {
  */
 async function nowPlaying_c(ctx) {
     const player = getPlayer(ctx.guild.id);
-    return player.isPlaying ? await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] }) : await ctx.reply("Nothing is playing.");
+    return player.playing ? await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] }) : await ctx.reply("Nothing is playing.");
 }
 
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function queue_c(ctx) {
-    return await ctx.reply(getQueuePage(getPlayer(ctx.guild.id), 1));
+    return await ctx.reply(getQueuePage(getPlayer(ctx.guild.id), 0));
 }
 
 /**
@@ -437,15 +440,13 @@ async function queue_c(ctx) {
  */
 async function remove_c(ctx, index) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length === 0)
         return await ctx.reply("The queue is empty.");
     if (index < 1 | index > player.queue.length)
         return await ctx.reply(`${index} is not a valid index in the queue.`);
-    const track = player.queue.splice(index - 1, 1)[0];
-    if (index === 1 && player.queue.length > 0 && player.queue[0].resource === null)
-        player.queue[0].resource = player.queue[0].getResource();
+    const track = player.queue.remove(index - 1);
     return await ctx.reply({ content: "**Removed:**", embeds: [track.toEmbed()] });
 }
 
@@ -456,7 +457,7 @@ async function remove_c(ctx, index) {
  */
 async function move_c(ctx, source, destination) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
@@ -466,10 +467,8 @@ async function move_c(ctx, source, destination) {
         return await ctx.reply(`${destination} is not a valid index in the queue.`);
     if (source === destination)
         return await ctx.reply("Indices must not be equal.");
-    const track = player.queue.splice(source - 1, 1)[0];
-    player.queue.splice(destination - 1, 0, track);
-    if (destination === 1 && player.queue[0].resource === null)
-        player.queue[0].resource = player.queue[0].getResource();
+    const track = player.queue.get(source - 1);
+    player.queue.move(source - 1, destination - 1);
     return await ctx.reply({ content: `Moved **${track.url ? `[${track.title}](${track.url})` : track.title}** to index ${destination} in the queue.`, flags: [MessageFlags.SuppressEmbeds] });
 }
 
@@ -478,11 +477,11 @@ async function move_c(ctx, source, destination) {
  */
 async function clear_c(ctx) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return ctx.reply("The queue is already empty.");
-    player.queue = [];
+    player.queue.clear();
     return ctx.reply("Queue cleared.");
 }
 
@@ -491,20 +490,11 @@ async function clear_c(ctx) {
  */
 async function shuffle_c(ctx) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
-    let currentIndex = player.queue.length, randomIndex;
-    while (currentIndex > 0) {
-        randomIndex = Math.floor(Math.random() * currentIndex);
-        currentIndex--;
-
-        [player.queue[currentIndex], player.queue[randomIndex]] = [
-            player.queue[randomIndex], player.queue[currentIndex]];
-    }
-    if (player.queue[0].resource === null)
-        player.queue[0].resource = player.queue[0].getResource();
+    player.queue.shuffle();
     return await ctx.reply("Queue shuffled.");
 }
 
@@ -514,13 +504,31 @@ async function shuffle_c(ctx) {
  */
 async function info_c(ctx, index) {
     const player = getPlayer(ctx.guild.id);
-    if (!player.isPlaying)
+    if (!player.playing)
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
     if (index < 1 || index > player.queue.length)
         return await ctx.reply(`${index} is not a valid index in the queue.`);
-    return await ctx.reply({ embeds: [player.queue[index - 1].toEmbed({ name: "Position", value: index.toString(), inline: true })] });
+    return await ctx.reply({ embeds: [player.queue.get(index - 1).toEmbed({ name: "Position", value: index.toString(), inline: true })] });
+}
+
+// Reaction roles
+
+/**
+ * 
+ * @param {InteractionCommandContext} ctx 
+ * @param {*} messageId 
+ * @param {*} emoji 
+ * @param {*} role 
+ * @returns 
+ */
+async function createReactionRole_c(ctx, messageId, emoji, role) {
+    return await ctx.reply({ ephemeral: true, content: "This command is still in development. If you actually want to use this command let know and I'll finish implementing it." });
+}
+
+async function removeReactionRole_c(ctx, messageId, emoji) {
+    return await ctx.reply({ ephemeral: true, content: "This command is still in development. If you actually want to use this command let know and I'll finish implementing it." });
 }
 
 // Misc
@@ -582,78 +590,87 @@ CLIENT.once(Events.ClientReady, async (client) => {
 CLIENT.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
         // Page update interaction for queue
-        interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(interaction.customId.split(":")[1])));
+        try {
+            await interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(interaction.customId.split(":")[1])));
+        } catch (e) {
+            console.error("Error on queue page update:", e);
+        }
     } else if (interaction.isChatInputCommand()) {
         const ctx = new InteractionCommandContext(interaction);
         const options = interaction.options;
-        // Ids are obviously unique to the version of the bot I use
-        switch (interaction.commandId) {
-            case "1310548215606542357":
-                await connect_c(ctx, options.getChannel("channel", false, [ChannelType.GuildVoice]));
-                break;
-            case "1310548217078747166":
-                await disconnect_c(ctx);
-                break;
-            case "1310147625114275930":
-                await play_c(ctx, options.getString("query", true));
-                break;
-            case "1310538948191457311":
-                await play_c(ctx, null, options.getAttachment("file", true))
-                break;
-            case "1310150411092623450":
-                await playMusic_c(ctx, options.getString("query", true));
-                break;
-            case "1310547396488466514":
-                await pause_c(ctx);
-                break;
-            case "1310547398581420095":
-                await resume_c(ctx);
-                break;
-            case "1310547401098006569":
-                await stop_c(ctx);
-                break;
-            case "1310547400120729651":
-                await skip_c(ctx);
-                break;
-            case "1310548304681238528":
-                await loop_c(ctx);
-                break;
-            case "1310547402536517652":
-                await nowPlaying_c(ctx);
-                break;
-            case "1310547482328961045":
-                await queue_c(ctx);
-                break;
-            case "1310548305910169610":
-                await info_c(ctx, options.getInteger("index", true));
-                break;
-            case "1310548218555138098":
-                await move_c(ctx, options.getInteger("source", true), options.getInteger("destination", true));
-                break;
-            case "1310548219817885706":
-                await remove_c(ctx, options.getInteger("index", true));
-                break;
-            case "1310548302835748934":
-                await shuffle_c(ctx);
-                break;
-            case "1310548221520515112":
-                await clear_c(ctx);
-                break;
-            case "1310548315271729173":
-                await volume_c(ctx, options.getNumber("percentage", true));
-                break;
-            case "1311586863437316096":
-                switch (options.getSubcommand()) {
-                    case "create":
-                        await createReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji", true), options.getRole("role", true));
-                        break;
-                    case "remove":
-                        await removeReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji"));
-                        break;
-                }
-                break;
-            default:
-                console.error("Unrecognized Command:", interaction);
+        try {
+            // Ids are obviously unique to the version of the bot I use
+            switch (interaction.commandId) {
+                case "1310548215606542357":
+                    await connect_c(ctx, options.getChannel("channel", false, [ChannelType.GuildVoice]));
+                    break;
+                case "1310548217078747166":
+                    await disconnect_c(ctx);
+                    break;
+                case "1310147625114275930":
+                    await play_c(ctx, options.getString("query", true));
+                    break;
+                case "1310538948191457311":
+                    await play_c(ctx, null, options.getAttachment("file", true))
+                    break;
+                case "1310150411092623450":
+                    await playMusic_c(ctx, options.getString("query", true));
+                    break;
+                case "1310547396488466514":
+                    await pause_c(ctx);
+                    break;
+                case "1310547398581420095":
+                    await resume_c(ctx);
+                    break;
+                case "1310547401098006569":
+                    await stop_c(ctx);
+                    break;
+                case "1310547400120729651":
+                    await skip_c(ctx);
+                    break;
+                case "1310548304681238528":
+                    await loop_c(ctx);
+                    break;
+                case "1310547402536517652":
+                    await nowPlaying_c(ctx);
+                    break;
+                case "1310547482328961045":
+                    await queue_c(ctx);
+                    break;
+                case "1310548305910169610":
+                    await info_c(ctx, options.getInteger("index", true));
+                    break;
+                case "1310548218555138098":
+                    await move_c(ctx, options.getInteger("source", true), options.getInteger("destination", true));
+                    break;
+                case "1310548219817885706":
+                    await remove_c(ctx, options.getInteger("index", true));
+                    break;
+                case "1310548302835748934":
+                    await shuffle_c(ctx);
+                    break;
+                case "1310548221520515112":
+                    await clear_c(ctx);
+                    break;
+                case "1310548315271729173":
+                    await volume_c(ctx, options.getNumber("percentage", true));
+                    break;
+                case "1311586863437316096":
+                    switch (options.getSubcommand()) {
+                        case "create":
+                            await createReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji", true), options.getRole("role", true));
+                            break;
+                        case "remove":
+                            await removeReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji"));
+                            break;
+                    }
+                    break;
+                default:
+                    console.error("Unrecognized Command:", interaction);
+            }
+        } catch (e) {
+            console.error(`[${new Date(Date.now()).toLocaleString()}] Uncaught Error on "${interaction.commandName}":`);
+            console.error(e);
         }
     }
 });
@@ -828,10 +845,19 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     // Display the help message
                     await help_c(ctx);
                     break;
+                case "toggledownload":
+                case "td":
+                    // Toggle between downloading and streaming for YouTube videos (Owner Only)
+                    if (ctx.member.id === process.env.OWNER) {
+                        const player = getPlayer(ctx.guild.id);
+                        player.download = !player.download;
+                        ctx.reply(`Downloads toggled ${player.download ? "on" : "off"}.`);
+                        break;
+                    }
                 case "execute":
                 case "exec":
                     // Execute code (Owner Only)
-                    if (message.author.id === process.env.OWNER) {
+                    if (ctx.member.id === process.env.OWNER) {
                         try {
                             let res = "Code Executed.";
                             eval(args.join(" "));

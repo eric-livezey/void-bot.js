@@ -542,6 +542,14 @@ declare class OAuthClient {
     initialize(): Promise<void>;
 }
 
+declare function videoURL<T extends string>(id: T): `https://www.youtube.com/watch?v=${T}`;
+
+declare function videoURL<T extends string, U extends boolean>(id: T, short?: U): U extends true ? `https://youtu.be/${T}` : `https://www.youtube.com/watch?v=${T}`;
+
+declare function playlistURL<T extends string>(id: T): `https://www.youtube/com/playlist?list=${T}`;
+
+declare function channelURL<T extends string>(id: T): `https://www.youtube.com/channel/${T}`;
+
 /**
  * Returns the video with the matching ID.
  * 
@@ -577,7 +585,7 @@ declare function getChannel(id: string): Promise<Channel | null>;
  * 
  * @param q Specifies the query term to search for.
  */
-declare function listSongSearchResults(q: string): Promise<{ id: string; title: string | null ;}[]>;
+declare function listSongSearchResults(q: string): Promise<{ id: string; title: string | null; }[]>;
 
 /**
  * Returns a list of ids of albums which correspond to the given query.
@@ -599,6 +607,9 @@ export {
     SearchListResponse,
     Channel,
     OAuthClient,
+    videoURL,
+    playlistURL,
+    channelURL,
     getVideo,
     getPlaylist,
     listSearchResults,

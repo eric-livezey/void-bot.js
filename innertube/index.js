@@ -765,6 +765,18 @@ class Channel {
     }
 }
 
+function videoURL(id, short) {
+    return short ? `https://youtu.be/${id}` : `https://www.youtube.com/watch?v=${id}`;
+}
+
+function playlistURL(id) {
+    return `https://www.youtube.com/playlist?list=${id}`;
+}
+
+function channelURL(id) {
+    return `https://www.youtube.com/channel/${id}`;
+}
+
 /**
  * @param {string} id 
  * @param {OAuthClient | undefined} auth
@@ -898,6 +910,9 @@ export {
     SearchListResponse,
     SearchResult,
     Video,
+    videoURL,
+    playlistURL,
+    channelURL,
     getChannel,
     getMusicSearchSuggestions,
     getPlaylist,
@@ -907,4 +922,3 @@ export {
     listSearchResults,
     listSongSearchResults
 };
-

@@ -1,172 +1,228 @@
-import { AudioPlayer, AudioResource, VoiceConnection } from "@discordjs/voice";
-import ytdl from "@distube/ytdl-core";
-import { APIEmbed, APIEmbedField, Snowflake } from "discord.js";
+import { AudioPlayer, AudioResource, PlayerSubscription, VoiceConnection } from "@discordjs/voice";
+import { downloadOptions, videoInfo } from "@distube/ytdl-core";
+import { APIEmbed, APIEmbedField, RestOrArray, Snowflake } from "discord.js";
 import { EventEmitter } from "events";
 import { PlaylistItem } from "./innertube";
 
-declare class Player extends EventEmitter {
+declare interface TrackDetails {
+    url?: string;
+    thumbnail?: string;
+    duration?: number;
+    author?: {
+        name?: string;
+        url?: string;
+        iconURL?: string
+    }
+}
+
+declare interface TrackAuthor {
     /**
-     * The id of guild which the player is for
+     * Author name
      */
-    readonly id: Snowflake;
+    readonly name: string | null;
     /**
-     * The AudioPlayer this player uses
+     * URL to author
      */
-    readonly player: AudioPlayer;
+    readonly url: string | null;
     /**
-     * The voice connection the player is currently subscribed to.
+     * URL to author icon
+     */
+    readonly iconURL: string | null;
+}
+
+/**
+ * Represents a track to played by a player.
+ */
+declare class Track<T = null> {
+    /**
+     * The title of the track
+     */
+    readonly title: string;
+    /**
+     * The URL to the track
+     */
+    readonly url: string | null;
+    /**
+     * The URL to the thumbnail image
+     */
+    readonly thumbnail: string | null;
+    /**
+     * The track's duration in milliseconds
+     */
+    readonly duration: number | null;
+    /**
+     * The track's author's info
+     */
+    readonly author: TrackAuthor;
+    #resource: Promise<AudioResource<T>> | null;
+    #error: Error | null;
+    #prepare: () => Promise<AudioResource<T>> | AudioResource<T>;
+    /**
+     * Returns whether the track has been prepared.
+     */
+    get prepared(): boolean;
+    /**
+     * Returns whether the track has been resolved.
+     */
+    get resolved(): boolean;
+    /**
+     * Returns the current {@link AudioResource} object for the track if it's been resolved.
+     */
+    get resource(): AudioResource<T> | null;
+    /**
+     * @param prepare a function which resolved the {@link AudioResource} to be used
+     * @param title the title of the track
+     * @param details track details
+     */
+    constructor(prepare: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, details?: TrackDetails);
+    /**
+     * Reset the track which allows the audio resource to be created again.
+     */
+    reset(): void;
+    /**
+     * Prepare the audio resource. If the resource is already being prepared, nothing will happen.
+     */
+    prepare(): void;
+    /**
+     * Resolve the audio resource.
+     */
+    resolve(): Promise<AudioResource<T>>;
+    /**
+     * Returns a APIEmbed representation of the track.
+     * 
+     * @param fields additional embed fields
+     */
+    toEmbed(...fields: RestOrArray<APIEmbedField>): APIEmbed;
+    /**
+     * Create a track from a URL. A track created this way will never be downloaded.
+     * 
+     * @param url a url to an audio file
+     * @param title the title of the track
+     * @param details track details
+     */
+    static fromURL(url: URL | string, title?: string, details?: TrackDetails): Track;
+    /**
+     * Creates a track from a YouTube video ID.
+     * 
+     * @param id a YouTube video ID
+     * @param options ytdl download options
+     */
+    static fromVideoId(id: string, options?: downloadOptions & { download?: boolean }): Promise<Track>;
+    /**
+     * Creates a track from a ytdl videoInfo object.
+     * 
+     * @param info a ytdl videoInfo object
+     * @param options ytdl download options
+     */
+    static fromVideoInfo(info: videoInfo, options?: downloadOptions & { download?: boolean }): Track;
+    /**
+     * Creates a track from a playlist item.
+     * 
+     * @param item a playlist item
+     * @param options ytdl download options
+     */
+    static fromPlaylistItem(item: PlaylistItem, options?: downloadOptions & { download?: boolean }): Track;
+}
+
+/**
+ * Represents a queue of tracks. Ensures that the first track is the queue is always prepared.
+ */
+declare class Queue<T = null> implements Iterable<Track<T>> {
+    #queue: Track<T>[];
+    [Symbol.iterator](): ArrayIterator<Track<T>>;
+    get length(): number;
+    get duration(): number;
+    values(): ArrayIterator<Track<T>>;
+    push(track: Track<T>): number;
+    shift(): Track<T>;
+    get(index: number): Track<T>;
+    set(index: number, value: Track<T>): void;
+    clear(): void;
+    shuffle(): void;
+    remove(index: number): Track<T>;
+    move(src: number, dst: number): void;
+}
+
+/**
+ * Represents a player for a guild.
+ */
+declare class Player<T = null> extends EventEmitter {
+    /**
+     * The id of the guild the player is associated with.
+     */
+    readonly guildId: Snowflake;
+    /**
+     * The player's {@link Queue} of tracks.
+     */
+    readonly queue: Queue<T>;
+    #nowPlaying: Track<T> | null;
+    #volume: number;
+    #loop: boolean;
+    #subscription: PlayerSubscription;
+    #connection: VoiceConnection;
+    #audioPlayer: AudioPlayer[];
+    /**
+     * The currently playing track.
+     */
+    get nowPlaying(): Track<T> | null;
+    /**
+     * The volume.
+     */
+    get volume(): number;
+    set volume(value);
+    /**
+     * Whether the player should loop the current track.
+     */
+    get loop(): boolean;
+    set loop(value);
+    /**
+     * The {@link VoiceConnection} the player is subscribed.
      */
     get connection(): VoiceConnection | null;
     set connection(value);
     /**
-     * The currently playing track
+     * Whether the player is ready to play audio.
      */
-    nowPlaying: Track | null;
+    get ready(): boolean;
     /**
-     * A list of tracks in the queue
+     * Whether the player is currently playing a track.
      */
-    queue: Track[];
+    get playing(): boolean;
     /**
-     * Whether player should loop the current track
+     * Whether the player is paused.
      */
-    loop: boolean;
-    /**
-     * The volume of the player
-     */
-    get volume(): number;
-    set volume(value);
-    download: boolean;
-    /**
-     * Whether the player is ready to play audio
-     */
-    get isReady(): boolean;
-    /**
-     * Whether the player is currently playing audio
-     */
-    get isPlaying(): boolean;
-    /**
-     * Whether the player is currently paused
-     */
-    get isPaused(): boolean;
-
-    /**
-     * @param id Guild ID
-     */
-    constructor(id: Snowflake);
-
+    get paused(): boolean;
     #next(): Promise<void>;
-
+    #play(track: Track<T>): Promise<void>;
     /**
-     * Plays a track.
+     * Plays a track or pushes it to the queue.
      * 
-     * @param track the track to play 
+     * @param track a track
      */
-    play(track: Track): Promise<void>;
-
+    enqueue(track: Track<T>): Promise<number>;
     /**
-     * Pauses the currently playing track. Returns whether the player was successfully paused.
+     * Pauses the player.
      */
     pause(): boolean;
-
     /**
-     * Unpauses the currently playing track. Returns whether the player was successfully unpaused.
+     * Unpauses the player.
      */
     unpause(): boolean;
-
+    /**
+     * Stops the player and clears the queue.
+     */
+    stop(): boolean;
     /**
      * Skips the current track.
      */
-    skip(): Promise<void>;
-
-    /**
-     * Stops the current track and clears the queue.
-     */
-    stop(): void;
-
-    /**
-     * Enqueue a track. If nothing is playing, it will played immediately, otherwise it will be added to the queue.
-     * 
-     * @param track the track to enqueue
-     */
-    enqueue(track: Track): Promise<number>;
+    skip(): Promise<Track<T> | null>;
+    getEmbed(page: number): APIEmbed | null;
 }
-
-declare class Track<T = unknown> {
-    /**
-     * A function which gets a new audio resource to play
-     */
-    getResource: () => Promise<AudioResource<T>>;
-    /**
-     * The audio resource, if any
-     */
-    resource: Promise<AudioResource<T>> | AudioResource<T> | null;
-    /**
-     * The title of the track
-     */
-    title: string;
-    /**
-     * The url to embed in the track's title
-     */
-    url: string | null;
-    /**
-     * Data about the author of the track
-     */
-    author: { title: string, url?: string, iconURL?: string } | null;
-    /**
-     * The url to a thumbnail for the track
-     */
-    thumbnail: string | null;
-    /**
-     * The duration of the track is milliseconds
-     */
-    duration: number | null;
-
-    /**
-     * @param getResource a function which returns an audio resource to play
-     * @param title the title of the track
-     * @param options additional info about the track
-     */
-    constructor(getResource: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, options?: { url?: string, author?: { title: string, url?: string, iconURL?: string }, thumbnail?: string, duration?: number });
-
-    /**
-     * Returns an Embed reprentation of this track
-     */
-    toEmbed(...fields: APIEmbedField[]): APIEmbed;
-
-    /**
-     * Creates a track from a URL.
-     * 
-     * @param url a url to create the track from
-     * @param title the title of the track, if no title is provided it will taken from the last part of the pathname
-     * @param options additional info about the track
-     */
-    static fromURL(url: string | URL, title?: string, options?: { url?: string, author?: { title: string, url?: string, iconURL?: string }, thumbnail?: string, duration?: number }): Track<null>;
-
-    /**
-     * Creates a track from YouTube video.
-     * 
-     * @param info a videoInfo object to construct the track from
-     * @param download whether the track should be downloaded
-     */
-    static fromVideoInfo(info: ytdl.videoInfo, agent: ytdl.Agent, download?: boolean): Track<null>;
-
-    /**
-     * Creates a track from a playlist item.
-     * 
-     * @param item a PlaylistItem to construct the track from
-     * @param download whether the track should be downloaded
-     */
-    static fromPlaylistItem(item: PlaylistItem, agent: ytdl.Agent, download?: boolean): Track<null>;
-}
-
-/**
- * Gets the player for the guild with the given id
- * 
- * @param id the guild id to retrieve the player for
- */
-declare function getPlayer(id: string): Player;
 
 export {
-    getPlayer, Player,
+    TrackDetails,
+    TrackAuthor,
+    Player,
+    Queue,
     Track
 };

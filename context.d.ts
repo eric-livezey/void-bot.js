@@ -1,4 +1,4 @@
-import { BaseMessageOptions, ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, TextBasedChannel, User } from "discord.js";
+import { BaseMessageOptions, ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, PermissionResolvable, Snowflake, TextBasedChannel, User } from "discord.js";
 
 declare abstract class CommandContext<InGuild extends boolean = boolean> {
     /**
@@ -18,7 +18,7 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
      */
     public readonly member: If<InGuild, GuildMember>;
     /**
-     * The guild in which the command was invoked
+     * The guild in which the command was invoked.
      */
     public readonly guild: If<InGuild, Guild>;
 
@@ -57,5 +57,16 @@ declare class InteractionCommandContext extends CommandContext<true> {
 
     public constructor(interaction: ChatInputCommandInteraction);
 
+    /**
+     * Reply to the command.
+     * 
+     * If the interaction was already deferred or replied to, the reply will be edited.
+     */
     public reply(options: string | MessagePayload | InteractionReplyOptions): Promise<Message<true>>;
+}
+
+export {
+    CommandContext,
+    MessageCommandContext,
+    InteractionCommandContext
 }

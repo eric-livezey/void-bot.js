@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, DMChannel, GuildMember, Message, NewsChannel, StageChannel, TextChannel, User, VoiceChannel } from "discord.js";
+import { ChatInputCommandInteraction, DMChannel, GuildMember, Message, NewsChannel, PermissionsBitField, StageChannel, TextChannel, User, VoiceChannel } from "discord.js";
 
 class CommandContext {
     constructor(user, channel, member) {
@@ -13,9 +13,9 @@ class CommandContext {
         if (member instanceof GuildMember)
             Object.defineProperties(this, { "member": { value: member, enumerable: true }, "guild": { value: member.guild, enumerable: true } });
         else if (member === null || member === undefined)
-            Object.defineProperty(this, "member", { value: null, enumerable: true });
+            Object.defineProperties(this, { "member": { value: null, enumerable: true }, "guild": { value: null, enumerable: true } });
         else
-            throw new TypeError("member must be an instance of a Member or null or undefined");
+            throw new TypeError("member must be an instance of a GuildMember or null or undefined");
     }
 
     isMessage() {
@@ -56,5 +56,6 @@ class InteractionCommandContext extends CommandContext {
 }
 
 export {
-    InteractionCommandContext, MessageCommandContext
+    InteractionCommandContext,
+    MessageCommandContext
 };
