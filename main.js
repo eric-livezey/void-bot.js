@@ -139,14 +139,14 @@ function getQueuePage(player, page) {
     if (page > 0)
         arb.addComponents(
             new ButtonBuilder()
-                .setEmoji("⬅️")
+                .setEmoji("\u2b05")
                 .setStyle(ButtonStyle.Secondary)
                 .setCustomId(`QUEUE_PAGE:${page - 1}`)
         );
     if (page < n)
         arb.addComponents(
             new ButtonBuilder()
-                .setEmoji("➡️")
+                .setEmoji("\u27a1")
                 .setStyle(ButtonStyle.Secondary)
                 .setCustomId(`QUEUE_PAGE:${page + 1}`)
         );
@@ -549,7 +549,7 @@ async function evaluate_c(ctx, expression) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function help_c(ctx) {
-    ctx.reply({
+    return await ctx.reply({
         embeds: [new EmbedBuilder().addFields(
             { name: "play *[query]", value: "Plays something from YouTube using the [query] as a link or search query. If any atachments are added, the bot will attempt to play them as audio, otherwise if no query is provided, attempts resume." },
             { name: "playmusic|playm|pm [query]", value: "Plays a song from YouTube using the [query] as a search query. Should only find official music in search results (not videos)." },
@@ -588,12 +588,12 @@ CLIENT.once(Events.ClientReady, async (client) => {
 });
 
 CLIENT.on(Events.InteractionCreate, async (interaction) => {
-    if (interaction.isButton()) {
-        // Page update interaction for queue
-        try {
-            await interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(interaction.customId.split(":")[1])));
-        } catch (e) {
-            console.error("Error on queue page update:", e);
+    if (interaction.isMessageComponent()) {
+        const [type, arg] = interaction.customId.split(":", 2);
+        switch (type) {
+            case "QUEUE_PAGE": // Page update interaction for queue
+                await interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(arg)));
+                break;
         }
     } else if (interaction.isChatInputCommand()) {
         const ctx = new InteractionCommandContext(interaction);
@@ -601,66 +601,66 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
         try {
             // Ids are obviously unique to the version of the bot I use
             switch (interaction.commandId) {
-                case "1310548215606542357":
+                case "1310548215606542357": // join
                     await connect_c(ctx, options.getChannel("channel", false, [ChannelType.GuildVoice]));
                     break;
-                case "1310548217078747166":
+                case "1310548217078747166": // leave
                     await disconnect_c(ctx);
                     break;
-                case "1310147625114275930":
+                case "1310147625114275930": // play
                     await play_c(ctx, options.getString("query", true));
                     break;
-                case "1310538948191457311":
+                case "1310538948191457311": // play-file
                     await play_c(ctx, null, options.getAttachment("file", true))
                     break;
-                case "1310150411092623450":
+                case "1310150411092623450": // play-music
                     await playMusic_c(ctx, options.getString("query", true));
                     break;
-                case "1310547396488466514":
+                case "1310547396488466514": // pause
                     await pause_c(ctx);
                     break;
-                case "1310547398581420095":
+                case "1310547398581420095": // resume
                     await resume_c(ctx);
                     break;
-                case "1310547401098006569":
+                case "1310547401098006569": // stop
                     await stop_c(ctx);
                     break;
-                case "1310547400120729651":
+                case "1310547400120729651": // skip
                     await skip_c(ctx);
                     break;
-                case "1310548304681238528":
+                case "1310548304681238528": // loop
                     await loop_c(ctx);
                     break;
-                case "1310547402536517652":
+                case "1310547402536517652": // now-playing
                     await nowPlaying_c(ctx);
                     break;
-                case "1310547482328961045":
+                case "1310547482328961045": // queue
                     await queue_c(ctx);
                     break;
-                case "1310548305910169610":
+                case "1310548305910169610": // info
                     await info_c(ctx, options.getInteger("index", true));
                     break;
-                case "1310548218555138098":
+                case "1310548218555138098": // move
                     await move_c(ctx, options.getInteger("source", true), options.getInteger("destination", true));
                     break;
-                case "1310548219817885706":
+                case "1310548219817885706": // remove
                     await remove_c(ctx, options.getInteger("index", true));
                     break;
-                case "1310548302835748934":
+                case "1310548302835748934": // shuffle
                     await shuffle_c(ctx);
                     break;
-                case "1310548221520515112":
+                case "1310548221520515112": // clear
                     await clear_c(ctx);
                     break;
-                case "1310548315271729173":
+                case "1310548315271729173": // volume
                     await volume_c(ctx, options.getNumber("percentage", true));
                     break;
-                case "1311586863437316096":
+                case "1311586863437316096": // reaction-roles
                     switch (options.getSubcommand()) {
-                        case "create":
+                        case "create": // reaction-roles create
                             await createReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji", true), options.getRole("role", true));
                             break;
-                        case "remove":
+                        case "remove": // reaction-roles remove
                             await removeReactionRole_c(ctx, options.getString("message-id", true), options.getString("emoji"));
                             break;
                     }
@@ -697,7 +697,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
     } else if (message.content.startsWith(PREFIX) && message.author.id !== CLIENT.user.id) {
         // Parse command name and arguments
         const args = message.content.split(" ");
-        const cmd = args.shift().substring(PREFIX.length);
+        const cmd = args.shift().substring(PREFIX.length).toLowerCase();
         try {
             const ctx = new MessageCommandContext(message);
             // Handle command
@@ -863,7 +863,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                             eval(args.join(" "));
                             await ctx.reply(res);
                         } catch (e) {
-                            await ctx.reply("Error:\n" + e.message);
+                            await ctx.reply(e.toString());
                         }
                         break;
                     }

@@ -142,13 +142,14 @@ class Track {
             eb.setAuthor({ name: this.author.name || undefined, url: this.author.url || undefined, iconURL: this.author.iconURL || undefined });
         if (this.thumbnail !== null)
             eb.setThumbnail(this.thumbnail);
-        if (this.duration !== null) {
-            let duration = formatDurationMillis(this.duration);
-            if (this.resource !== null && this.resource.started)
+        if (this.duration !== null || this.resolved && this.resource.started) {
+            let duration = this.duration !== null ? formatDurationMillis(this.duration) : "NA";
+            if (this.resolved && this.resource.started)
                 duration = `${formatDurationMillis(this.resource.playbackDuration)}/${duration}`;
             eb.addFields({ name: "Duration", value: duration, inline: true });
         }
-        eb.addFields(fields || []);
+        if (fields.length > 0)
+            eb.addFields(fields);
         return eb.toJSON();
     }
     static fromURL(url, title, details) {
@@ -180,13 +181,13 @@ class Track {
         const format = ytdl.chooseFormat(info.formats, { quality: "highestaudio" });
         const details = {
             url: videoURL(id),
-            thumbnail: videoDetails.thumbnails[videoDetails.thumbnails.length - 1].url,
+            thumbnail: videoDetails.thumbnails.length > 0 ? videoDetails.thumbnails[videoDetails.thumbnails.length - 1].url : undefined,
             duration: format.approxDurationMs !== undefined ? Number(format.approxDurationMs) : undefined,
             author: {
                 name: videoDetails.ownerChannelName,
                 url: channelURL(videoDetails.channelId)
             }
-        }
+        };
         return new Track(prepare, videoDetails.title, details);
     }
     static fromPlaylistItem(item, options) {
@@ -386,10 +387,10 @@ class Player extends EventEmitter {
         }
         if (this.loop && this.playing) {
             this.nowPlaying.reset();
-            await this.#play(this.nowPlaying).catch(this.skip);
+            await this.#play(this.nowPlaying).catch(() => this.skip());
         }
         else if (this.queue.length > 0)
-            await this.#play(this.queue.shift()).catch(this.skip);
+            await this.#play(this.queue.shift()).catch(() => this.skip());
         else
             this.stop();
     }
