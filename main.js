@@ -824,17 +824,6 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else
                         await volume_c(ctx, Number(args[0]));
                     break;
-                case "toggledownload":
-                case "td":
-                    // Toggle between downloading and streaming for YouTube videos (Owner Only)
-                    if (message.author.id === process.env.OWNER) {
-                        const player = getPlayer(ctx.guild.id);
-                        player.download = !player.download;
-                        ctx.reply(`Downloads toggled ${player.download ? "on" : "off"}.`);
-                    } else {
-                        await ctx.reply("Unrecognized command.\nUse `.help` for a list of commands.");
-                    }
-                    break;
                 case "evaluate":
                 case "eval":
                     // Evaluate a mathematical expression
