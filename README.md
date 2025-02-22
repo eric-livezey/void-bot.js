@@ -1,6 +1,6 @@
 # Void Bot
 
-Void Bot is a Discord bot that will play the audio from YouTube videos in voice calls. It uses [discord.js](https://discord.js.org) for Discord's API and <s>a YouTube downloader that I created</s> [ytdl-core](https://github.com/distubejs/ytdl-core). `main.js` works consistently when `shouldDownload` is set to `true` only because it downloads the entire track before hand. Because of this, it keeps every audio file in it's directory for caching which may lead to a large file size of the directory with many audio files. The `audio` folder can always be deleted whenever the cache gets too big.
+Void Bot is a Discord bot that will play the audio from YouTube videos in voice calls. It uses [discord.js](https://discord.js.org) for Discord's API and <s>a YouTube downloader that I created</s> [ytdl-core](https://github.com/distubejs/ytdl-core). Because of issues with streaming audio directly from YouTube, the bot dowloads every YouTube track by default. Because of this, it keeps every audio file in it's directory for caching which may lead to a large file size of the directory with many audio files. The `audio` folder can always be deleted whenever the cache gets too big.
 
 # Usage
 
@@ -23,6 +23,8 @@ Now you should create a file called `env.json` in the directory of the repositor
     }
 
 You can find your bot's token on it's application page.
+
+You can also optionally specify the bot owner's id in the same file using the `"OWNER"` field.
 
 Now all that's left is to run it. Assuming all the previous steps are done properly you should be able to run `main.js` with node which should launch the bot.
 
