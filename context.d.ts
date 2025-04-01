@@ -1,72 +1,68 @@
-import { BaseMessageOptions, ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, PermissionResolvable, Snowflake, TextBasedChannel, User } from "discord.js";
-
+import { ChatInputCommandInteraction, Client, Guild, GuildMember, GuildTextBasedChannel, If, InteractionEditReplyOptions, InteractionReplyOptions, Message, MessagePayload, MessageReplyOptions, SendableChannels, User } from 'discord.js';
 declare abstract class CommandContext<InGuild extends boolean = boolean> {
     /**
-     * The client associated with this command invokation.
+     * The client associated with this command invocation.
      */
-    public readonly client: Client<true>;
+    readonly client: Client<true>;
     /**
      * The user who invoked the command.
      */
-    public readonly user: User;
+    readonly user: User;
     /**
      * The channel in which the command was invoked.
      */
-    public readonly channel: If<InGuild, GuildTextBasedChannel, TextBasedChannel>;
+    readonly channel: If<InGuild, GuildTextBasedChannel, SendableChannels>;
     /**
      * The member who invoked the command or `null` if not in a guild.
      */
-    public readonly member: If<InGuild, GuildMember>;
+    readonly member: If<InGuild, GuildMember>;
     /**
      * The guild in which the command was invoked.
      */
-    public readonly guild: If<InGuild, Guild>;
-
-    public constructor(user: User, channel: TextBasedChannel, member?: GuildMember | null);
-
+    readonly guild: If<InGuild, Guild>;
+    constructor(user: User, channel: SendableChannels, member?: GuildMember);
     /**
      * Returns `true` if the command was invoked via a message, else `false`.
      */
-    public isMessage(): this is MessageCommandContext;
+    isMessage(): this is MessageCommandContext;
     /**
      * Returns `true` if the command was invoked via an interaction, else `false`.
      */
-    public isInteraction(): this is InteractionCommandContext;
+    isInteraction(): this is SlashCommandContext;
     /**
      * Reply to the command.
      */
-    public abstract reply(message: string | MessagePayload | BaseMessageOptions | InteractionReplyOptions): Promise<Message<InGuild>>;
+    abstract reply(options: any): Promise<Message<InGuild>>;
 }
-
+declare class SlashCommandContext<InGuild extends boolean = boolean> extends CommandContext<InGuild> {
+    /**
+     * The interaction associated with the command.
+     */
+    readonly interaction: ChatInputCommandInteraction;
+    constructor(interaction: ChatInputCommandInteraction<'cached'>);
+    /**
+     * Reply to the command.
+     *
+     * If the interaction was already deferred or replied to, the reply will be edited.
+     */
+    reply(options: string | MessagePayload | InteractionReplyOptions | InteractionEditReplyOptions): Promise<Message<InGuild>>;
+}
 declare class MessageCommandContext<InGuild extends boolean = boolean> extends CommandContext<InGuild> {
     /**
      * The message associated with the command.
      */
-    public readonly message: Message<InGuild>;
-
-    public constructor(message: Message<InGuild>);
-
-    public reply(options: string | MessagePayload | MessageReplyOptions): Promise<Message<InGuild>>;
-}
-
-declare class InteractionCommandContext extends CommandContext<true> {
+    readonly message: Message<InGuild>;
     /**
-     * The interaction associated with the command.
+     * Message content excluding the command name and prefix.
      */
-    public readonly interaction: ChatInputCommandInteraction;
-
-    public constructor(interaction: ChatInputCommandInteraction);
-
+    readonly content: string;
     /**
-     * Reply to the command.
-     * 
-     * If the interaction was already deferred or replied to, the reply will be edited.
+     * Parsed argument list.
      */
-    public reply(options: string | MessagePayload | InteractionReplyOptions): Promise<Message<true>>;
+    readonly args: string[];
+    constructor(message: Message<InGuild> & {
+        channel: SendableChannels;
+    }, content: string);
+    reply(options: string | MessagePayload | MessageReplyOptions): Promise<Message<InGuild>>;
 }
-
-export {
-    CommandContext,
-    MessageCommandContext,
-    InteractionCommandContext
-}
+export { CommandContext, SlashCommandContext, MessageCommandContext };

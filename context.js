@@ -1,61 +1,84 @@
-import { ChatInputCommandInteraction, DMChannel, GuildMember, Message, NewsChannel, PermissionsBitField, StageChannel, TextChannel, User, VoiceChannel } from "discord.js";
-
+import { nullifyValue } from './utils';
 class CommandContext {
+    /**
+     * The client associated with this command invocation.
+     */
+    client;
+    /**
+     * The user who invoked the command.
+     */
+    user;
+    /**
+     * The channel in which the command was invoked.
+     */
+    channel;
+    /**
+     * The member who invoked the command or `null` if not in a guild.
+     */
+    member;
+    /**
+     * The guild in which the command was invoked.
+     */
+    guild;
     constructor(user, channel, member) {
-        if (user instanceof User)
-            Object.defineProperties(this, { "user": { value: user, enumerable: true }, "client": { value: user.client } });
-        else
-            throw new TypeError("user must be an instance of User");
-        if (channel instanceof DMChannel || channel instanceof NewsChannel || channel instanceof StageChannel || channel instanceof TextChannel || channel instanceof VoiceChannel)
-            Object.defineProperty(this, "channel", { value: channel, enumerable: true });
-        else
-            throw new TypeError("channel must be an instance of a text based channel");
-        if (member instanceof GuildMember)
-            Object.defineProperties(this, { "member": { value: member, enumerable: true }, "guild": { value: member.guild, enumerable: true } });
-        else if (member === null || member === undefined)
-            Object.defineProperties(this, { "member": { value: null, enumerable: true }, "guild": { value: null, enumerable: true } });
-        else
-            throw new TypeError("member must be an instance of a GuildMember or null or undefined");
+        this.client = user.client;
+        this.user = user;
+        this.channel = channel;
+        this.member = nullifyValue(member);
+        this.guild = nullifyValue(member?.guild);
     }
-
+    /**
+     * Returns `true` if the command was invoked via a message, else `false`.
+     */
     isMessage() {
         return this instanceof MessageCommandContext;
     }
-
+    /**
+     * Returns `true` if the command was invoked via an interaction, else `false`.
+     */
     isInteraction() {
-        return this instanceof InteractionCommandContext;
+        return this instanceof SlashCommandContext;
     }
 }
-
-class MessageCommandContext extends CommandContext {
-    constructor(message) {
-        super(message.author, message.channel, message.member);
-        if (message instanceof Message)
-            Object.defineProperty(this, "message", { value: message, enumerable: true });
-        else
-            throw new TypeError("message must be an instance of Message");
-    }
-
-    async reply(options) {
-        return await this.message.channel.send(options);
-    }
-}
-
-class InteractionCommandContext extends CommandContext {
+class SlashCommandContext extends CommandContext {
+    /**
+     * The interaction associated with the command.
+     */
+    interaction;
     constructor(interaction) {
-        super(interaction.user, interaction.channel, interaction.member);
-        if (interaction instanceof ChatInputCommandInteraction)
-            Object.defineProperty(this, "interaction", { value: interaction, enumerable: true });
-        else
-            throw new TypeError("interaction must be an instance of ChatInputCommandInteraction");
+        super(interaction.user, interaction.channel, interaction.member || undefined);
+        this.interaction = interaction;
     }
-
+    /**
+     * Reply to the command.
+     *
+     * If the interaction was already deferred or replied to, the reply will be edited.
+     */
     async reply(options) {
-        return this.interaction.replied || this.interaction.deferred ? this.interaction.editReply(options) : await this.interaction.reply(options);
+        return this.interaction.replied || this.interaction.deferred ? await this.interaction.editReply(options) : await (await this.interaction.reply(options)).fetch();
     }
 }
-
-export {
-    InteractionCommandContext,
-    MessageCommandContext
-};
+class MessageCommandContext extends CommandContext {
+    /**
+     * The message associated with the command.
+     */
+    message;
+    /**
+     * Message content excluding the command name and prefix.
+     */
+    content;
+    /**
+     * Parsed argument list.
+     */
+    args;
+    constructor(message, content) {
+        super(message.author, message.channel, message.member || undefined);
+        this.message = message;
+        this.content = content;
+        this.args = content.split(' ');
+    }
+    async reply(options) {
+        return await this.channel.send(options);
+    }
+}
+export { CommandContext, SlashCommandContext, MessageCommandContext };
