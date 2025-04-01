@@ -1,7 +1,7 @@
 import ytdl from "@distube/ytdl-core";
 import { ActionRowBuilder, Attachment, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
-import { InteractionCommandContext, MessageCommandContext } from "./context.js";
+import { SlashCommandContext, MessageCommandContext } from "./context.js";
 import { SearchResultType, channelURL, getChannel, getPlaylist, getPlaylistIdFromAlbumId, getVideo, listAlbumSearchResults, listSearchResults, listSongSearchResults, playlistURL, videoURL } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 import { Player, Track } from "./player.js";
@@ -125,7 +125,7 @@ function getQueuePage(player, page) {
 // Utility
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {string} id 
  */
 async function playPlaylist(ctx, id) {
@@ -142,7 +142,7 @@ async function playPlaylist(ctx, id) {
         }
         if (item.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(item, { agent: AGENT, download: !!player.download }));
+                await player.enqueue(Track.fromPlaylistItem(item, { agent: AGENT, download: !player.stream }));
             } catch {
                 continue;
             }
@@ -163,7 +163,7 @@ async function playPlaylist(ctx, id) {
 // Voice
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {VoiceChannel|null|undefined} channel
  */
 async function connect_c(ctx, channel) {
@@ -177,7 +177,7 @@ async function connect_c(ctx, channel) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function disconnect_c(ctx) {
     const me = await ctx.guild.members.fetchMe();
@@ -192,7 +192,7 @@ async function disconnect_c(ctx) {
 // Playback
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {string | null | undefined} query 
  * @param {Attachment | null | undefined} attachment
  */
@@ -246,7 +246,7 @@ async function play_c(ctx, query, attachment) {
         }
         if (track === null) {
             try {
-                track = await Track.fromVideoId(id, { agent: AGENT, download: !!player.download });
+                track = await Track.fromVideoId(id, { agent: AGENT, download: !player.stream });
             } catch (e) {
                 return await ctx.reply(e.toString());
             }
@@ -289,7 +289,7 @@ async function playAlbum_c(ctx, query) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function skip_c(ctx) {
     const member = ctx.member;
@@ -306,7 +306,7 @@ async function skip_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function stop_c(ctx) {
     const member = ctx.member;
@@ -322,7 +322,7 @@ async function stop_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function pause_c(ctx) {
     const member = ctx.member;
@@ -340,7 +340,7 @@ async function pause_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function resume_c(ctx) {
     const member = ctx.member;
@@ -358,7 +358,7 @@ async function resume_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {number} percentage
  */
 async function volume_c(ctx, percentage) {
@@ -368,7 +368,7 @@ async function volume_c(ctx, percentage) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function loop_c(ctx) {
     const player = Player.get(ctx.guild.id);
@@ -379,7 +379,7 @@ async function loop_c(ctx) {
 // Queue
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function nowPlaying_c(ctx) {
     const player = Player.get(ctx.guild.id);
@@ -387,14 +387,14 @@ async function nowPlaying_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function queue_c(ctx) {
     return await ctx.reply(getQueuePage(Player.get(ctx.guild.id), 0));
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {number} index
  */
 async function remove_c(ctx, index) {
@@ -410,7 +410,7 @@ async function remove_c(ctx, index) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {number} source
  * @param {number} destination
  */
@@ -432,7 +432,7 @@ async function move_c(ctx, source, destination) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function clear_c(ctx) {
     const player = Player.get(ctx.guild.id);
@@ -445,7 +445,7 @@ async function clear_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function shuffle_c(ctx) {
     const player = Player.get(ctx.guild.id);
@@ -458,7 +458,7 @@ async function shuffle_c(ctx) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {number} index
  */
 async function info_c(ctx, index) {
@@ -476,7 +476,7 @@ async function info_c(ctx, index) {
 
 /**
  * 
- * @param {InteractionCommandContext} ctx 
+ * @param {SlashCommandContext} ctx 
  * @param {*} messageId 
  * @param {*} emoji 
  * @param {*} role 
@@ -493,7 +493,7 @@ async function removeReactionRole_c(ctx, messageId, emoji) {
 // Misc
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  * @param {string} expression
  */
 async function evaluate_c(ctx, expression) {
@@ -505,7 +505,7 @@ async function evaluate_c(ctx, expression) {
 }
 
 /**
- * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext<true>|SlashCommandContext} ctx 
  */
 async function help_c(ctx) {
     return await ctx.reply({
@@ -556,7 +556,7 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
                 break;
         }
     } else if (interaction.isChatInputCommand()) {
-        const ctx = new InteractionCommandContext(interaction);
+        const ctx = new SlashCommandContext(interaction);
         const options = interaction.options;
         try {
             // Ids are obviously unique to the version of the bot I use
@@ -656,10 +656,11 @@ CLIENT.on(Events.MessageCreate, async (message) => {
         }
     } else if (message.content.startsWith(PREFIX) && message.author.id !== CLIENT.user.id) {
         // Parse command name and arguments
-        const args = message.content.split(" ");
-        const cmd = args.shift().substring(PREFIX.length).toLowerCase();
+        const [name] = message.content.substring(PREFIX.length).split(' ', 1);
+        const cmd = name.toLowerCase();
         try {
-            const ctx = new MessageCommandContext(message);
+            const ctx = new MessageCommandContext(message,  message.content.substring(PREFIX.length + name.length + 1));
+            const { args } = ctx;
             // Handle command
             switch (cmd) {
                 case "join":
@@ -684,7 +685,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     break;
                 case "play":
                     // Play something
-                    await play_c(ctx, message.content.substring(cmd.length + 1).trim(), message.attachments.at(0));
+                    await play_c(ctx, ctx.content, message.attachments.at(0));
                     break;
                 case "playmusic":
                 case "playm":
@@ -693,7 +694,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     if (args.length < 1)
                         await ctx.reply("You must provide a query.");
                     else
-                        await playMusic_c(ctx, message.content.substring(cmd.length + 1).trim());
+                        await playMusic_c(ctx, ctx.content);
                     break;
                 case "playalbum":
                 case "playa":
@@ -702,7 +703,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     if (args.length < 1)
                         await ctx.reply("You must provide a query.");
                     else
-                        await playAlbum_c(ctx, message.content.substring(cmd.length + 1).trim());
+                        await playAlbum_c(ctx, ctx.content);
                     break;
                 case "pause":
                     // Pause the player
@@ -817,8 +818,8 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     // Toggle between downloading and streaming for YouTube videos (Owner Only)
                     if (ctx.member.id === process.env.OWNER) {
                         const player = Player.get(ctx.guild.id);
-                        player.download = !player.download;
-                        ctx.reply(`Downloads toggled ${player.download ? "on" : "off"}.`);
+                        player.stream = !player.stream;
+                        ctx.reply(`Downloads toggled ${!player.stream ? "on" : "off"}.`);
                         break;
                     }
                 case "execute":
@@ -863,7 +864,7 @@ const YT_TRACKER_TYPE = Object.freeze({ VIDEO: 0, CHANNEL: 1 });
 const YT_TRACKERS = JSON.parse(String(fs.readFileSync("./yt_trackers.json")));
 
 /**
- * @param {MessageCommandContext|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext|SlashCommandContext} ctx 
  * @param {string} url 
  * @returns 
  */
@@ -888,7 +889,7 @@ async function viewCount_c(ctx, url) {
 
 /**
  * 
- * @param {MessageCommandContext|InteractionCommandContext} ctx 
+ * @param {MessageCommandContext|SlashCommandContext} ctx 
  * @param {string} id 
  * @returns 
  */

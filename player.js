@@ -624,4 +624,4 @@ function ytdlPrepare(id, fn, arg, options) {
         };
     }
 }
-export { Player, Queue, Track, downloadFromStream };
+export { Player, Queue, Track };

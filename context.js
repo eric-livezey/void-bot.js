@@ -1,4 +1,4 @@
-import { nullifyValue } from './utils';
+import { nullifyValue } from './utils.js';
 class CommandContext {
     /**
      * The client associated with this command invocation.
