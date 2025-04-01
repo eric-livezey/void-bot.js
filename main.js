@@ -655,14 +655,11 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             });
         }
     } else if (message.content.startsWith(PREFIX) && message.author.id !== CLIENT.user.id) {
-        // Parse command name and arguments
-        const [name] = message.content.substring(PREFIX.length).split(' ', 1);
-        const cmd = name.toLowerCase();
+        const ctx = new MessageCommandContext(message, PREFIX);
+        const {name, args} = ctx;
         try {
-            const ctx = new MessageCommandContext(message,  message.content.substring(PREFIX.length + name.length + 1));
-            const { args } = ctx;
             // Handle command
-            switch (cmd) {
+            switch (name) {
                 case "join":
                 case "connect":
                     // Connect the bot
@@ -841,7 +838,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
             }
         } catch (e) {
             // An error occurred
-            console.error(`[${new Date(Date.now()).toLocaleString()}] Uncaught Error on "${cmd}":`);
+            console.error(`[${new Date(Date.now()).toLocaleString()}] Uncaught Error on "${name}":`);
             console.error(e);
             try {
                 // Attempt to send a message to notify about the error

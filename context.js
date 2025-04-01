@@ -64,6 +64,10 @@ class MessageCommandContext extends CommandContext {
      */
     message;
     /**
+     * The name of the command.
+     */
+    name;
+    /**
      * Message content excluding the command name and prefix.
      */
     content;
@@ -71,11 +75,13 @@ class MessageCommandContext extends CommandContext {
      * Parsed argument list.
      */
     args;
-    constructor(message, content) {
+    constructor(message, prefix) {
         super(message.author, message.channel, message.member || undefined);
         this.message = message;
-        this.content = content;
-        this.args = content.split(' ');
+        const messageContent = message.content.substring(prefix.length);
+        [this.name] = messageContent.split(' ');
+        this.content = messageContent.substring(this.name.length).trimStart();
+        this.args = this.content.split(' ');
     }
     async reply(options) {
         return await this.channel.send(options);

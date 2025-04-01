@@ -53,6 +53,10 @@ declare class MessageCommandContext<InGuild extends boolean = boolean> extends C
      */
     readonly message: Message<InGuild>;
     /**
+     * The name of the command.
+     */
+    readonly name: string;
+    /**
      * Message content excluding the command name and prefix.
      */
     readonly content: string;
@@ -62,7 +66,7 @@ declare class MessageCommandContext<InGuild extends boolean = boolean> extends C
     readonly args: string[];
     constructor(message: Message<InGuild> & {
         channel: SendableChannels;
-    }, content: string);
+    }, prefix: string);
     reply(options: string | MessagePayload | MessageReplyOptions): Promise<Message<InGuild>>;
 }
 export { CommandContext, SlashCommandContext, MessageCommandContext };
