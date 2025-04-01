@@ -1,21 +1,13 @@
-import { AudioPlayer, AudioResource, PlayerSubscription, VoiceConnection } from "@discordjs/voice";
-import { downloadOptions, videoInfo } from "@distube/ytdl-core";
-import { APIEmbed, APIEmbedField, RestOrArray, Snowflake } from "discord.js";
-import { EventEmitter } from "events";
-import { PlaylistItem } from "./innertube";
-
-declare interface TrackDetails {
-    url?: string;
-    thumbnail?: string;
-    duration?: number;
-    author?: {
-        name?: string;
-        url?: string;
-        iconURL?: string
-    }
-}
-
-declare interface TrackAuthor {
+import { AudioResource, VoiceConnection } from '@discordjs/voice';
+import { downloadOptions, videoInfo } from '@distube/ytdl-core';
+import { APIEmbedField, RestOrArray, Snowflake } from 'discord.js';
+import { EventEmitter } from 'events';
+import { Readable } from 'stream';
+import { PlaylistItem } from './innertube';
+type PrepareOptions<T extends downloadOptions = downloadOptions> = T & {
+    download?: boolean;
+};
+interface TrackAuthor {
     /**
      * Author name
      */
@@ -29,11 +21,19 @@ declare interface TrackAuthor {
      */
     readonly iconURL: string | null;
 }
-
+interface TrackOptions {
+    url?: string;
+    thumbnail?: string;
+    duration?: number;
+    author?: {
+        -readonly [P in keyof TrackAuthor]?: TrackAuthor[P];
+    };
+}
 /**
  * Represents a track to played by a player.
  */
-declare class Track<T = null> {
+declare class Track<T = unknown> {
+    #private;
     /**
      * The title of the track
      */
@@ -54,27 +54,57 @@ declare class Track<T = null> {
      * The track's author's info
      */
     readonly author: TrackAuthor;
-    #resource: Promise<AudioResource<T>> | null;
-    #error: Error | null;
-    #prepare: () => Promise<AudioResource<T>> | AudioResource<T>;
     /**
-     * Returns whether the track has been prepared.
+     * Returns the current state of the {@link AudioResource} object associated with the track.
      */
-    get prepared(): boolean;
+    get resource(): AudioResource<T> | Promise<AudioResource<T>>;
     /**
-     * Returns whether the track has been resolved.
-     */
-    get resolved(): boolean;
-    /**
-     * Returns the current {@link AudioResource} object for the track if it's been resolved.
-     */
-    get resource(): AudioResource<T> | null;
-    /**
-     * @param prepare a function which resolved the {@link AudioResource} to be used
+     * @param prepare a function which resolves an {@link AudioResource} to be used
      * @param title the title of the track
      * @param details track details
      */
-    constructor(prepare: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, details?: TrackDetails);
+    constructor(prepare: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, details?: TrackOptions);
+    /**
+     * Create a track from a URL. A track created this way will never be downloaded.
+     *
+     * @param url a url to an audio file
+     * @param title the title of the track
+     * @param details track details
+     */
+    static fromURL(url: URL | string, title?: string, details?: TrackOptions): Track<null>;
+    /**
+     * Creates a track from a ytdl videoInfo object.
+     *
+     * @param info a ytdl videoInfo object
+     * @param options ytdl download options
+     */
+    static fromVideoInfo(info: videoInfo, options?: PrepareOptions): Track<null>;
+    /**
+     * Creates a track from a YouTube video ID.
+     *
+     * @param id a YouTube video ID
+     * @param options ytdl download options
+     */
+    static fromVideoId(id: string, options?: PrepareOptions): Promise<Track<null>>;
+    /**
+     * Creates a track from a playlist item.
+     *
+     * @param item a playlist item
+     * @param options ytdl download options
+     */
+    static fromPlaylistItem(item: PlaylistItem, options?: PrepareOptions): Track<null>;
+    /**
+     * Returns whether the track has been resolved successfully.
+     */
+    isResolved(): this is this & {
+        resource: AudioResource<T>;
+    };
+    /**
+     * Returns whether the track has been prepared.
+     */
+    isPrepared(): this is this & {
+        resource: Promise<AudioResource<T> | null> | AudioResource<T>;
+    };
     /**
      * Reset the track which allows the audio resource to be created again.
      */
@@ -89,64 +119,35 @@ declare class Track<T = null> {
     resolve(): Promise<AudioResource<T>>;
     /**
      * Returns a APIEmbed representation of the track.
-     * 
+     *
      * @param fields additional embed fields
      */
-    toEmbed(...fields: RestOrArray<APIEmbedField>): APIEmbed;
-    /**
-     * Create a track from a URL. A track created this way will never be downloaded.
-     * 
-     * @param url a url to an audio file
-     * @param title the title of the track
-     * @param details track details
-     */
-    static fromURL(url: URL | string, title?: string, details?: TrackDetails): Track;
-    /**
-     * Creates a track from a YouTube video ID.
-     * 
-     * @param id a YouTube video ID
-     * @param options ytdl download options
-     */
-    static fromVideoId(id: string, options?: downloadOptions & { download?: boolean }): Promise<Track>;
-    /**
-     * Creates a track from a ytdl videoInfo object.
-     * 
-     * @param info a ytdl videoInfo object
-     * @param options ytdl download options
-     */
-    static fromVideoInfo(info: videoInfo, options?: downloadOptions & { download?: boolean }): Track;
-    /**
-     * Creates a track from a playlist item.
-     * 
-     * @param item a playlist item
-     * @param options ytdl download options
-     */
-    static fromPlaylistItem(item: PlaylistItem, options?: downloadOptions & { download?: boolean }): Track;
+    toEmbed(...fields: RestOrArray<APIEmbedField>): import("discord.js").APIEmbed;
 }
-
 /**
  * Represents a queue of tracks. Ensures that the first track is the queue is always prepared.
  */
-declare class Queue<T = null> implements Iterable<Track<T>> {
-    #queue: Track<T>[];
-    [Symbol.iterator](): ArrayIterator<Track<T>>;
+declare class Queue implements Iterable<Track> {
+    #private;
     get length(): number;
-    get duration(): number;
-    values(): ArrayIterator<Track<T>>;
-    push(track: Track<T>): number;
-    shift(): Track<T>;
-    get(index: number): Track<T>;
-    set(index: number, value: Track<T>): void;
+    constructor();
+    [Symbol.iterator](): ArrayIterator<Track<unknown>>;
+    values(): ArrayIterator<Track<unknown>>;
+    push(value: Track): number;
+    shift(): Track;
+    get(index: number): Track<unknown>;
+    set(index: number, value: Track): void;
+    remove(index: number): Track<unknown>;
+    move(source: number, destination: number): void;
     clear(): void;
     shuffle(): void;
-    remove(index: number): Track<T>;
-    move(src: number, dst: number): void;
+    calcDuration(): number;
 }
-
 /**
  * Represents a player for a guild.
  */
-declare class Player<T = null> extends EventEmitter {
+declare class Player extends EventEmitter {
+    #private;
     /**
      * The id of the guild the player is associated with.
      */
@@ -154,52 +155,64 @@ declare class Player<T = null> extends EventEmitter {
     /**
      * The player's {@link Queue} of tracks.
      */
-    readonly queue: Queue<T>;
-    #nowPlaying: Track<T> | null;
-    #volume: number;
-    #loop: boolean;
-    #subscription: PlayerSubscription;
-    #connection: VoiceConnection;
-    #audioPlayer: AudioPlayer[];
-    /**
-     * The currently playing track.
-     */
-    get nowPlaying(): Track<T> | null;
-    /**
-     * The volume.
-     */
-    get volume(): number;
-    set volume(value);
+    readonly queue: Queue;
     /**
      * Whether the player should loop the current track.
      */
-    get loop(): boolean;
-    set loop(value);
+    loop: boolean;
     /**
-     * The {@link VoiceConnection} the player is subscribed.
+     * The currently playing track.
      */
-    get connection(): VoiceConnection | null;
-    set connection(value);
+    get nowPlaying(): Track<unknown>;
+    private constructor();
+    /**
+     * Returns the player associated with `guildId` or creates a new one if one does not yet exist.
+     *
+     * @param guildId A guild ID
+     */
+    static get(guildId: Snowflake): Player;
     /**
      * Whether the player is ready to play audio.
      */
-    get ready(): boolean;
+    isReady(): this is this & {
+        connection: VoiceConnection;
+    };
     /**
-     * Whether the player is currently playing a track.
+     * Returns whether the player is currently playing a track.
      */
-    get playing(): boolean;
+    isPlaying(): this is this & {
+        nowPlaying: Track;
+    };
     /**
      * Whether the player is paused.
      */
-    get paused(): boolean;
-    #next(): Promise<void>;
-    #play(track: Track<T>): Promise<void>;
+    isPaused(): boolean;
+    /**
+     * Return the volume of the player.
+     */
+    getVolume(): number;
+    /**
+     * Set the volume of the player.
+     *
+     * @param value a percentage
+     */
+    setVolume(value: number): void;
+    /**
+     * Returns the {@link VoiceConnection} the player is subscribed.
+     */
+    getConnection(): VoiceConnection | null;
+    /**
+     * Set the {@link VoiceConnection} the player should be subscribed to.
+     *
+     * @param value
+     */
+    setConnection(value: VoiceConnection | null): void;
     /**
      * Plays a track or pushes it to the queue.
-     * 
+     *
      * @param track a track
      */
-    enqueue(track: Track<T>): Promise<number>;
+    enqueue(track: Track): Promise<number>;
     /**
      * Pauses the player.
      */
@@ -211,18 +224,12 @@ declare class Player<T = null> extends EventEmitter {
     /**
      * Stops the player and clears the queue.
      */
-    stop(): boolean;
+    stop(): void;
     /**
      * Skips the current track.
      */
-    skip(): Promise<Track<T> | null>;
-    getEmbed(page: number): APIEmbed | null;
+    skip(): Promise<Track<unknown>>;
+    getEmbed(page: number): import("discord.js").APIEmbed;
 }
-
-export {
-    TrackDetails,
-    TrackAuthor,
-    Player,
-    Queue,
-    Track
-};
+declare function downloadFromStream(stream: Readable, path: string, id: string): Promise<string>;
+export { Player, Queue, Track, TrackAuthor, TrackOptions, downloadFromStream };

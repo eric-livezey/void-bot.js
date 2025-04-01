@@ -1,4 +1,3 @@
-import { joinVoiceChannel } from "@discordjs/voice";
 import ytdl from "@distube/ytdl-core";
 import { ActionRowBuilder, Attachment, ButtonBuilder, ButtonStyle, ChannelType, Client, EmbedBuilder, Events, MessageFlags, Partials, PermissionFlagsBits, VoiceChannel } from "discord.js";
 import fs from "fs";
@@ -6,6 +5,7 @@ import { InteractionCommandContext, MessageCommandContext } from "./context.js";
 import { SearchResultType, channelURL, getChannel, getPlaylist, getPlaylistIdFromAlbumId, getVideo, listAlbumSearchResults, listSearchResults, listSongSearchResults, playlistURL, videoURL } from "./innertube/index.js";
 import { evaluate } from "./math.js";
 import { Player, Track } from "./player.js";
+import { createVoiceConnection, timelog } from "./utils.js";
 
 Object.assign(process.env, JSON.parse(fs.readFileSync("./env.json")));
 
@@ -79,50 +79,6 @@ function extractPlaylistID(url) {
     }
 }
 
-function timelog(msg) {
-    console.log(`[${new Date(Date.now()).toLocaleString()}]`, msg);
-}
-
-/**
- * @type {Record<import("discord.js").Snowflake, Player & { download: boolean }>}
- */
-const PLAYERS = {};
-function getPlayer(guildId) {
-    if (!(guildId in PLAYERS)) {
-        PLAYERS[guildId] = new Player(guildId);
-        PLAYERS[guildId].on("error", (error) => {
-            console.error(error);
-        });
-        PLAYERS[guildId].download = true;
-    }
-    return PLAYERS[guildId];
-}
-
-/**
- * @param {import("discord.js").VoiceBasedChannel} channel 
- */
-function createVoiceConnection(channel) {
-    const connection = joinVoiceChannel({
-        channelId: channel.id,
-        guildId: channel.guildId,
-        adapterCreator: channel.guild.voiceAdapterCreator,
-        selfDeaf: false
-    });
-    connection.on("error", e => {
-        timelog("A voice connection error occurred.\nAttempting to rejoin...");
-        while (connection.rejoinAttempts < 5) {
-            if (connection.rejoin()) {
-                timelog("Rejoin was successful.");
-                return;
-            }
-        }
-        timelog("Rejoin failed after 5 attempts with the following error:");
-        connection.destroy();
-        console.error(e);
-    });
-    return connection;
-}
-
 /**
  * @param {Player} player 
  * @param {number} page 
@@ -177,16 +133,16 @@ async function playPlaylist(ctx, id) {
     const playlist = await getPlaylist(id);
     if (playlist === null)
         return await ctx.reply("That is not a valid YouTube playlist link.");
-    const player = getPlayer(ctx.guild.id)
+    const player = Player.get(ctx.guild.id)
     let totalAdded = 0;
     for (const item of await playlist.listItems()) {
-        if (!player.ready) {
+        if (!player.isReady()) {
             player.stop();
             return await ctx.reply("A voice connection error occurred whilst adding the playlist.");
         }
         if (item.playable) {
             try {
-                await player.enqueue(Track.fromPlaylistItem(item, { agent: AGENT, download: player.download }));
+                await player.enqueue(Track.fromPlaylistItem(item, { agent: AGENT, download: !!player.download }));
             } catch {
                 continue;
             }
@@ -248,9 +204,9 @@ async function play_c(ctx, query, attachment) {
     if ((await ctx.guild.members.fetchMe()).voice.channelId !== channel.id)
         createVoiceConnection(channel);
 
-    const player = getPlayer(ctx.guild.id);
+    const player = Player.get(ctx.guild.id);
     let track = null;
-    if (ctx.isInteraction())
+    if (ctx.isInteraction() && !ctx.interaction.deferred)
         await ctx.interaction.deferReply();
     if (attachment) {
         // Create a track from the attachment
@@ -290,7 +246,7 @@ async function play_c(ctx, query, attachment) {
         }
         if (track === null) {
             try {
-                track = await Track.fromVideoId(id, { agent: AGENT, download: player.download });
+                track = await Track.fromVideoId(id, { agent: AGENT, download: !!player.download });
             } catch (e) {
                 return await ctx.reply(e.toString());
             }
@@ -308,6 +264,9 @@ async function play_c(ctx, query, attachment) {
  * @param {string} query 
  */
 async function playMusic_c(ctx, query) {
+    if (ctx.isInteraction()) {
+        await ctx.interaction.deferReply();
+    }
     const items = await listSongSearchResults(query).catch(() => []);
     if (items.length === 0) {
         return ctx.reply("There were no valid results for your query.");
@@ -334,8 +293,8 @@ async function playAlbum_c(ctx, query) {
  */
 async function skip_c(ctx) {
     const member = ctx.member;
-    const player = getPlayer(member.guild.id);
-    if (!player.playing)
+    const player = Player.get(member.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
@@ -351,8 +310,8 @@ async function skip_c(ctx) {
  */
 async function stop_c(ctx) {
     const member = ctx.member;
-    const player = getPlayer(member.guild.id);
-    if (!player.playing)
+    const player = Player.get(member.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
@@ -367,14 +326,14 @@ async function stop_c(ctx) {
  */
 async function pause_c(ctx) {
     const member = ctx.member;
-    const player = getPlayer(member.guild.id);
-    if (!player.playing)
+    const player = Player.get(member.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
     if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return await ctx.reply("You must be in the same voice channel as the bot to use the command.");
-    if (player.paused)
+    if (player.isPaused())
         return await resume_c(ctx);
     player.pause();
     return await ctx.reply("Playback paused.")
@@ -385,14 +344,14 @@ async function pause_c(ctx) {
  */
 async function resume_c(ctx) {
     const member = ctx.member;
-    const player = getPlayer(member.guild.id);
-    if (!player.playing)
+    const player = Player.get(member.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.")
     if (member.voice.channel === null)
         return await ctx.reply("You are not in a voice channel.");
     if ((await member.guild.members.fetchMe()).voice.channelId !== member.voice.channelId)
         return await ctx.reply("You must be in the same voice channel as the bot to use the command.")
-    if (!player.paused)
+    if (!player.isPaused())
         return await ctx.reply("Playback is not paused.");
     player.unpause();
     return await ctx.reply("Playback resumed.")
@@ -403,7 +362,7 @@ async function resume_c(ctx) {
  * @param {number} percentage
  */
 async function volume_c(ctx, percentage) {
-    const player = getPlayer(ctx.guild.id);
+    const player = Player.get(ctx.guild.id);
     player.volume = percentage / 100;
     return await ctx.reply(`Volume set to ${percentage}%.`);
 }
@@ -412,7 +371,7 @@ async function volume_c(ctx, percentage) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function loop_c(ctx) {
-    const player = getPlayer(ctx.guild.id);
+    const player = Player.get(ctx.guild.id);
     player.loop = !player.loop;
     return await ctx.reply("Loop " + (player.loop ? "enabled." : "disabled."));
 }
@@ -423,15 +382,15 @@ async function loop_c(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function nowPlaying_c(ctx) {
-    const player = getPlayer(ctx.guild.id);
-    return player.playing ? await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] }) : await ctx.reply("Nothing is playing.");
+    const player = Player.get(ctx.guild.id);
+    return player.isPlaying() ? await ctx.reply({ content: "**Now playing:**", embeds: [player.nowPlaying.toEmbed()] }) : await ctx.reply("Nothing is playing.");
 }
 
 /**
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function queue_c(ctx) {
-    return await ctx.reply(getQueuePage(getPlayer(ctx.guild.id), 0));
+    return await ctx.reply(getQueuePage(Player.get(ctx.guild.id), 0));
 }
 
 /**
@@ -439,8 +398,8 @@ async function queue_c(ctx) {
  * @param {number} index
  */
 async function remove_c(ctx, index) {
-    const player = getPlayer(ctx.guild.id);
-    if (!player.playing)
+    const player = Player.get(ctx.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length === 0)
         return await ctx.reply("The queue is empty.");
@@ -456,8 +415,8 @@ async function remove_c(ctx, index) {
  * @param {number} destination
  */
 async function move_c(ctx, source, destination) {
-    const player = getPlayer(ctx.guild.id);
-    if (!player.playing)
+    const player = Player.get(ctx.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
@@ -476,8 +435,8 @@ async function move_c(ctx, source, destination) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function clear_c(ctx) {
-    const player = getPlayer(ctx.guild.id);
-    if (!player.playing)
+    const player = Player.get(ctx.guild.id);
+    if (!player.isPlaying())
         return ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return ctx.reply("The queue is already empty.");
@@ -489,8 +448,8 @@ async function clear_c(ctx) {
  * @param {MessageCommandContext<true>|InteractionCommandContext} ctx 
  */
 async function shuffle_c(ctx) {
-    const player = getPlayer(ctx.guild.id);
-    if (!player.playing)
+    const player = Player.get(ctx.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
@@ -503,8 +462,8 @@ async function shuffle_c(ctx) {
  * @param {number} index
  */
 async function info_c(ctx, index) {
-    const player = getPlayer(ctx.guild.id);
-    if (!player.playing)
+    const player = Player.get(ctx.guild.id);
+    if (!player.isPlaying())
         return await ctx.reply("Nothing is playing.");
     if (player.queue.length == 0)
         return await ctx.reply("The queue is empty.");
@@ -585,6 +544,7 @@ CLIENT.once(Events.ClientReady, async (client) => {
             createVoiceConnection(channel);
         }
     }
+    initYTTracking();
 });
 
 CLIENT.on(Events.InteractionCreate, async (interaction) => {
@@ -592,7 +552,7 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
         const [type, arg] = interaction.customId.split(":", 2);
         switch (type) {
             case "QUEUE_PAGE": // Page update interaction for queue
-                await interaction.update(getQueuePage(getPlayer(interaction.guild.id), Number(arg)));
+                await interaction.update(getQueuePage(Player.get(interaction.guild.id), Number(arg)));
                 break;
         }
     } else if (interaction.isChatInputCommand()) {
@@ -824,6 +784,24 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                     else
                         await volume_c(ctx, Number(args[0]));
                     break;
+                case "viewcount":
+                    // Create a YouTube view count tracker
+                    if (args.length < 1)
+                        await ctx.reply("You must provide a youtube video URL.");
+                    else
+                        await viewCount_c(ctx, args[0]);
+                    break;
+                case "subcount":
+                    // Create a YouTube subscriber count tracker
+                    if (message.author.id === process.env.OWNER) {
+                        if (args.length < 1)
+                            await ctx.reply("You must provide a youtube channel id.");
+                        else
+                            await subCount_c(ctx, args[0]);
+                    } else {
+                        await ctx.reply("Unrecognized command.\nUse `.help` for a list of commands.");
+                    }
+                    break;
                 case "evaluate":
                 case "eval":
                     // Evaluate a mathematical expression
@@ -838,7 +816,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 case "td":
                     // Toggle between downloading and streaming for YouTube videos (Owner Only)
                     if (ctx.member.id === process.env.OWNER) {
-                        const player = getPlayer(ctx.guild.id);
+                        const player = Player.get(ctx.guild.id);
                         player.download = !player.download;
                         ctx.reply(`Downloads toggled ${player.download ? "on" : "off"}.`);
                         break;
@@ -875,5 +853,171 @@ CLIENT.on(Events.MessageCreate, async (message) => {
         }
     }
 });
+
+// YT Tracking
+
+const YT_TRACKER_TYPE = Object.freeze({ VIDEO: 0, CHANNEL: 1 });
+/**
+ * @type {{[guildId: string]:{[id: string]:{type:0|1;categoryId:string;channelId:string}}}}
+ */
+const YT_TRACKERS = JSON.parse(String(fs.readFileSync("./yt_trackers.json")));
+
+/**
+ * @param {MessageCommandContext|InteractionCommandContext} ctx 
+ * @param {string} url 
+ * @returns 
+ */
+async function viewCount_c(ctx, url) {
+    url = parseURL(url);
+    if (url !== null) {
+        // Attempt to extract the video ID
+        const id = extractVideoID(url);
+        if (id === null)
+            // Non YouTube URL
+            return await ctx.reply("That URL does not correspond to a YouTube video.");
+        if (ctx.guild.id in YT_TRACKERS && id in YT_TRACKERS[ctx.guild.id])
+            return await ctx.reply("That video is already being tracked.");
+        if (await addVideoTracker(id, ctx.guild.id))
+            return await ctx.reply(`Added view count tracking for <${videoURL(id)}>.`);
+        else
+            return await ctx.reply("There was error getting view count statistics for that video.");
+    } else {
+        return await ctx.reply("That is not a valid URL.");
+    }
+}
+
+/**
+ * 
+ * @param {MessageCommandContext|InteractionCommandContext} ctx 
+ * @param {string} id 
+ * @returns 
+ */
+async function subCount_c(ctx, id) {
+    if (ctx.guild.id in YT_TRACKERS && id in YT_TRACKERS[ctx.guild.id])
+        return await ctx.reply("That channel is already being tracked.");
+    if (await addChannelTracker(id, ctx.guild.id))
+        return await ctx.reply(`Added subscriber count tracking.`);
+    else
+        return await ctx.reply("There was error getting subscriber count statistics for that channel.");
+}
+
+function formatNumber(n) {
+    const str = String(n);
+    const decIndex = str.indexOf('.');
+    const isDec = decIndex != -1;
+    let dec = '';
+    if (isDec)
+        dec = str.substring(decIndex);
+    let result = '';
+    for (let i = isDec ? decIndex : str.length; i > 0; i -= 3)
+        result = ',' + str.substring(i - 3, i) + result;
+    return result.substring(1) + dec;
+}
+
+function formatViewCount(n) {
+    if (n > 1000000000)
+        return Math.floor(n / 100000000) / 10 + "B";
+    if (n > 1000000)
+        return Math.floor(n / 100000) / 10 + "M";
+    else return formatNumber(n);
+}
+
+async function addVideoTracker(id, guildId) {
+    try {
+        const video = await getVideo(id).catch(() => null);
+        if (!video || !video.title || !video.viewCount)
+            return false;
+        const guild = await CLIENT.guilds.fetch(guildId);
+        const category = await guild.channels.create({ name: video.title, type: ChannelType.GuildCategory });
+        const voiceChannel = await guild.channels.create({ name: formatViewCount(video.viewCount) + " views", type: ChannelType.GuildVoice, parent: category, permissionOverwrites: [{ allow: PermissionFlagsBits.ViewChannel, deny: PermissionFlagsBits.Connect, id: guild.roles.everyone }] });
+        if (!(guildId in YT_TRACKERS))
+            YT_TRACKERS[guildId] = {};
+        YT_TRACKERS[guildId][id] = { type: YT_TRACKER_TYPE.VIDEO, categoryId: category.id, channelId: voiceChannel.id };
+        fs.writeFileSync("./yt_trackers.json", JSON.stringify(YT_TRACKERS));
+        return true;
+    } catch (e) {
+        console.error(e);
+        return false;
+    }
+}
+
+async function addChannelTracker(id, guildId) {
+    try {
+        const channel = await getChannel(id).catch(() => null);
+        if (!channel || !channel.title || !channel.subscriberCount)
+            return false;
+        const guild = await CLIENT.guilds.fetch(guildId);
+        const category = await guild.channels.create({ name: channel.title, type: ChannelType.GuildCategory });
+        const voiceChannel = await guild.channels.create({ name: channel.subscriberCount, type: ChannelType.GuildVoice, parent: category, permissionOverwrites: [{ allow: PermissionFlagsBits.ViewChannel, deny: PermissionFlagsBits.Connect, id: guild.roles.everyone }] });
+        if (!(guildId in YT_TRACKERS))
+            YT_TRACKERS[guildId] = {};
+        YT_TRACKERS[guildId][id] = { type: YT_TRACKER_TYPE.CHANNEL, categoryId: category.id, channelId: voiceChannel.id };
+        fs.writeFileSync("./yt_trackers.json", JSON.stringify(YT_TRACKERS));
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function updateYTCounts() {
+    const promises = [];
+    let save = false;
+    for (const guildId in YT_TRACKERS) {
+        for (const id in YT_TRACKERS[guildId]) {
+            const tracker = YT_TRACKERS[guildId][id];
+            promises.push(new Promise(async resolve => {
+                const category = await CLIENT.channels.fetch(tracker.categoryId).catch(() => null);
+                const voiceChannel = await CLIENT.channels.fetch(tracker.channelId).catch(() => null);
+                if (category === null || voiceChannel === null) {
+                    delete YT_TRACKERS[guildId][id];
+                    if (Object.keys(YT_TRACKERS[guildId]).length === 0) delete YT_TRACKERS[guildId];
+                    save = true;
+                    resolve();
+                    return;
+                }
+                switch (tracker.type) {
+                    case YT_TRACKER_TYPE.VIDEO:
+                        const video = await getVideo(id).catch(() => null);
+                        if (!video) break;
+                        if (video.title) {
+                            const catName = video.title.length <= 100 ? video.title : video.title.substring(0, 100);
+                            if (category.name != catName)
+                                category.edit({ name: catName, reason: "video title update" });
+                        }
+                        if (video.viewCount) {
+                            const viewCountText = formatViewCount(video.viewCount) + " views";
+                            if (voiceChannel.name != viewCountText)
+                                voiceChannel.edit({ name: viewCountText, reason: "view count update" });
+                        }
+                        break;
+                    case YT_TRACKER_TYPE.CHANNEL:
+                        const channel = await getChannel(id).catch(() => null);
+                        if (!channel) break;
+                        if (channel.title) {
+                            const catName = channel.title.length <= 100 ? channel.title : channel.title.substring(0, 100);
+                            if (category.name != catName)
+                                category.edit({ name: catName, reason: "channel title update" });
+                        }
+                        if (channel.subscriberCount) {
+                            const subscriberCountText = channel.subscriberCount;
+                            if (voiceChannel.name != subscriberCountText)
+                                voiceChannel.edit({ name: subscriberCountText, reason: "subscriber count update" });
+                        }
+                        break;
+                }
+                resolve();
+            }).catch(e => {
+                console.error(e);
+            }));
+        }
+    }
+    await Promise.all(promises);
+    if (save)
+        fs.writeFileSync("./yt_trackers.json", JSON.stringify(YT_TRACKERS));
+}
+
+function initYTTracking() {
+    return setInterval(updateYTCounts, 60000);
+}
 
 CLIENT.login(process.env.TOKEN);

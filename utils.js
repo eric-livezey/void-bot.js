@@ -1,43 +1,258 @@
+import { joinVoiceChannel } from '@discordjs/voice';
 class Duration {
-    total;
-    seconds;
-    minutes;
-    hours;
-    days;
-
-    constructor(seconds) {
-        this.total = seconds;
-        this.days = Math.floor(seconds / 86400);
-        this.hours = Math.floor(seconds % 86400 / 3600);
-        this.minutes = Math.floor(seconds % 3600 / 60);
-        this.seconds = seconds % 60;
+    #milliseconds;
+    /**
+     * Construct a new {@link Duration} with `milliseconds` milliseconds.
+     *
+     * @param milliseconds the total number of milliseconds
+     */
+    constructor(milliseconds) {
+        this.#milliseconds = milliseconds;
     }
-
-    format() {
-        if (this.days > 0) {
-            return `${this.days}:${zFill(this.hours)}:${zFill(this.minutes)}:${zFill(this.seconds)}`;
-        } else if (this.hours > 0) {
-            return `${this.hours}:${zFill(this.minutes)}:${zFill(this.seconds)}`;
-        } else {
-            return `${zFill(this.minutes)}:${zFill(this.seconds)}`;
+    /**
+     * Returns the formatted version of a duration with `milliseconds` milliseconds.
+     *
+     * Equivalent to:
+     * ```js
+     * new Duration(milliseconds).format(includeMillis);
+     * ```
+     *
+     * @param milliseconds the total number of milliseconds
+     * @param includeMillis whether the millisecond should be included
+     */
+    static format(milliseconds, includeMillis) {
+        return new Duration(milliseconds).format(includeMillis);
+    }
+    /**
+     * Returns the total number of milliseconds.
+     */
+    getMilliseconds() {
+        return this.#milliseconds;
+    }
+    /**
+     * Set the total number of milliseconds.
+     *
+     * @param milliseconds the total number of milliseconds
+     */
+    setMilliseconds(milliseconds) {
+        this.#milliseconds = Math.floor(milliseconds);
+    }
+    /**
+     * Returns the total number of seconds.
+     */
+    getSeconds() {
+        return this.getMilliseconds() / 1000;
+    }
+    /**
+     * Set the total number of seconds.
+     *
+     * @param seconds the total number of seconds
+     */
+    setSeconds(seconds) {
+        this.setMilliseconds(seconds * 1000);
+    }
+    /**
+     * Returns the total number of minutes.
+     */
+    getMinutes() {
+        return this.getMilliseconds() / 60000;
+    }
+    /**
+     * Set the total number of minutes.
+     *
+     * @param minutes the total number of minutes
+     */
+    setMinutes(minutes) {
+        this.setMilliseconds(minutes * 60000);
+    }
+    /**
+     * Returns the total number of hours.
+     */
+    getHours() {
+        return this.getMilliseconds() / 3.6e+6;
+    }
+    /**
+     * Set the total number of hours.
+     *
+     * @param hours the total number of hours
+     */
+    setHours(hours) {
+        this.setMilliseconds(hours * 3.6e+6);
+    }
+    /**
+     * Returns the total number of days.
+     */
+    getDays() {
+        return this.getMilliseconds() / 8.64e+7;
+    }
+    /**
+     * Set the total number of days.
+     *
+     * @param days the total number of days
+     */
+    setDays(days) {
+        this.setMilliseconds(days * 8.64e+7);
+    }
+    /**
+     * Returns the millisecond.
+     */
+    getMillisecond() {
+        return this.getMilliseconds() % 1000;
+    }
+    /**
+     * Set the millisecond.
+     *
+     * @param millisecond the millisecond
+     */
+    setMillisecond(millisecond) {
+        this.setDay(this.getDay(), this.getHour(), this.getMinute(), this.getSecond(), millisecond);
+    }
+    /**
+     * Returns the second.
+     */
+    getSecond() {
+        return Math.floor(this.getMilliseconds() % 60000 / 1000);
+    }
+    /**
+     * Set the second.
+     *
+     * @param second the second
+     * @param millisecond the millisecond
+     */
+    setSecond(second, millisecond) {
+        this.setDay(this.getDay(), this.getHour(), this.getMinute(), second, millisecond);
+    }
+    /**
+     * Returns the minute.
+     */
+    getMinute() {
+        return Math.floor(this.getMilliseconds() % 3.6e+6 / 60000);
+    }
+    /**
+     * Set the minute.
+     *
+     * @param minute the minute
+     * @param second the second
+     * @param millisecond the millisecond
+     */
+    setMinute(minute, second, millisecond) {
+        this.setDay(this.getDay(), this.getHour(), minute, second, millisecond);
+    }
+    /**
+     * Returns the hour.
+     */
+    getHour() {
+        return Math.floor(this.getMilliseconds() % 8.64e+7 / 3.6e+6);
+    }
+    /**
+     * Set the hour.
+     *
+     * @param hour the hour
+     * @param minute the minute
+     * @param second the second
+     * @param millisecond the millisecond
+     */
+    setHour(hour, minute, second, millisecond) {
+        this.setDay(this.getDay(), hour, minute, second, millisecond);
+    }
+    /**
+     * Returns the day.
+     */
+    getDay() {
+        return Math.floor(this.getDays());
+    }
+    /**
+     * Set the day.
+     *
+     * @param day the day
+     * @param hour the hour
+     * @param minute this minute
+     * @param second the second
+     * @param millisecond the millisecond
+     */
+    setDay(day, hour, minute, second, millisecond) {
+        if (hour === undefined) {
+            hour = this.getHour();
         }
+        if (minute === undefined) {
+            minute = this.getMinute();
+        }
+        if (second === undefined) {
+            second = this.getSecond();
+        }
+        if (millisecond === undefined) {
+            millisecond = this.getMillisecond();
+        }
+        this.setMilliseconds(Math.floor(this.getMilliseconds() / 8.64e+7) + day * 8.64e+7 + hour * 3.6e+6 + minute * 60000 + second * 1000 + millisecond);
+    }
+    /**
+     * Returns the formatted duration.
+     *
+     * @param includeMillis weather the millisecond should be included
+     */
+    format(includeMillis) {
+        let str = `${zeroFill(this.getMinute())}:${zeroFill(this.getSecond())}`;
+        if (includeMillis) {
+            str += '.' + zeroFill(this.getMillisecond(), 3);
+        }
+        let prefix = '';
+        for (const value of [this.getDay(), this.getHour()]) {
+            if (prefix || value > 0) {
+                prefix += (prefix ? zeroFill(value) : value) + ':';
+            }
+        }
+        return prefix + str;
+    }
+    toString() {
+        return this.format();
     }
 }
-
-function zFill(arg) {
-    return arg.toString().padStart(2, "0");
+function zeroFill(value, maxLength) {
+    if (maxLength === undefined) {
+        maxLength = 2;
+    }
+    return value.toString().padStart(maxLength, '0');
 }
-
-function formatDuration(seconds) {
-    return new Duration(seconds).format();
+function nullify(value, ...keys) {
+    if (value !== null && typeof value === 'object') {
+        const result = {};
+        if (keys === undefined) {
+            keys = Object.keys(value);
+        }
+        for (const key of keys) {
+            Object.defineProperty(result, key, { value: nullify(value[key]), enumerable: true });
+        }
+        return result;
+    }
+    else {
+        return value === undefined ? null : value;
+    }
 }
-
-function formatDurationMillis(millis) {
-    return new Duration(Math.floor(millis / 1000)).format();
+function nullifyValue(value) {
+    return value === undefined ? null : value;
 }
-
-export {
-    Duration,
-    formatDuration,
-    formatDurationMillis
+function timelog(msg) {
+    console.log(`[${new Date().toLocaleString()}]`, msg);
 }
+function createVoiceConnection(channel) {
+    const connection = joinVoiceChannel({
+        channelId: channel.id,
+        guildId: channel.guildId,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+        selfDeaf: false
+    });
+    connection.on('error', e => {
+        timelog('A voice connection error occurred.\nAttempting to rejoin...');
+        while (connection.rejoinAttempts < 5) {
+            if (connection.rejoin()) {
+                timelog('Rejoin was successful.');
+                return;
+            }
+        }
+        timelog('Rejoin failed after 5 attempts with the following error:');
+        connection.destroy();
+        console.error(e);
+    });
+    return connection;
+}
+export { Duration, nullify, nullifyValue, timelog, createVoiceConnection };
