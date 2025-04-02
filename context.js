@@ -79,8 +79,8 @@ class MessageCommandContext extends CommandContext {
         super(message.author, message.channel, message.member || undefined);
         this.message = message;
         const messageContent = message.content.substring(prefix.length);
-        [this.name] = messageContent.split(' ');
-        this.content = messageContent.substring(this.name.length).trimStart();
+        [this.name] = messageContent.split(' ', 1);
+        this.content = messageContent.substring(this.name.length + 1).trimStart();
         this.args = this.content.split(' ');
     }
     async reply(options) {
