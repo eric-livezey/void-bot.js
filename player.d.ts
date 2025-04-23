@@ -9,15 +9,15 @@ type PrepareOptions<T extends downloadOptions = downloadOptions> = T & {
 };
 interface TrackAuthor {
     /**
-     * Author name
+     * Author name.
      */
     readonly name: string | null;
     /**
-     * URL to author
+     * URL to author.
      */
     readonly url: string | null;
     /**
-     * URL to author icon
+     * URL to author icon.
      */
     readonly iconURL: string | null;
 }
@@ -35,62 +35,62 @@ interface TrackOptions {
 declare class Track<T = unknown> {
     #private;
     /**
-     * The title of the track
+     * The title of the track.
      */
     readonly title: string;
     /**
-     * The URL to the track
+     * The URL to the track.
      */
     readonly url: string | null;
     /**
-     * The URL to the thumbnail image
+     * The URL to the thumbnail image.
      */
     readonly thumbnail: string | null;
     /**
-     * The track's duration in milliseconds
+     * The track's duration in milliseconds.
      */
     readonly duration: number | null;
     /**
-     * The track's author's info
+     * The track's author's info.
      */
     readonly author: TrackAuthor;
     /**
      * Returns the current state of the {@link AudioResource} object associated with the track.
      */
-    get resource(): AudioResource<T> | Promise<AudioResource<T>>;
+    get resource(): AudioResource<T> | Promise<AudioResource<T> | null> | null;
     /**
-     * @param prepare a function which resolves an {@link AudioResource} to be used
-     * @param title the title of the track
-     * @param details track details
+     * @param prepare A function which resolves an {@link AudioResource} to be used.
+     * @param title The title of the track.
+     * @param details Track details.
      */
     constructor(prepare: () => Promise<AudioResource<T>> | AudioResource<T>, title: string, details?: TrackOptions);
     /**
      * Create a track from a URL. A track created this way will never be downloaded.
      *
-     * @param url a url to an audio file
-     * @param title the title of the track
-     * @param details track details
+     * @param url A url to an audio file.
+     * @param title The title of the track.
+     * @param details Track details.
      */
     static fromURL(url: URL | string, title?: string, details?: TrackOptions): Track<null>;
     /**
      * Creates a track from a ytdl videoInfo object.
      *
-     * @param info a ytdl videoInfo object
-     * @param options ytdl download options
+     * @param info A ytdl videoInfo object.
+     * @param options ytdl download options.
      */
     static fromVideoInfo(info: videoInfo, options?: PrepareOptions): Track<null>;
     /**
      * Creates a track from a YouTube video ID.
      *
-     * @param id a YouTube video ID
-     * @param options ytdl download options
+     * @param id A YouTube video ID.
+     * @param options ytdl download options.
      */
     static fromVideoId(id: string, options?: PrepareOptions): Promise<Track<null>>;
     /**
      * Creates a track from a playlist item.
      *
-     * @param item a playlist item
-     * @param options ytdl download options
+     * @param item A playlist item.
+     * @param options ytdl download options.
      */
     static fromPlaylistItem(item: PlaylistItem, options?: PrepareOptions): Track<null>;
     /**
@@ -120,7 +120,7 @@ declare class Track<T = unknown> {
     /**
      * Returns a APIEmbed representation of the track.
      *
-     * @param fields additional embed fields
+     * @param fields Additional embed fields.
      */
     toEmbed(...fields: RestOrArray<APIEmbedField>): import("discord.js").APIEmbed;
 }
@@ -163,12 +163,12 @@ declare class Player extends EventEmitter {
     /**
      * The currently playing track.
      */
-    get nowPlaying(): Track<unknown>;
+    get nowPlaying(): Track<unknown> | null;
     private constructor();
     /**
      * Returns the player associated with `guildId` or creates a new one if one does not yet exist.
      *
-     * @param guildId A guild ID
+     * @param guildId A guild ID.
      */
     static get(guildId: Snowflake): Player;
     /**
@@ -194,7 +194,7 @@ declare class Player extends EventEmitter {
     /**
      * Set the volume of the player.
      *
-     * @param value a percentage
+     * @param value A percentage.
      */
     setVolume(value: number): void;
     /**
@@ -210,7 +210,7 @@ declare class Player extends EventEmitter {
     /**
      * Plays a track or pushes it to the queue.
      *
-     * @param track a track
+     * @param track A track.
      */
     enqueue(track: Track): Promise<number>;
     /**
@@ -228,8 +228,8 @@ declare class Player extends EventEmitter {
     /**
      * Skips the current track.
      */
-    skip(): Promise<Track<unknown>>;
-    getEmbed(page: number): import("discord.js").APIEmbed;
+    skip(): Promise<Track<unknown> | null>;
+    getEmbed(page: number): import("discord.js").APIEmbed | null;
 }
 declare function downloadFromStream(stream: Readable, path: string, id: string): Promise<string>;
 export { Player, Queue, Track, TrackAuthor, TrackOptions, downloadFromStream };

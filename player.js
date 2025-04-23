@@ -11,23 +11,23 @@ import { Duration, nullify } from './utils.js';
  */
 class Track {
     /**
-     * The title of the track
+     * The title of the track.
      */
     title;
     /**
-     * The URL to the track
+     * The URL to the track.
      */
     url;
     /**
-     * The URL to the thumbnail image
+     * The URL to the thumbnail image.
      */
     thumbnail;
     /**
-     * The track's duration in milliseconds
+     * The track's duration in milliseconds.
      */
     duration;
     /**
-     * The track's author's info
+     * The track's author's info.
      */
     author;
     #resource;
@@ -40,9 +40,9 @@ class Track {
         return this.#resource;
     }
     /**
-     * @param prepare a function which resolves an {@link AudioResource} to be used
-     * @param title the title of the track
-     * @param details track details
+     * @param prepare A function which resolves an {@link AudioResource} to be used.
+     * @param title The title of the track.
+     * @param details Track details.
      */
     constructor(prepare, title, details) {
         this.#resource = null;
@@ -60,9 +60,9 @@ class Track {
     /**
      * Create a track from a URL. A track created this way will never be downloaded.
      *
-     * @param url a url to an audio file
-     * @param title the title of the track
-     * @param details track details
+     * @param url A url to an audio file.
+     * @param title The title of the track.
+     * @param details Track details.
      */
     static fromURL(url, title, details) {
         url = new URL(url);
@@ -85,8 +85,8 @@ class Track {
     /**
      * Creates a track from a ytdl videoInfo object.
      *
-     * @param info a ytdl videoInfo object
-     * @param options ytdl download options
+     * @param info A ytdl videoInfo object.
+     * @param options ytdl download options.
      */
     static fromVideoInfo(info, options) {
         const videoDetails = info.videoDetails;
@@ -107,8 +107,8 @@ class Track {
     /**
      * Creates a track from a YouTube video ID.
      *
-     * @param id a YouTube video ID
-     * @param options ytdl download options
+     * @param id A YouTube video ID.
+     * @param options ytdl download options.
      */
     static async fromVideoId(id, options) {
         const info = await ytdl.getInfo(id, options);
@@ -117,8 +117,8 @@ class Track {
     /**
      * Creates a track from a playlist item.
      *
-     * @param item a playlist item
-     * @param options ytdl download options
+     * @param item A playlist item.
+     * @param options ytdl download options.
      */
     static fromPlaylistItem(item, options) {
         const id = item.id;
@@ -178,7 +178,7 @@ class Track {
     /**
      * Returns a APIEmbed representation of the track.
      *
-     * @param fields additional embed fields
+     * @param fields Additional embed fields.
      */
     toEmbed(...fields) {
         new Date().getSeconds();
@@ -345,7 +345,7 @@ class Player extends EventEmitter {
     /**
      * Returns the player associated with `guildId` or creates a new one if one does not yet exist.
      *
-     * @param guildId A guild ID
+     * @param guildId A guild ID.
      */
     static get(guildId) {
         const players = Player.#players;
@@ -386,7 +386,7 @@ class Player extends EventEmitter {
     /**
      * Set the volume of the player.
      *
-     * @param value a percentage
+     * @param value A percentage.
      */
     setVolume(value) {
         if (value < 0) {
@@ -439,7 +439,7 @@ class Player extends EventEmitter {
     /**
      * Plays a track or pushes it to the queue.
      *
-     * @param track a track
+     * @param track A track.
      */
     async enqueue(track) {
         if (!this.isPlaying()) {
@@ -562,7 +562,7 @@ class Player extends EventEmitter {
         }
     }
 }
-// keep track of in-progress downloads
+// keep track of in progress downloads
 const downloads = {};
 function downloadFromStream(stream, path, id) {
     if (id in downloads) {
@@ -624,4 +624,4 @@ function ytdlPrepare(id, fn, arg, options) {
         };
     }
 }
-export { Player, Queue, Track };
+export { Player, Queue, Track, downloadFromStream };

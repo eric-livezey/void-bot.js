@@ -20,6 +20,11 @@ declare abstract class CommandContext<InGuild extends boolean = boolean> {
      * The guild in which the command was invoked.
      */
     readonly guild: If<InGuild, Guild>;
+    /**
+     * @param user The user who invoked the command.
+     * @param channel The channel in which the command was invoked.
+     * @param member The member which invoked the command.
+     */
     constructor(user: User, channel: SendableChannels, member?: GuildMember);
     /**
      * Returns `true` if the command was invoked via a message, else `false`.
@@ -38,7 +43,10 @@ declare class SlashCommandContext<InGuild extends boolean = boolean> extends Com
     /**
      * The interaction associated with the command.
      */
-    readonly interaction: ChatInputCommandInteraction;
+    readonly interaction: ChatInputCommandInteraction<'cached'>;
+    /**
+     * @param interaction The interaction associated with the command.
+     */
     constructor(interaction: ChatInputCommandInteraction<'cached'>);
     /**
      * Reply to the command.
@@ -64,9 +72,13 @@ declare class MessageCommandContext<InGuild extends boolean = boolean> extends C
      * Parsed argument list.
      */
     readonly args: string[];
+    /**
+     * @param message The message assocated with the command.
+     * @param prefix The prefix of the command.
+     */
     constructor(message: Message<InGuild> & {
         channel: SendableChannels;
     }, prefix: string);
     reply(options: string | MessagePayload | MessageReplyOptions): Promise<Message<InGuild>>;
 }
-export { CommandContext, SlashCommandContext, MessageCommandContext };
+export { CommandContext, MessageCommandContext, SlashCommandContext };

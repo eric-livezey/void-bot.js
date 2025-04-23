@@ -20,6 +20,11 @@ class CommandContext {
      * The guild in which the command was invoked.
      */
     guild;
+    /**
+     * @param user The user who invoked the command.
+     * @param channel The channel in which the command was invoked.
+     * @param member The member which invoked the command.
+     */
     constructor(user, channel, member) {
         this.client = user.client;
         this.user = user;
@@ -45,6 +50,9 @@ class SlashCommandContext extends CommandContext {
      * The interaction associated with the command.
      */
     interaction;
+    /**
+     * @param interaction The interaction associated with the command.
+     */
     constructor(interaction) {
         super(interaction.user, interaction.channel, interaction.member || undefined);
         this.interaction = interaction;
@@ -75,16 +83,20 @@ class MessageCommandContext extends CommandContext {
      * Parsed argument list.
      */
     args;
+    /**
+     * @param message The message assocated with the command.
+     * @param prefix The prefix of the command.
+     */
     constructor(message, prefix) {
         super(message.author, message.channel, message.member || undefined);
         this.message = message;
         const messageContent = message.content.substring(prefix.length);
         [this.name] = messageContent.split(' ', 1);
-        this.content = messageContent.substring(this.name.length + 1).trimStart();
+        this.content = messageContent.substring(this.name.length + 1).trim();
         this.args = this.content.split(' ');
     }
     async reply(options) {
         return await this.channel.send(options);
     }
 }
-export { CommandContext, SlashCommandContext, MessageCommandContext };
+export { CommandContext, MessageCommandContext, SlashCommandContext };
