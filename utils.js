@@ -4,7 +4,7 @@ class Duration {
     /**
      * Construct a new {@link Duration} with `milliseconds` milliseconds.
      *
-     * @param milliseconds the total number of milliseconds
+     * @param milliseconds The total number of milliseconds.
      */
     constructor(milliseconds) {
         this.#milliseconds = milliseconds;
@@ -17,8 +17,8 @@ class Duration {
      * new Duration(milliseconds).format(includeMillis);
      * ```
      *
-     * @param milliseconds the total number of milliseconds
-     * @param includeMillis whether the millisecond should be included
+     * @param milliseconds The total number of milliseconds.
+     * @param includeMillis Whether the millisecond should be included.
      */
     static format(milliseconds, includeMillis) {
         return new Duration(milliseconds).format(includeMillis);
@@ -32,7 +32,7 @@ class Duration {
     /**
      * Set the total number of milliseconds.
      *
-     * @param milliseconds the total number of milliseconds
+     * @param milliseconds The total number of milliseconds.
      */
     setMilliseconds(milliseconds) {
         this.#milliseconds = Math.floor(milliseconds);
@@ -46,7 +46,7 @@ class Duration {
     /**
      * Set the total number of seconds.
      *
-     * @param seconds the total number of seconds
+     * @param seconds The total number of seconds.
      */
     setSeconds(seconds) {
         this.setMilliseconds(seconds * 1000);
@@ -60,7 +60,7 @@ class Duration {
     /**
      * Set the total number of minutes.
      *
-     * @param minutes the total number of minutes
+     * @param minutes The total number of minutes.
      */
     setMinutes(minutes) {
         this.setMilliseconds(minutes * 60000);
@@ -74,7 +74,7 @@ class Duration {
     /**
      * Set the total number of hours.
      *
-     * @param hours the total number of hours
+     * @param hours The total number of hours.
      */
     setHours(hours) {
         this.setMilliseconds(hours * 3.6e+6);
@@ -88,7 +88,7 @@ class Duration {
     /**
      * Set the total number of days.
      *
-     * @param days the total number of days
+     * @param days The total number of days.
      */
     setDays(days) {
         this.setMilliseconds(days * 8.64e+7);
@@ -102,7 +102,7 @@ class Duration {
     /**
      * Set the millisecond.
      *
-     * @param millisecond the millisecond
+     * @param millisecond The millisecond.
      */
     setMillisecond(millisecond) {
         this.setDay(this.getDay(), this.getHour(), this.getMinute(), this.getSecond(), millisecond);
@@ -116,8 +116,8 @@ class Duration {
     /**
      * Set the second.
      *
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setSecond(second, millisecond) {
         this.setDay(this.getDay(), this.getHour(), this.getMinute(), second, millisecond);
@@ -131,9 +131,9 @@ class Duration {
     /**
      * Set the minute.
      *
-     * @param minute the minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setMinute(minute, second, millisecond) {
         this.setDay(this.getDay(), this.getHour(), minute, second, millisecond);
@@ -147,10 +147,10 @@ class Duration {
     /**
      * Set the hour.
      *
-     * @param hour the hour
-     * @param minute the minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setHour(hour, minute, second, millisecond) {
         this.setDay(this.getDay(), hour, minute, second, millisecond);
@@ -164,11 +164,11 @@ class Duration {
     /**
      * Set the day.
      *
-     * @param day the day
-     * @param hour the hour
-     * @param minute this minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param day The day.
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setDay(day, hour, minute, second, millisecond) {
         if (hour === undefined) {
@@ -188,7 +188,7 @@ class Duration {
     /**
      * Returns the formatted duration.
      *
-     * @param includeMillis weather the millisecond should be included
+     * @param includeMillis Whether the millisecond should be included.
      */
     format(includeMillis) {
         let str = `${zeroFill(this.getMinute())}:${zeroFill(this.getSecond())}`;

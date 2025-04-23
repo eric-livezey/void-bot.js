@@ -4,7 +4,7 @@ declare class Duration {
     /**
      * Construct a new {@link Duration} with `milliseconds` milliseconds.
      *
-     * @param milliseconds the total number of milliseconds
+     * @param milliseconds The total number of milliseconds.
      */
     constructor(milliseconds: number);
     /**
@@ -15,8 +15,8 @@ declare class Duration {
      * new Duration(milliseconds).format(includeMillis);
      * ```
      *
-     * @param milliseconds the total number of milliseconds
-     * @param includeMillis whether the millisecond should be included
+     * @param milliseconds The total number of milliseconds.
+     * @param includeMillis Whether the millisecond should be included.
      */
     static format(milliseconds: number, includeMillis?: boolean): string;
     /**
@@ -26,7 +26,7 @@ declare class Duration {
     /**
      * Set the total number of milliseconds.
      *
-     * @param milliseconds the total number of milliseconds
+     * @param milliseconds The total number of milliseconds.
      */
     setMilliseconds(milliseconds: number): void;
     /**
@@ -36,7 +36,7 @@ declare class Duration {
     /**
      * Set the total number of seconds.
      *
-     * @param seconds the total number of seconds
+     * @param seconds The total number of seconds.
      */
     setSeconds(seconds: number): void;
     /**
@@ -46,7 +46,7 @@ declare class Duration {
     /**
      * Set the total number of minutes.
      *
-     * @param minutes the total number of minutes
+     * @param minutes The total number of minutes.
      */
     setMinutes(minutes: number): void;
     /**
@@ -56,7 +56,7 @@ declare class Duration {
     /**
      * Set the total number of hours.
      *
-     * @param hours the total number of hours
+     * @param hours The total number of hours.
      */
     setHours(hours: number): void;
     /**
@@ -66,7 +66,7 @@ declare class Duration {
     /**
      * Set the total number of days.
      *
-     * @param days the total number of days
+     * @param days The total number of days.
      */
     setDays(days: number): void;
     /**
@@ -76,7 +76,7 @@ declare class Duration {
     /**
      * Set the millisecond.
      *
-     * @param millisecond the millisecond
+     * @param millisecond The millisecond.
      */
     setMillisecond(millisecond: number): void;
     /**
@@ -86,8 +86,8 @@ declare class Duration {
     /**
      * Set the second.
      *
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setSecond(second: number, millisecond?: number): void;
     /**
@@ -97,9 +97,9 @@ declare class Duration {
     /**
      * Set the minute.
      *
-     * @param minute the minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setMinute(minute: number, second?: number, millisecond?: number): void;
     /**
@@ -109,10 +109,10 @@ declare class Duration {
     /**
      * Set the hour.
      *
-     * @param hour the hour
-     * @param minute the minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setHour(hour: number, minute?: number, second?: number, millisecond?: number): void;
     /**
@@ -122,17 +122,17 @@ declare class Duration {
     /**
      * Set the day.
      *
-     * @param day the day
-     * @param hour the hour
-     * @param minute this minute
-     * @param second the second
-     * @param millisecond the millisecond
+     * @param day The day.
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
      */
     setDay(day: number, hour?: number, minute?: number, second?: number, millisecond?: number): void;
     /**
      * Returns the formatted duration.
      *
-     * @param includeMillis weather the millisecond should be included
+     * @param includeMillis Whether the millisecond should be included.
      */
     format(includeMillis?: boolean): string;
     toString(): string;
