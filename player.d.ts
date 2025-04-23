@@ -172,7 +172,7 @@ declare class Player extends EventEmitter {
      */
     static get(guildId: Snowflake): Player;
     /**
-     * Whether the player is ready to play audio.
+     * Returns whether the player is ready to play audio.
      */
     isReady(): this is this & {
         connection: VoiceConnection;
@@ -230,6 +230,10 @@ declare class Player extends EventEmitter {
      */
     skip(): Promise<Track<unknown> | null>;
     getEmbed(page: number): import("discord.js").APIEmbed | null;
+    /**
+     * Destroys the player.
+     */
+    destroy(): void;
 }
 declare function downloadFromStream(stream: Readable, path: string, id: string): Promise<string>;
 export { Player, Queue, Track, TrackAuthor, TrackOptions, downloadFromStream };

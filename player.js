@@ -246,9 +246,7 @@ class Queue {
         if (index < 0 || index >= this.#queue.length) {
             throw new RangeError(`index ${index} is out of bounds`);
         }
-        if (index) {
-            this.#queue[index] = value;
-        }
+        this.#queue[index] = value;
         if (index === 0) {
             value.prepare();
         }
@@ -359,7 +357,7 @@ class Player extends EventEmitter {
         return players[guildId];
     }
     /**
-     * Whether the player is ready to play audio.
+     * Returns whether the player is ready to play audio.
      */
     isReady() {
         const connection = this.getConnection();
@@ -519,7 +517,7 @@ class Player extends EventEmitter {
                 value: `**${i + 1}: ${track.url ? `[${track.title}](${track.url})` : track.title}**\n${track.duration !== null ? Duration.format(track.duration) : ''}`
             });
         }
-        const duration = this.nowPlaying.duration || 0 + this.queue.calcDuration();
+        const duration = (this.nowPlaying.duration || 0) + this.queue.calcDuration();
         eb.setFooter({ text: `${this.queue.length + 1} items (${Duration.format(duration)})${this.queue.length > 25 ? `\nPage ${page + 1}/${n + 1}` : ''}` });
         return eb.toJSON();
     }
@@ -560,6 +558,13 @@ class Player extends EventEmitter {
         if (this.isPaused()) {
             this.unpause();
         }
+    }
+    /**
+     * Destroys the player.
+     */
+    destroy() {
+        this.stop();
+        delete Player.#players[this.guildId];
     }
 }
 // keep track of in progress downloads
