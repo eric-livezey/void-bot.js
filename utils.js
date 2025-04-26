@@ -30,7 +30,7 @@ class Duration {
         return this.#milliseconds;
     }
     /**
-     * Set the total number of milliseconds.
+     * Sets the total number of milliseconds.
      *
      * @param milliseconds The total number of milliseconds.
      */
@@ -44,7 +44,7 @@ class Duration {
         return this.getMilliseconds() / 1000;
     }
     /**
-     * Set the total number of seconds.
+     * Sets the total number of seconds.
      *
      * @param seconds The total number of seconds.
      */
@@ -58,7 +58,7 @@ class Duration {
         return this.getMilliseconds() / 60000;
     }
     /**
-     * Set the total number of minutes.
+     * Sets the total number of minutes.
      *
      * @param minutes The total number of minutes.
      */
@@ -72,7 +72,7 @@ class Duration {
         return this.getMilliseconds() / 3.6e+6;
     }
     /**
-     * Set the total number of hours.
+     * Sets the total number of hours.
      *
      * @param hours The total number of hours.
      */
@@ -86,12 +86,26 @@ class Duration {
         return this.getMilliseconds() / 8.64e+7;
     }
     /**
-     * Set the total number of days.
+     * Sets the total number of days.
      *
      * @param days The total number of days.
      */
     setDays(days) {
         this.setMilliseconds(days * 8.64e+7);
+    }
+    /**
+     * Returns the total number of weeks.
+     */
+    getWeeks() {
+        return this.getMilliseconds() / 6.048e+8;
+    }
+    /**
+     * Sets the total number of weeks.
+     *
+     * @param weeks The total number of weeks.
+     */
+    setWeeks(weeks) {
+        this.setMilliseconds(weeks * 6.048e+8);
     }
     /**
      * Returns the millisecond.
@@ -100,7 +114,7 @@ class Duration {
         return this.getMilliseconds() % 1000;
     }
     /**
-     * Set the millisecond.
+     * Sets the millisecond.
      *
      * @param millisecond The millisecond.
      */
@@ -114,7 +128,7 @@ class Duration {
         return Math.floor(this.getMilliseconds() % 60000 / 1000);
     }
     /**
-     * Set the second.
+     * Sets the second.
      *
      * @param second The second.
      * @param millisecond The millisecond.
@@ -129,7 +143,7 @@ class Duration {
         return Math.floor(this.getMilliseconds() % 3.6e+6 / 60000);
     }
     /**
-     * Set the minute.
+     * Sets the minute.
      *
      * @param minute The minute.
      * @param second The second.
@@ -145,7 +159,7 @@ class Duration {
         return Math.floor(this.getMilliseconds() % 8.64e+7 / 3.6e+6);
     }
     /**
-     * Set the hour.
+     * Sets the hour.
      *
      * @param hour The hour.
      * @param minute The minute.
@@ -159,10 +173,10 @@ class Duration {
      * Returns the day.
      */
     getDay() {
-        return Math.floor(this.getDays());
+        return Math.floor(this.getMilliseconds() % 6.048e+8 / 8.64e+7);
     }
     /**
-     * Set the day.
+     * Sets the day.
      *
      * @param day The day.
      * @param hour The hour.
@@ -171,6 +185,28 @@ class Duration {
      * @param millisecond The millisecond.
      */
     setDay(day, hour, minute, second, millisecond) {
+        this.setWeek(this.getWeek(), day, hour, minute, second, millisecond);
+    }
+    /**
+     * Returns the week.
+     */
+    getWeek() {
+        return Math.floor(this.getWeeks());
+    }
+    /**
+     * Sets the week.
+     *
+     * @param week The week.
+     * @param day The day.
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
+     */
+    setWeek(week, day, hour, minute, second, millisecond) {
+        if (day === undefined) {
+            day = this.getDay();
+        }
         if (hour === undefined) {
             hour = this.getHour();
         }
@@ -183,7 +219,7 @@ class Duration {
         if (millisecond === undefined) {
             millisecond = this.getMillisecond();
         }
-        this.setMilliseconds(Math.floor(this.getMilliseconds() / 8.64e+7) + day * 8.64e+7 + hour * 3.6e+6 + minute * 60000 + second * 1000 + millisecond);
+        this.setMilliseconds(week * 6.048e+8 + day * 8.64e+7 + hour * 3.6e+6 + minute * 60000 + second * 1000 + millisecond);
     }
     /**
      * Returns the formatted duration.
@@ -191,26 +227,22 @@ class Duration {
      * @param includeMillis Whether the millisecond should be included.
      */
     format(includeMillis) {
-        let str = `${zeroFill(this.getMinute())}:${zeroFill(this.getSecond())}`;
-        if (includeMillis) {
-            str += '.' + zeroFill(this.getMillisecond(), 3);
-        }
-        let prefix = '';
-        for (const value of [this.getDay(), this.getHour()]) {
-            if (prefix || value > 0) {
-                prefix += (prefix ? zeroFill(value) : value) + ':';
+        const second = zeroFill(this.getSecond());
+        const parts = [zeroFill(this.getMinute()), includeMillis ? `${second}.${this.getMillisecond()}` : second];
+        const prefix = [];
+        for (const value of [this.getWeek(), this.getDay(), this.getHour()]) {
+            const hasPrefix = prefix.length > 0;
+            if (hasPrefix || value) {
+                prefix.push(hasPrefix ? zeroFill(value) : value.toString());
             }
         }
-        return prefix + str;
+        return [...prefix, ...parts].join(':');
     }
     toString() {
         return this.format();
     }
 }
-function zeroFill(value, maxLength) {
-    if (maxLength === undefined) {
-        maxLength = 2;
-    }
+function zeroFill(value, maxLength = 2) {
     return value.toString().padStart(maxLength, '0');
 }
 function nullify(value, ...keys) {

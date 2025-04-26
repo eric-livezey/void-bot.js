@@ -24,7 +24,7 @@ declare class Duration {
      */
     getMilliseconds(): number;
     /**
-     * Set the total number of milliseconds.
+     * Sets the total number of milliseconds.
      *
      * @param milliseconds The total number of milliseconds.
      */
@@ -34,7 +34,7 @@ declare class Duration {
      */
     getSeconds(): number;
     /**
-     * Set the total number of seconds.
+     * Sets the total number of seconds.
      *
      * @param seconds The total number of seconds.
      */
@@ -44,7 +44,7 @@ declare class Duration {
      */
     getMinutes(): number;
     /**
-     * Set the total number of minutes.
+     * Sets the total number of minutes.
      *
      * @param minutes The total number of minutes.
      */
@@ -54,7 +54,7 @@ declare class Duration {
      */
     getHours(): number;
     /**
-     * Set the total number of hours.
+     * Sets the total number of hours.
      *
      * @param hours The total number of hours.
      */
@@ -64,17 +64,27 @@ declare class Duration {
      */
     getDays(): number;
     /**
-     * Set the total number of days.
+     * Sets the total number of days.
      *
      * @param days The total number of days.
      */
     setDays(days: number): void;
     /**
+     * Returns the total number of weeks.
+     */
+    getWeeks(): number;
+    /**
+     * Sets the total number of weeks.
+     *
+     * @param weeks The total number of weeks.
+     */
+    setWeeks(weeks: number): void;
+    /**
      * Returns the millisecond.
      */
     getMillisecond(): number;
     /**
-     * Set the millisecond.
+     * Sets the millisecond.
      *
      * @param millisecond The millisecond.
      */
@@ -84,7 +94,7 @@ declare class Duration {
      */
     getSecond(): number;
     /**
-     * Set the second.
+     * Sets the second.
      *
      * @param second The second.
      * @param millisecond The millisecond.
@@ -95,7 +105,7 @@ declare class Duration {
      */
     getMinute(): number;
     /**
-     * Set the minute.
+     * Sets the minute.
      *
      * @param minute The minute.
      * @param second The second.
@@ -107,7 +117,7 @@ declare class Duration {
      */
     getHour(): number;
     /**
-     * Set the hour.
+     * Sets the hour.
      *
      * @param hour The hour.
      * @param minute The minute.
@@ -120,7 +130,7 @@ declare class Duration {
      */
     getDay(): number;
     /**
-     * Set the day.
+     * Sets the day.
      *
      * @param day The day.
      * @param hour The hour.
@@ -130,6 +140,21 @@ declare class Duration {
      */
     setDay(day: number, hour?: number, minute?: number, second?: number, millisecond?: number): void;
     /**
+     * Returns the week.
+     */
+    getWeek(): number;
+    /**
+     * Sets the week.
+     *
+     * @param week The week.
+     * @param day The day.
+     * @param hour The hour.
+     * @param minute The minute.
+     * @param second The second.
+     * @param millisecond The millisecond.
+     */
+    setWeek(week: number, day?: number, hour?: number, minute?: number, second?: number, millisecond?: number): void;
+    /**
      * Returns the formatted duration.
      *
      * @param includeMillis Whether the millisecond should be included.
@@ -137,13 +162,13 @@ declare class Duration {
     format(includeMillis?: boolean): string;
     toString(): string;
 }
+type NullifyValue<T> = T extends undefined ? null : T;
 type Nullify<T, U extends Extract<keyof T, any> = keyof T> = T extends object ? T & {
     readonly [P in U]: T[P] extends undefined ? null : Nullify<T[P]>;
 } : NullifyValue<T>;
-type NullifyValue<T> = Exclude<T, undefined> | null;
 declare function nullify<T extends Exclude<any, object>>(value: T): Nullify<T>;
 declare function nullify<T extends object, U extends keyof T>(obj: T, ...keys: U[]): Nullify<T, U>;
-declare function nullifyValue<T extends Exclude<any, object>>(value: T): NullifyValue<T>;
+declare function nullifyValue<T>(value: T): NullifyValue<T>;
 declare function timelog(msg: string): void;
 declare function createVoiceConnection(channel: VoiceBasedChannel): import("@discordjs/voice").VoiceConnection;
 export { Duration, Nullify, NullifyValue, nullify, nullifyValue, timelog, createVoiceConnection };
