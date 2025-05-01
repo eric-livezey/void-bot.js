@@ -3,7 +3,7 @@ import { downloadOptions, videoInfo } from '@distube/ytdl-core';
 import { APIEmbedField, RestOrArray, Snowflake } from 'discord.js';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
-import { PlaylistItem } from './innertube';
+import { PlaylistItem } from './youtube/youtube.js';
 type PrepareOptions<T extends downloadOptions = downloadOptions> = T & {
     download?: boolean;
 };
@@ -134,7 +134,7 @@ declare class Queue implements Iterable<Track> {
     [Symbol.iterator](): ArrayIterator<Track<unknown>>;
     values(): ArrayIterator<Track<unknown>>;
     push(value: Track): number;
-    shift(): Track;
+    shift(): Track<unknown> | undefined;
     get(index: number): Track<unknown>;
     set(index: number, value: Track): void;
     remove(index: number): Track<unknown>;
@@ -229,11 +229,11 @@ declare class Player extends EventEmitter {
      * Skips the current track.
      */
     skip(): Promise<Track<unknown> | null>;
-    getEmbed(page: number): import("discord.js").APIEmbed | null;
     /**
      * Destroys the player.
      */
     destroy(): void;
+    getEmbed(page: number): import("discord.js").APIEmbed | null;
 }
 declare function downloadFromStream(stream: Readable, path: string, id: string): Promise<string>;
 export { Player, Queue, Track, TrackAuthor, TrackOptions, downloadFromStream };

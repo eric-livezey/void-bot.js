@@ -4,8 +4,8 @@ import { EmbedBuilder } from 'discord.js';
 import { EventEmitter } from 'events';
 import { createWriteStream, existsSync, rmSync } from 'fs';
 import { Readable } from 'stream';
-import { channelURL, videoURL } from './innertube/index.js';
 import { Duration, nullify } from './utils.js';
+import { channelURL, videoURL } from './youtube/youtube.js';
 /**
  * Represents a track to played by a player.
  */
@@ -491,9 +491,16 @@ class Player extends EventEmitter {
         await this.#next();
         return track;
     }
+    /**
+     * Destroys the player.
+     */
+    destroy() {
+        this.stop();
+        delete Player.#players[this.guildId];
+    }
     getEmbed(page) {
         const n = Math.max(Math.ceil(this.queue.length / 25) - 1, 0);
-        if (page < 0 || n > 0 && page > n || !Number.isSafeInteger(page))
+        if (page < 0 || page >= n || !Number.isSafeInteger(page))
             throw new RangeError(`page ${page} is invalid`);
         if (!this.isPlaying())
             return null;
@@ -530,14 +537,22 @@ class Player extends EventEmitter {
             this.nowPlaying.reset();
             await this.#play(this.nowPlaying).catch(() => this.skip());
         }
-        else if (this.queue.length > 0) {
-            await this.#play(this.queue.shift()).catch(() => this.skip());
-        }
         else {
-            this.stop();
+            const track = this.queue.shift();
+            if (track) {
+                await this.#play(track).catch(() => this.skip());
+            }
+            else {
+                this.stop();
+            }
         }
     }
+    // queue concurrent calls to #play()
+    #playQueue = Promise.resolve();
     async #play(track) {
+        return await this.#playQueue.then(this.#playImpl.bind(this, track));
+    }
+    async #playImpl(track) {
         if (!this.isReady()) {
             this.stop();
             throw new Error('the audio connection was invalidated');
@@ -558,13 +573,6 @@ class Player extends EventEmitter {
         if (this.isPaused()) {
             this.unpause();
         }
-    }
-    /**
-     * Destroys the player.
-     */
-    destroy() {
-        this.stop();
-        delete Player.#players[this.guildId];
     }
 }
 // keep track of in progress downloads

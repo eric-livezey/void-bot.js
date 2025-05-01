@@ -1,4 +1,26 @@
 import { VoiceBasedChannel } from 'discord.js';
+/**
+ * Represents a unit of time.
+ */
+declare enum TimeUnit {
+    MILLISECOND = 0,
+    SECOND = 1,
+    MINUTE = 2,
+    HOUR = 3,
+    DAY = 4,
+    WEEK = 5
+}
+interface ITimeUnitKeys {
+    readonly millisecond: TimeUnit.MILLISECOND;
+    readonly second: TimeUnit.SECOND;
+    readonly minute: TimeUnit.MINUTE;
+    readonly hour: TimeUnit.HOUR;
+    readonly day: TimeUnit.DAY;
+    readonly week: TimeUnit.WEEK;
+}
+/**
+ * Represents a duration.
+ */
 declare class Duration {
     #private;
     /**
@@ -19,6 +41,19 @@ declare class Duration {
      * @param includeMillis Whether the millisecond should be included.
      */
     static format(milliseconds: number, includeMillis?: boolean): string;
+    /**
+     * Returns the total duration in the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     */
+    getTotal(unit: TimeUnit): number;
+    /**
+     * Sets the total duration in the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     * @param value The total duration in the specified {@link TimeUnit}.
+     */
+    setTotal(unit: TimeUnit, value: number): number;
     /**
      * Returns the total number of milliseconds.
      */
@@ -79,6 +114,20 @@ declare class Duration {
      * @param weeks The total number of weeks.
      */
     setWeeks(weeks: number): void;
+    /**
+     * Returns the component of duration that corresponds to the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     */
+    getComponent(unit: TimeUnit): number;
+    /**
+     * Sets the components of duration that correspond to the specified {@link TimeUnit TimeUnits}.
+     *
+     * @param components Components to set.
+     */
+    setComponents(components: {
+        -readonly [K in keyof ITimeUnitKeys]?: number;
+    }): void;
     /**
      * Returns the millisecond.
      */
@@ -171,4 +220,4 @@ declare function nullify<T extends object, U extends keyof T>(obj: T, ...keys: U
 declare function nullifyValue<T>(value: T): NullifyValue<T>;
 declare function timelog(msg: string): void;
 declare function createVoiceConnection(channel: VoiceBasedChannel): import("@discordjs/voice").VoiceConnection;
-export { Duration, Nullify, NullifyValue, nullify, nullifyValue, timelog, createVoiceConnection };
+export { TimeUnit, Duration, Nullify, NullifyValue, nullify, nullifyValue, timelog, createVoiceConnection };

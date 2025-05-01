@@ -1,4 +1,35 @@
 import { joinVoiceChannel } from '@discordjs/voice';
+/**
+ * Represents a unit of time.
+ */
+var TimeUnit;
+(function (TimeUnit) {
+    TimeUnit[TimeUnit["MILLISECOND"] = 0] = "MILLISECOND";
+    TimeUnit[TimeUnit["SECOND"] = 1] = "SECOND";
+    TimeUnit[TimeUnit["MINUTE"] = 2] = "MINUTE";
+    TimeUnit[TimeUnit["HOUR"] = 3] = "HOUR";
+    TimeUnit[TimeUnit["DAY"] = 4] = "DAY";
+    TimeUnit[TimeUnit["WEEK"] = 5] = "WEEK";
+})(TimeUnit || (TimeUnit = {}));
+const TimeUnitKeys = {
+    millisecond: TimeUnit.MILLISECOND,
+    second: TimeUnit.SECOND,
+    minute: TimeUnit.MINUTE,
+    hour: TimeUnit.HOUR,
+    day: TimeUnit.DAY,
+    week: TimeUnit.WEEK
+};
+const TimeUnitDurations = {
+    [TimeUnit.MILLISECOND]: 1,
+    [TimeUnit.SECOND]: 1000,
+    [TimeUnit.MINUTE]: 60000,
+    [TimeUnit.HOUR]: 3.6e+6,
+    [TimeUnit.DAY]: 8.64e+7,
+    [TimeUnit.WEEK]: 6.048e+8
+};
+/**
+ * Represents a duration.
+ */
 class Duration {
     #milliseconds;
     /**
@@ -24,10 +55,27 @@ class Duration {
         return new Duration(milliseconds).format(includeMillis);
     }
     /**
+     * Returns the total duration in the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     */
+    getTotal(unit) {
+        return this.#milliseconds / TimeUnitDurations[unit];
+    }
+    /**
+     * Sets the total duration in the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     * @param value The total duration in the specified {@link TimeUnit}.
+     */
+    setTotal(unit, value) {
+        return this.#milliseconds = Math.round(value * TimeUnitDurations[unit]);
+    }
+    /**
      * Returns the total number of milliseconds.
      */
     getMilliseconds() {
-        return this.#milliseconds;
+        return this.getTotal(TimeUnit.MILLISECOND);
     }
     /**
      * Sets the total number of milliseconds.
@@ -35,13 +83,13 @@ class Duration {
      * @param milliseconds The total number of milliseconds.
      */
     setMilliseconds(milliseconds) {
-        this.#milliseconds = Math.floor(milliseconds);
+        this.setTotal(TimeUnit.MILLISECOND, milliseconds);
     }
     /**
      * Returns the total number of seconds.
      */
     getSeconds() {
-        return this.getMilliseconds() / 1000;
+        return this.getTotal(TimeUnit.SECOND);
     }
     /**
      * Sets the total number of seconds.
@@ -49,13 +97,13 @@ class Duration {
      * @param seconds The total number of seconds.
      */
     setSeconds(seconds) {
-        this.setMilliseconds(seconds * 1000);
+        this.setTotal(TimeUnit.SECOND, seconds);
     }
     /**
      * Returns the total number of minutes.
      */
     getMinutes() {
-        return this.getMilliseconds() / 60000;
+        return this.getTotal(TimeUnit.MINUTE);
     }
     /**
      * Sets the total number of minutes.
@@ -63,13 +111,13 @@ class Duration {
      * @param minutes The total number of minutes.
      */
     setMinutes(minutes) {
-        this.setMilliseconds(minutes * 60000);
+        this.setTotal(TimeUnit.MINUTE, minutes);
     }
     /**
      * Returns the total number of hours.
      */
     getHours() {
-        return this.getMilliseconds() / 3.6e+6;
+        return this.getTotal(TimeUnit.HOUR);
     }
     /**
      * Sets the total number of hours.
@@ -77,13 +125,13 @@ class Duration {
      * @param hours The total number of hours.
      */
     setHours(hours) {
-        this.setMilliseconds(hours * 3.6e+6);
+        this.setTotal(TimeUnit.HOUR, hours);
     }
     /**
      * Returns the total number of days.
      */
     getDays() {
-        return this.getMilliseconds() / 8.64e+7;
+        return this.getTotal(TimeUnit.DAY);
     }
     /**
      * Sets the total number of days.
@@ -91,13 +139,13 @@ class Duration {
      * @param days The total number of days.
      */
     setDays(days) {
-        this.setMilliseconds(days * 8.64e+7);
+        this.setTotal(TimeUnit.DAY, days);
     }
     /**
      * Returns the total number of weeks.
      */
     getWeeks() {
-        return this.getMilliseconds() / 6.048e+8;
+        return this.getTotal(TimeUnit.WEEK);
     }
     /**
      * Sets the total number of weeks.
@@ -105,13 +153,38 @@ class Duration {
      * @param weeks The total number of weeks.
      */
     setWeeks(weeks) {
-        this.setMilliseconds(weeks * 6.048e+8);
+        this.setTotal(TimeUnit.WEEK, weeks);
+    }
+    /**
+     * Returns the component of duration that corresponds to the specified {@link TimeUnit}.
+     *
+     * @param unit The time unit.
+     */
+    getComponent(unit) {
+        return Math.floor(unit + 1 in TimeUnit ? this.getMilliseconds() % TimeUnitDurations[unit + 1] / TimeUnitDurations[unit] : this.getTotal(unit));
+    }
+    /**
+     * Sets the components of duration that correspond to the specified {@link TimeUnit TimeUnits}.
+     *
+     * @param components Components to set.
+     */
+    setComponents(components) {
+        this.setMilliseconds(Object.entries(components).reduce((prev, [key, value]) => {
+            if (value !== undefined) {
+                const unit = TimeUnitKeys[key];
+                const duration = TimeUnitDurations[unit];
+                return prev - this.getComponent(unit) * duration + value * duration;
+            }
+            else {
+                return prev;
+            }
+        }, this.getMilliseconds()));
     }
     /**
      * Returns the millisecond.
      */
     getMillisecond() {
-        return this.getMilliseconds() % 1000;
+        return this.getComponent(TimeUnit.MILLISECOND);
     }
     /**
      * Sets the millisecond.
@@ -119,13 +192,13 @@ class Duration {
      * @param millisecond The millisecond.
      */
     setMillisecond(millisecond) {
-        this.setDay(this.getDay(), this.getHour(), this.getMinute(), this.getSecond(), millisecond);
+        this.setSecond(this.getSecond(), millisecond);
     }
     /**
      * Returns the second.
      */
     getSecond() {
-        return Math.floor(this.getMilliseconds() % 60000 / 1000);
+        return this.getComponent(TimeUnit.SECOND);
     }
     /**
      * Sets the second.
@@ -134,13 +207,13 @@ class Duration {
      * @param millisecond The millisecond.
      */
     setSecond(second, millisecond) {
-        this.setDay(this.getDay(), this.getHour(), this.getMinute(), second, millisecond);
+        this.setMinute(this.getMinute(), second, millisecond);
     }
     /**
      * Returns the minute.
      */
     getMinute() {
-        return Math.floor(this.getMilliseconds() % 3.6e+6 / 60000);
+        return this.getComponent(TimeUnit.MINUTE);
     }
     /**
      * Sets the minute.
@@ -150,13 +223,13 @@ class Duration {
      * @param millisecond The millisecond.
      */
     setMinute(minute, second, millisecond) {
-        this.setDay(this.getDay(), this.getHour(), minute, second, millisecond);
+        this.setHour(this.getHour(), minute, second, millisecond);
     }
     /**
      * Returns the hour.
      */
     getHour() {
-        return Math.floor(this.getMilliseconds() % 8.64e+7 / 3.6e+6);
+        return this.getComponent(TimeUnit.HOUR);
     }
     /**
      * Sets the hour.
@@ -173,7 +246,7 @@ class Duration {
      * Returns the day.
      */
     getDay() {
-        return Math.floor(this.getMilliseconds() % 6.048e+8 / 8.64e+7);
+        return this.getComponent(TimeUnit.DAY);
     }
     /**
      * Sets the day.
@@ -191,7 +264,7 @@ class Duration {
      * Returns the week.
      */
     getWeek() {
-        return Math.floor(this.getWeeks());
+        return this.getComponent(TimeUnit.WEEK);
     }
     /**
      * Sets the week.
@@ -204,22 +277,7 @@ class Duration {
      * @param millisecond The millisecond.
      */
     setWeek(week, day, hour, minute, second, millisecond) {
-        if (day === undefined) {
-            day = this.getDay();
-        }
-        if (hour === undefined) {
-            hour = this.getHour();
-        }
-        if (minute === undefined) {
-            minute = this.getMinute();
-        }
-        if (second === undefined) {
-            second = this.getSecond();
-        }
-        if (millisecond === undefined) {
-            millisecond = this.getMillisecond();
-        }
-        this.setMilliseconds(week * 6.048e+8 + day * 8.64e+7 + hour * 3.6e+6 + minute * 60000 + second * 1000 + millisecond);
+        this.setComponents({ week, day, hour, minute, second, millisecond });
     }
     /**
      * Returns the formatted duration.
@@ -287,4 +345,4 @@ function createVoiceConnection(channel) {
     });
     return connection;
 }
-export { Duration, nullify, nullifyValue, timelog, createVoiceConnection };
+export { TimeUnit, Duration, nullify, nullifyValue, timelog, createVoiceConnection };
