@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
 import { createWriteStream, existsSync, rmSync } from 'fs';
 import { Readable } from 'stream';
 import { Duration, nullify } from './utils.js';
-import { channelURL, videoURL } from './youtube/youtube.js';
+import { channelURL, videoURL } from './innertube/index.js';
 /**
  * Represents a track to played by a player.
  */

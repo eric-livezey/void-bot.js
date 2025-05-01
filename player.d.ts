@@ -3,7 +3,7 @@ import { downloadOptions, videoInfo } from '@distube/ytdl-core';
 import { APIEmbedField, RestOrArray, Snowflake } from 'discord.js';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
-import { PlaylistItem } from './youtube/youtube.js';
+import { PlaylistItem } from './innertube';
 type PrepareOptions<T extends downloadOptions = downloadOptions> = T & {
     download?: boolean;
 };
