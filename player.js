@@ -500,7 +500,7 @@ class Player extends EventEmitter {
     }
     getEmbed(page) {
         const n = Math.max(Math.ceil(this.queue.length / 25) - 1, 0);
-        if (page < 0 || page >= n || !Number.isSafeInteger(page))
+        if (page < 0 || n > 0 && page > n || !Number.isSafeInteger(page))
             throw new RangeError(`page ${page} is invalid`);
         if (!this.isPlaying())
             return null;
