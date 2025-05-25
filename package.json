@@ -11,6 +11,6 @@
         "discord.js": "^14.17.3",
         "ffmpeg-static": "^5.2.0",
         "opusscript": "^0.1.1",
-        "sodium-native": "^4.1.1"
+        "sodium-native": "^5.0.4"
     }
 }
