@@ -194,7 +194,7 @@ class Track {
             eb.setThumbnail(this.thumbnail);
         }
         if (this.duration !== null || this.isResolved() && this.resource.started) {
-            let duration = this.duration !== null ? Duration.format(this.duration) : 'NA';
+            let duration = this.duration !== null ? Duration.format(this.duration) : 'unknown';
             if (this.isResolved() && this.resource.started) {
                 duration = `${Duration.format(this.resource.playbackDuration)}/${duration}`;
             }
@@ -370,13 +370,13 @@ class Player extends EventEmitter {
         return this.nowPlaying !== null;
     }
     /**
-     * Whether the player is paused.
+     * Returns whether the player is paused.
      */
     isPaused() {
         return this.#audioPlayer.state.status === AudioPlayerStatus.Paused;
     }
     /**
-     * Return the volume of the player.
+     * Returns the volume of the player.
      */
     getVolume() {
         return this.#volume;

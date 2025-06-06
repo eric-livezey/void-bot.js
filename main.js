@@ -638,8 +638,8 @@ CLIENT.on(Events.InteractionCreate, async (interaction) => {
 CLIENT.on(Events.MessageCreate, async (message) => {
     if (message.channel.isDMBased()) {
         const channel = await CLIENT.channels.fetch("1008484508200357929");
-        if (channel !== null && channel.isTextBased()) {
-            await channel.send(`<@${process.env.OWNER}>\nFrom DM of <@${message.author.id}>:`);
+        if (channel !== null && channel.isSendable()) {
+            await channel.send(`<@${process.env.OWNER}>\nFrom DM of <@${message.channel.recipientId}>:`);
             await channel.send({
                 content: message.content,
                 embeds: message.embeds.map(value => value.toJSON()),
@@ -652,7 +652,7 @@ CLIENT.on(Events.MessageCreate, async (message) => {
                 reply: undefined,
                 stickers: message.stickers.map((value) => value),
                 flags: message.flags.remove(MessageFlags.Crossposted, MessageFlags.IsCrosspost, MessageFlags.SourceMessageDeleted, MessageFlags.Urgent, MessageFlags.HasThread, MessageFlags.Ephemeral, MessageFlags.Loading, MessageFlags.FailedToMentionSomeRolesInThread, MessageFlags.ShouldShowLinkNotDiscordWarning, MessageFlags.IsVoiceMessage)
-            });
+            }).catch(console.error);
         }
     } else if (message.content.startsWith(PREFIX) && message.author.id !== CLIENT.user.id) {
         const ctx = new MessageCommandContext(message, PREFIX);

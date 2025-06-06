@@ -131,13 +131,13 @@ declare class Queue implements Iterable<Track> {
     #private;
     get length(): number;
     constructor();
-    [Symbol.iterator](): ArrayIterator<Track<unknown>>;
-    values(): ArrayIterator<Track<unknown>>;
+    [Symbol.iterator](): ArrayIterator<Track>;
+    values(): ArrayIterator<Track>;
     push(value: Track): number;
-    shift(): Track<unknown> | undefined;
-    get(index: number): Track<unknown>;
+    shift(): Track | undefined;
+    get(index: number): Track;
     set(index: number, value: Track): void;
-    remove(index: number): Track<unknown>;
+    remove(index: number): Track;
     move(source: number, destination: number): void;
     clear(): void;
     shuffle(): void;
@@ -163,7 +163,7 @@ declare class Player extends EventEmitter {
     /**
      * The currently playing track.
      */
-    get nowPlaying(): Track<unknown> | null;
+    get nowPlaying(): Track | null;
     private constructor();
     /**
      * Returns the player associated with `guildId` or creates a new one if one does not yet exist.
@@ -184,11 +184,11 @@ declare class Player extends EventEmitter {
         nowPlaying: Track;
     };
     /**
-     * Whether the player is paused.
+     * Returns whether the player is paused.
      */
     isPaused(): boolean;
     /**
-     * Return the volume of the player.
+     * Returns the volume of the player.
      */
     getVolume(): number;
     /**
@@ -228,7 +228,7 @@ declare class Player extends EventEmitter {
     /**
      * Skips the current track.
      */
-    skip(): Promise<Track<unknown> | null>;
+    skip(): Promise<Track | null>;
     /**
      * Destroys the player.
      */
